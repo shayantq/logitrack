@@ -1,0 +1,12 @@
+{
+  "name": "logitrack-ui-e2e",
+  "private": true,
+  "description": "تست رابط کاربری: اپ React (صفحه اصلی، فرم درخواست و پنل‌ها) با Chromium (Playwright)",
+  "type": "module",
+  "scripts": {
+    "e2e": "node e2e.mjs http://localhost:8001"
+  },
+  "dependencies": {
+    "playwright": "1.49.1"
+  }
+}

@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+/* حالت تاریک با data-theme روی <html> (نه فقط تنظیم سیستم) — انتخاب کاربر اولویت دارد */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* ------------------------------------------------------------------
+   هویت بصری: پالت آبی
+   روشن: #F7FBFC · #D6E6F2 · #B9D7EA · #769FCD
+   تاریک (سرمه‌ای به‌جای سیاه خشن): #091540 · #1B2CC1 · #7692FF · #ABD2FA
+   رنگ‌های پالت مستقیم یا با تیره/روشن‌سازی جزئی استفاده شده‌اند تا متن و دکمه‌ها
+   کنتراست استاندارد WCAG AA (≥ ۴٫۵ برای متن) داشته باشند؛ مثلاً #769FCD روی سفید
+   برای متن کم‌رنگ است، پس رنگ اصلی دکمه و متن نسخه تیره‌ترش (#4672AD) است و
+   خود #769FCD رنگ مکمل (accent) شده. رنگ‌های معنایی (موفق/هشدار/خطا) جدا می‌مانند.
+------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+  --bg: #f7fbfc;             /* پالت */
+  --bg-2: #ecf3f9;           /* بین #F7FBFC و #D6E6F2 */
+  --surface: #ffffff;
+  --surface-2: #f1f7fb;
+  --border: #d6e6f2;         /* پالت */
+  --border-strong: #b9d7ea;  /* پالت */
+  --text: #102a43;           /* جوهر سرمه‌ای به‌جای سیاه خالص */
+  --text-2: #3e5871;
+  --muted: #5e7690;
+  --brand: #4672ad;          /* #769FCD تیره‌شده برای کنتراست AA با سفید */
+  --brand-strong: #355c93;
+  --brand-soft: #e4eef8;
+  --brand-ink: #ffffff;
+  --accent: #769fcd;         /* پالت */
+  --accent-soft: #d6e6f2;
+  --accent-ink: #0e2440;
+  --mark-dot: #abd2fa;
+  --success: #1e8e5a;
+  --success-soft: #e2f4ea;
+  --warning: #b7791f;
+  --warning-soft: #fbf1dc;
+  --danger: #d14343;
+  --danger-soft: #fce8e8;
+  --info: #2b8ca3;
+  --info-soft: #e0f2f6;
+  --violet: #7559d1;
+  --violet-soft: #eeeafb;
+  /* رنگ‌های تفکیک بخش‌ها و نمودارها (کنار آبی پالت، گرم و مکمل) */
+  --orange: #b9531a;
+  --orange-soft: #fcebdd;
+  --pink: #b0336b;
+  --pink-soft: #fbe6ef;
+  --shadow: 0 1px 2px rgb(16 42 67 / 0.05), 0 8px 24px -12px rgb(16 42 67 / 0.14);
+  --shadow-lg: 0 24px 60px -24px rgb(16 42 67 / 0.3);
+}
+
+[data-theme=dark] {
+  color-scheme: dark;
+  --bg: #091540;             /* پالت — سرمه‌ای عمیق به‌جای مشکی */
+  --bg-2: #0c1a4b;
+  --surface: #0f1f52;
+  --surface-2: #14275f;
+  --border: #1e3170;
+  --border-strong: #2b4290;
+  --text: #eaf2fd;
+  --text-2: #bcd2ee;
+  --muted: #8ea3cc;
+  --brand: #7692ff;          /* پالت */
+  --brand-strong: #9db1ff;
+  --brand-soft: #111f7a;     /* #1B2CC1 ترکیب‌شده با پس‌زمینه */
+  --brand-ink: #08123a;
+  --accent: #abd2fa;         /* پالت */
+  --accent-soft: #142d63;
+  --accent-ink: #08123a;
+  --mark-dot: #eaf2fd;
+  --success: #43d08e;
+  --success-soft: #0c2e35;
+  --warning: #f2b851;
+  --warning-soft: #2a2738;
+  --danger: #f2737a;
+  --danger-soft: #321a3d;
+  --info: #5fd3e6;
+  --info-soft: #0d2c4a;
+  --violet: #b49cff;
+  --violet-soft: #221d5c;
+  --orange: #ff9a5c;
+  --orange-soft: #3a2230;
+  --pink: #f27bb0;
+  --pink-soft: #3a1d45;
+  --shadow: 0 1px 2px rgb(2 6 23 / 0.35), 0 8px 24px -12px rgb(2 6 23 / 0.6);
+  --shadow-lg: 0 24px 60px -24px rgb(2 6 23 / 0.85);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-orange: var(--orange);
+  --color-orange-soft: var(--orange-soft);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
+  --shadow-card: var(--shadow);
+  --shadow-float: var(--shadow-lg);
+  --font-sans: "Vazirmatn", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Vazirmatn", ui-monospace, monospace;
+}
+
+@layer base {
+  html { font-family: var(--font-sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; background: var(--bg); }
+  ::selection { background: var(--brand); color: var(--brand-ink); }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+  input, select, textarea, button { font: inherit; }
+  /* اعداد و کدهای لاتین (پلاک، کد پیگیری، موبایل) چپ‌به‌راست بمانند */
+  .ltr { direction: ltr; unicode-bidi: isolate; }
+  .tnum { font-variant-numeric: tabular-nums; }
+}
+
+@layer components {
+  /* برچسب کوچک بالای تیتر بخش‌ها: «۰۱ — چرا» */
+  .eyebrow { @apply inline-flex items-center gap-2 text-xs font-semibold text-muted; }
+  .eyebrow::before { content: ""; @apply inline-block size-2 rounded-[2px]; background: var(--eyebrow, var(--brand)); }
+  .card { @apply rounded-2xl border border-border bg-surface shadow-card; }
+  .table-base { @apply w-full text-sm; }
+  .table-base thead th { @apply sticky top-0 z-10 bg-surface-2 px-4 py-3 text-start text-xs font-medium text-muted whitespace-nowrap; }
+  .table-base tbody td { @apply border-t border-border px-4 py-3 align-middle; }
+  .table-base tbody tr.clickable { @apply cursor-pointer transition-colors hover:bg-surface-2; }
+}
+
+/* کاربرانی که انیمیشن را در سیستم خاموش کرده‌اند */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* انیمیشن‌های عمومی */
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes bell { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 75% { transform: rotate(2deg); } }
+/* ردیفی که از اعلان به آن رسیده‌اید چند لحظه برجسته می‌شود */
+@keyframes focus-flash { 0%, 35% { background-color: color-mix(in oklab, var(--brand) 18%, transparent); } 100% { background-color: transparent; } }
+@keyframes focus-ring { 0%, 40% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand) 50%, transparent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+.focus-flash > td { animation: focus-flash 2.8s ease-out; }
+div.focus-flash { animation: focus-ring 2.8s ease-out; }
+@keyframes shimmer { 100% { transform: translateX(-100%); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.animate-rise { animation: rise .45s cubic-bezier(.2, .7, .2, 1) both; }
+.live-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* فلش لیست کشویی (سمت چپ در راست‌به‌چپ) */
+.select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e7690' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------------ صفحه اصلی */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+section[id] { scroll-margin-top: 4rem; }
+
+@keyframes accordion-down { from { height: 0; } to { height: var(--radix-accordion-content-height); } }
+@keyframes accordion-up { from { height: var(--radix-accordion-content-height); } to { height: 0; } }
+.accordion-content[data-state="open"] { animation: accordion-down 300ms cubic-bezier(.2,.8,.2,1); }
+.accordion-content[data-state="closed"] { animation: accordion-up 240ms cubic-bezier(.2,.8,.2,1); }
+
+@keyframes route-flow { to { stroke-dashoffset: -220; } }
+.cta-route { animation: route-flow 6s linear infinite; }
+
+/* ------------------------------------------------------------------ تغییر تم با View Transition (دایره از محل کلیک) */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* ------------------------------------------------------------------ ورود نرم صفحه‌ها و بخش‌ها */
+@keyframes page-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes page-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+/* کل صفحه (عمومی/ورود): فقط محو شدن — بدون transform تا سربرگ ثابت و بخش‌های چسبان صفحه اصلی جابه‌جا نشوند */
+.page-fade { animation: page-fade .45s ease-out both; }
+/* فرزندان مستقیم: پشت‌سرهم و نرم بالا می‌آیند */
+.stagger > * { animation: page-rise .55s cubic-bezier(.2,.8,.2,1) both; }
+.stagger > *:nth-child(2) { animation-delay: .06s; }
+.stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .18s; }
+.stagger > *:nth-child(5) { animation-delay: .24s; }
+.stagger > *:nth-child(n+6) { animation-delay: .3s; }
+/* محتوایی که بعد از بارگذاری داده جای اسکلتون را می‌گیرد */
+.animate-fade { animation: page-fade .35s ease-out both; }
+
+/* ------------------------------------------------------------------ کنترل‌های فرم: به‌جای ظاهر پیش‌فرض مرورگر */
+@keyframes pop { from { opacity: 0; scale: .96; } to { opacity: 1; scale: 1; } }
+.animate-pop { animation: pop .14s cubic-bezier(.2,.8,.2,1) both; }
+
+/* فلش‌های بالا/پایین فیلد عدد */
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* پس‌زمینه زرد/سفید «تکمیل خودکار» کروم — هم‌رنگ تم */
+input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, textarea:-webkit-autofill {
+  -webkit-text-fill-color: var(--text); caret-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--surface) inset; transition: background-color 99999s;
+}
+
+/* چک‌باکس */
+input[type=checkbox]:not(.sr-only) {
+  appearance: none; -webkit-appearance: none; flex: none; display: inline-grid; place-content: center;
+  width: 1.125rem; height: 1.125rem; border: 2px solid var(--border-strong); border-radius: .4rem;
+  background: var(--surface); cursor: pointer; transition: background-color .15s, border-color .15s, box-shadow .15s;
+}
+input[type=checkbox]:not(.sr-only)::before {
+  content: ""; width: .62rem; height: .62rem; scale: 0; transition: scale .15s cubic-bezier(.2,.8,.2,1);
+  background: var(--brand-ink); clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+input[type=checkbox]:not(.sr-only):checked { background: var(--brand); border-color: var(--brand); }
+input[type=checkbox]:not(.sr-only):checked::before { scale: 1; }
+input[type=checkbox]:not(.sr-only):hover { border-color: var(--brand); }
+input[type=checkbox]:not(.sr-only):focus-visible { outline: none; box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 20%, transparent); }
+
+/* نوار اسکرول باریک و هم‌رنگ */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* انتخاب متن */
+::selection { background: color-mix(in oklab, var(--brand) 28%, transparent); }
+
+/* فیلدی که در ارسال فرم نامعتبر بود */
+[data-invalid] input:not(.sr-only), [data-invalid] textarea, [data-invalid] button[role=combobox], [data-invalid] button[aria-haspopup],
+input[data-invalid], textarea[data-invalid] {
+  border-color: var(--danger) !important; box-shadow: 0 0 0 4px color-mix(in oklab, var(--danger) 15%, transparent) !important;
+}

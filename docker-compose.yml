@@ -1,0 +1,106 @@
+# تنظیمات قابل تغییر از فایل .env کنار همین فایل خوانده می‌شوند (نمونه: .env.example)
+
+x-app-env: &app-env
+  MEDIA_ROOT: /code/media
+  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/logitrack
+  REDIS_URL: redis://redis:6379/0
+  # کلید امضای JWT — اگر خالی باشد هر بار کلید موقت ساخته می‌شود و با ری‌استارت همه باید دوباره وارد شوند
+  SECRET_KEY: ${SECRET_KEY:-}
+
+x-app-depends: &app-depends
+  db:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+services:
+  # دیتابیس PostgreSQL
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password}
+      POSTGRES_DB: logitrack
+    ports:
+      # فقط روی خود این کامپیوتر (برای DBeaver/pgAdmin). 5433 چون 5432 دست PostgreSQL نصب‌شده روی ویندوز است
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # این اسکریپت فقط روی یک volume کاملاً خالی اجرا می‌شود و دیتابیس
+      # جدای logitrack_test را برای تست‌های یکپارچگی می‌سازد
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d logitrack"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  # Redis — هم صف کار (broker) Celery و هم مخزن نتیجه (result backend)
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  # اپلیکیشن FastAPI — قبل از اجرا، مایگریشن‌های Alembic را خودکار اعمال می‌کند
+  web:
+    build: .
+    image: logitrack-app:local
+    restart: unless-stopped
+    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      # پورت 8000 میزبان دست پروژه دیگری (ATS) است؛ پیش‌فرض 8001 — با WEB_PORT قابل تغییر
+      - "${WEB_PORT:-8001}:8000"
+    environment:
+      <<: *app-env
+      # دیتابیس کاملاً جدا برای تست‌های یکپارچگی — هرگز با DATABASE_URL اصلی قاطی نمی‌شود
+      TEST_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/logitrack_test
+      # فقط اگر کلاینتی روی دامنه جدا دارید (با کاما جدا کنید)
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+    volumes:
+      # فایل‌های آپلودی (لوگو سازمان‌ها و ...) — با rebuild و حذف کانتینر از بین نمی‌روند
+      - media_data:/code/media
+    depends_on: *app-depends
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  # Celery Worker — پردازش ناهمگام گزارش‌های سنگین، جدا از پردازش وب
+  celery_worker:
+    build: .
+    image: logitrack-app:local
+    restart: unless-stopped
+    # concurrency=2: پیش‌فرض Celery به تعداد هسته‌های CPU پروسس می‌سازد و هرکدام pandas را جدا لود می‌کنند (رم زیاد)
+    command: celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=2
+    environment: *app-env
+    volumes:
+      # worker برای سربرگ گزارش‌ها به لوگوی سازمان‌ها نیاز دارد
+      - media_data:/code/media
+    depends_on:
+      <<: *app-depends
+      # تا مایگریشن‌ها توسط web اعمال نشده باشند، worker شروع نمی‌کند
+      web:
+        condition: service_healthy
+
+  # Celery Beat — زمان‌بند تسک‌های دوره‌ای (بررسی خودکار موجودی رو‌به‌اتمام هر ساعت)
+  celery_beat:
+    build: .
+    image: logitrack-app:local
+    restart: unless-stopped
+    command: celery -A app.celery_app.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    environment: *app-env
+    depends_on:
+      <<: *app-depends
+      web:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  media_data:

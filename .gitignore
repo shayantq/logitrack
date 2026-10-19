@@ -1,0 +1,29 @@
+# محیط‌ها و تنظیمات محلی
+.venv/
+.env
+.vscode/
+.idea/
+
+# پایتون
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node و خروجی build (در CI و Dockerfile از نو ساخته می‌شوند)
+node_modules/
+frontend/dist/
+
+# داده‌ها و فایل‌های آپلودی (مدارک رانندگان، لوگوها و ...)
+media/
+backups/
+*.db
+*.sql.gz
+
+# خروجی تست‌ها و اسکرین‌شات‌های عیب‌یابی E2E
+/e2e-*.png
+tests/ui/*.png
+*.log
+
+# آرشیوها
+*.zip
+*.rar
