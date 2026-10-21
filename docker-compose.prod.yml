@@ -1,0 +1,37 @@
+# تنظیمات سرور اصلی (روی docker-compose.yml سوار می‌شود)
+# روی سرور در فایل .env:  COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+# تا همان «docker compose up -d --build» هر دو فایل را بخواند.
+#
+#   • Caddy جلوی برنامه: HTTPS خودکار (گواهی رایگان و تمدید خودکار) برای DOMAIN و www.DOMAIN
+#   • پورت مستقیم برنامه فقط روی خود سرور (WEB_PORT=127.0.0.1:8001 در .env) — داکر فایروال را دور می‌زند
+#   • آی‌پی واقعی کاربر از Caddy (برای محدودیت تلاش ورود، قفل ردیابی و گزارش فعالیت)
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN را در .env تنظیم کنید}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+  web:
+    environment:
+      # فقط Caddy (داخل شبکه داکر) به برنامه وصل می‌شود؛ هدر X-Forwarded-For آن پذیرفته می‌شود
+      FORWARDED_ALLOW_IPS: "*"
+
+  celery_worker:
+    # سرور ۲ گیگابایتی: یک پردازش گزارش (هر پردازش pandas را جدا بار می‌کند)
+    command: celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-1}
+
+volumes:
+  caddy_data:
+  caddy_config:

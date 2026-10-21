@@ -85,6 +85,18 @@ docker compose exec web python create_admin.py <username> <password>
 
 ⚠️ این رمزها فقط برای محیط آزمایشی هستند.
 
+## استقرار روی سرور اصلی (HTTPS)
+
+`docker-compose.prod.yml` روی همان `docker-compose.yml` سوار می‌شود: Caddy با گواهی HTTPS خودکار جلوی برنامه، پورت مستقیم برنامه فقط روی خود سرور، آی‌پی واقعی کاربران و یک پردازش گزارش برای سرور کم‌رم. در `.env` سرور (کنار `SECRET_KEY` و `POSTGRES_PASSWORD` واقعی):
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+DOMAIN=example.ir            # رکورد A دامنه و www باید به آی‌پی سرور اشاره کند
+WEB_PORT=127.0.0.1:8001
+```
+
+سپس `docker compose up -d --build` و ساخت ادمین پلتفرم با `docker compose exec web python create_admin.py`. پورت‌های 80 و 443 باید در فایروال باز باشند. داده نمونه (`seed_demo_data.py`) را روی سرور اصلی اجرا نکنید.
+
 ## تست‌ها
 
 ```bash
