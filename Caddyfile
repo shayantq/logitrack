@@ -6,6 +6,16 @@ www.{$DOMAIN} {
 
 {$DOMAIN} {
 	encode zstd gzip
+	# هدرهای امنیتی: فقط HTTPS، جلوگیری از جاسازی سایت در صفحه‌های دیگر و حدس نوع فایل؛
+	# دوربین و میکروفون فقط برای خود سایت (ضبط ویدیوی احراز هویت راننده)
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=(self), payment=()"
+		-Server
+	}
 	# ویدیوی احراز هویت راننده تا ۳۰ مگابایت
 	request_body {
 		max_size 40MB

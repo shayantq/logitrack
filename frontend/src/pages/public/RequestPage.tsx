@@ -11,6 +11,7 @@ import { faDate, latinDigits, normalizeDigits } from "@/lib/format";
 import { Badge, Button, Field, Input, Select, Textarea, buttonClass, cn } from "@/ui/primitives";
 import { CitySelect } from "@/components/CitySelect";
 import { PublicFooter, PublicHeader } from "./chrome";
+import { planById } from "./content/pricing";
 
 type Body = Schemas["OrganizationRequestCreate"];
 type FormState = Record<
@@ -33,7 +34,8 @@ const STEPS = [
 const DRAFT_KEY = "request-draft";
 
 export default function RequestPage() {
-  const { hash } = useLocation();
+  const { hash, search } = useLocation();
+  const plan = planById(new URLSearchParams(search).get("plan"));
   const { data: provinces = [] } = useProvinces();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(() => {
@@ -60,6 +62,7 @@ export default function RequestPage() {
       const body: Record<string, unknown> = { ...form };
       for (const k of DIGITS) body[k] = normalizeDigits(form[k].trim());
       if (!form.referral_source) body.referral_detail = null;
+      if (plan) body.notes = [`پلن انتخابی: ${plan.name}`, form.notes.trim()].filter(Boolean).join("\n");
       for (const [k, v] of Object.entries(body)) if (typeof v === "string" && v.trim() === "") body[k] = null;
       body.warehouse_count = form.warehouse_count === "" ? null : Number(normalizeDigits(form.warehouse_count));
       body.fleet_size = form.fleet_size === "" ? null : Number(normalizeDigits(form.fleet_size));
@@ -110,6 +113,12 @@ export default function RequestPage() {
           <div>
             {done ? <Success result={done} onAgain={() => { setDone(null); setForm(EMPTY); setStep(0); }} /> : (
               <form id="request-form" onSubmit={next} className="card p-6 sm:p-8" data-testid="request-step" data-step={step}>
+                {plan && (
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-soft px-4 py-2.5 text-sm text-brand-strong" data-testid="request-plan">
+                    <span>پلن انتخابی: <b>{plan.name}</b></span>
+                    <Link to="/pricing" className="text-xs font-medium hover:underline">تغییر پلن</Link>
+                  </div>
+                )}
                 <div className="mb-6 h-1 overflow-hidden rounded-full bg-surface-2">
                   <div className="h-full rounded-full bg-linear-to-l from-brand to-accent transition-all duration-500" style={{ width: `${((step + 1) / 3) * 100}%` }} />
                 </div>
@@ -192,7 +201,7 @@ export default function RequestPage() {
                         </div>
                       </div>
                       <p className="text-xs leading-6 text-muted sm:col-span-2" data-testid="req-terms">
-                        با ثبت درخواست، <Link to="/terms" target="_blank" className="font-medium text-brand hover:underline">قوانین و مقررات</Link> استفاده از {BRAND.nameFa} را می‌پذیرید.
+                        با ثبت درخواست، <Link to="/terms" target="_blank" className="font-medium text-brand hover:underline">قوانین و مقررات</Link> و <Link to="/privacy" target="_blank" className="font-medium text-brand hover:underline">سیاست حریم خصوصی</Link> {BRAND.nameFa} را می‌پذیرید.
                       </p>
                     </div>
                   )}

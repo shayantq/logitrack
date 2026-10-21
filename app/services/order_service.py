@@ -19,11 +19,13 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import (
-    ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderItem, OrderStatusHistory, Product, User, Vehicle,
+    ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderItem, OrderStatusHistory, Organization, Product, User, Vehicle,
 )
 from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
-from app.services import catalog_service, commission_service, dispatch_service, notification_service, stock_ledger
+from app.services import (
+    catalog_service, commission_service, dispatch_service, messaging, notification_service, stock_ledger,
+)
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
 # انتقال‌های مجاز وضعیت (با endpoint تغییر وضعیت). pending → assigned فقط از مسیر تخصیص خودرو.
@@ -230,10 +232,16 @@ def create_order(db: Session, user: User, order_request: OrderRequest) -> Order:
                      "ثبت سفارش" + (f" و تخصیص خودرو {vehicle.license_plate or vehicle.id}" if vehicle else ""))
         notification_service.order_assigned(db, order)
         db.commit()
+        messaging.order_created(order, _organization_name(db, order))
         return get_order(db, user, order.id)
     except Exception:
         db.rollback()
         raise
+
+
+def _organization_name(db: Session, order: Order) -> str:
+    org = db.get(Organization, order.organization_id)
+    return org.name if org else "پسینه"
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +484,8 @@ def update_order_status(db: Session, user: User, order_id: int, status_request: 
     try:
         _apply_status(db, target_order, new_status, user, status_request.note)
         db.commit()
+        if new_status == 'delivered':
+            messaging.order_delivered(target_order, _organization_name(db, target_order))
         return get_order(db, user, target_order.id)
     except Exception:
         db.rollback()

@@ -331,3 +331,18 @@ def generate_report_task(organization_id, user_id, report, fmt, params=None):
         return build_report_file(db, organization_id, db.get(User, user_id), report, fmt, params or {})
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# پیامک و ایمیل خودکار (app/services/messaging.py) — با چند تلاش دوباره اگر سرویس بیرونی موقتاً جواب نداد
+# ---------------------------------------------------------------------------
+@celery_app.task(name="tasks.send_sms", autoretry_for=(Exception,), retry_backoff=30, max_retries=3)
+def send_sms_task(mobile: str, text: str):
+    from app.services import messaging
+    return messaging.deliver_sms(mobile, text)
+
+
+@celery_app.task(name="tasks.send_email", autoretry_for=(Exception,), retry_backoff=30, max_retries=3)
+def send_email_task(to: str, subject: str, text: str):
+    from app.services import messaging
+    return messaging.deliver_email(to, subject, text)

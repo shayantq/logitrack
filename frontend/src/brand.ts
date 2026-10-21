@@ -10,5 +10,6 @@ export const BRAND = {
   supportEmail: "support@passineh.ir",
   infoEmail: "info@passineh.ir",
   phone: "09929534190",
-  phoneDisplay: "۰۹۹۲ ۹۵۳ ۴۱۹۰",
+  // فاصله بدون شکست خط و جهت چپ‌به‌راست (LRI…PDI) تا شماره در متن فارسی جابه‌جا یا دوخطی نشود
+  phoneDisplay: "⁦۰۹۹۲ ۹۵۳ ۴۱۹۰⁩",
 };

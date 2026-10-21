@@ -829,6 +829,20 @@ class ProductPrice(TenantScoped, Base):
     product = relationship("Product", back_populates="prices")
 
 
+class PasswordReset(Base):
+    """کد یک‌بارمصرف بازیابی رمز (پیامک یا ایمیل). خود کد ذخیره نمی‌شود، فقط HMAC آن."""
+    __tablename__ = "password_resets"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    code_hash = Column(String(64), nullable=False)
+    channel = Column(String(8), nullable=False)                 # sms | email
+    created_at = Column(DateTime, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    used_at = Column(DateTime, nullable=True)
+
+
 class AuditLog(TenantScoped, Base):
     """
     گزارش فعالیت (مرحله ۱۵): ورودها، مدیریت کاربران، تنظیمات سازمان، کاتالوگ و گزارش‌گیری.

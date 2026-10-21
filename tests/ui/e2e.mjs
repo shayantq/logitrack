@@ -1318,8 +1318,44 @@ await session("info-pages", null, null, async page => {
 }, { viewport: { width: 1280, height: 800 } });
 
 // هیچ صفحه عمومی روی موبایل اسکرول افقی نداشته باشد
+// ---------------- حریم خصوصی، تعرفه‌ها، بازیابی رمز و پیش‌نمایش لینک ----------------
+await session("brand-pages", null, null, async page => {
+  await page.goto(`${BASE}/about`);
+  await page.click("[data-testid=footer-site-pages] >> text=حریم خصوصی");
+  await page.waitForSelector("[data-testid=privacy-page]");
+  check("brand", "privacy policy opens from footer", (await page.locator("[data-testid=privacy-clause]").count()) >= 8);
+  check("brand", "privacy has table of contents", (await page.locator("[data-testid=privacy-toc] a").count()) >= 8);
+  check("brand", "footer shows support phone", ((await page.textContent("[data-testid=footer-phone]")) ?? "").includes("۰۹۹۲"));
+
+  await page.goto(`${BASE}/pricing`);
+  await page.waitForSelector("[data-testid=pricing-page]");
+  check("brand", "four pricing plans", (await page.locator("[data-testid=plan-card]").count()) === 4);
+  const monthly = await page.textContent("[data-plan=pro] [data-testid=plan-price]");
+  await page.click("text=سالانه");
+  await page.waitForFunction(m => document.querySelector("[data-plan=pro] [data-testid=plan-price]")?.textContent !== m, monthly);
+  check("brand", "annual billing changes the price", ((await page.textContent("[data-plan=pro] [data-testid=plan-price]")) ?? "").includes("در سال"));
+  check("brand", "feature comparison table", (await page.locator("[data-testid=pricing-compare] tbody tr").count()) >= 8);
+  await page.click("[data-plan=pro] [data-testid=plan-cta]");
+  await page.waitForSelector("[data-testid=request-plan] >> text=حرفه‌ای");
+  check("brand", "chosen plan carried into the request form", page.url().includes("plan=pro"));
+
+  // بدون پیامک/ایمیل تنظیم‌شده: لینک «فراموشی رمز» نیست و صفحه آن راه دیگر را توضیح می‌دهد
+  await page.goto(`${BASE}/app/login`);
+  await page.waitForSelector("#username");
+  await page.waitForTimeout(800);
+  check("brand", "no forgot-password link without SMS/email", (await page.locator("[data-testid=forgot-password-link]").count()) === 0);
+  await page.goto(`${BASE}/app/forgot-password`);
+  await page.waitForSelector("[data-testid=reset-unavailable]");
+  check("brand", "forgot-password explains admin reset when disabled", true);
+
+  const og = await fetch(`${BASE}/og.png`);
+  check("brand", "link preview image served", og.ok && og.headers.get("content-type") === "image/png", String(og.status));
+  const html = await (await fetch(`${BASE}/pricing`)).text();
+  check("brand", "pricing route served directly and has og:image", html.includes('property="og:image"'));
+});
+
 await session("mobile-overflow", null, null, async page => {
-  for (const path of ["/", "/request", "/track", "/about", "/faq", "/terms"]) {
+  for (const path of ["/", "/request", "/track", "/about", "/faq", "/terms", "/privacy", "/pricing", "/app/forgot-password"]) {
     await page.goto(`${BASE}${path}`);
     await page.waitForTimeout(600);
     const { sw, w } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, w: innerWidth }));

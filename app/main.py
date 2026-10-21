@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -76,6 +76,8 @@ if (FRONTEND_DIST / "assets").exists():
 @app.get("/about", include_in_schema=False)
 @app.get("/faq", include_in_schema=False)
 @app.get("/terms", include_in_schema=False)
+@app.get("/privacy", include_in_schema=False)
+@app.get("/pricing", include_in_schema=False)
 @app.get("/support/{token}", include_in_schema=False)
 @app.get("/app", include_in_schema=False)
 @app.get("/app/{path:path}", include_in_schema=False)
@@ -85,11 +87,17 @@ def serve_react_app(path: str = "", code: str = ""):
     return JSONResponse(status_code=404, content={"error": "اپ React ساخته نشده است (cd frontend && npm run build)."})
 
 
+PUBLIC_FILES = {"favicon.svg": "image/svg+xml", "og.png": "image/png"}
+
+
 @app.get("/favicon.svg", include_in_schema=False)
-def serve_favicon():
-    icon = FRONTEND_DIST / "favicon.svg"
-    if icon.exists():
-        return FileResponse(str(icon), media_type="image/svg+xml")
+@app.get("/og.png", include_in_schema=False)
+def serve_public_file(request: Request):
+    """فایل‌های ثابت ریشه سایت: آیکن و تصویر پیش‌نمایش لینک (واتس‌اپ، تلگرام و ...)."""
+    name = request.url.path.lstrip("/")
+    path = FRONTEND_DIST / name
+    if path.exists():
+        return FileResponse(str(path), media_type=PUBLIC_FILES[name], headers={"Cache-Control": "public, max-age=86400"})
     return JSONResponse(status_code=404, content={"error": "یافت نشد."})
 
 

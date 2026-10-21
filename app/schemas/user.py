@@ -143,3 +143,22 @@ class MeResponse(UserResponse):
 
 class TourStateIn(BaseModel):
     state: Literal["done", "skipped"]
+
+
+class PasswordResetChannels(BaseModel):
+    sms: bool
+    email: bool
+
+
+class PasswordResetRequestIn(BaseModel):
+    identifier: constr(min_length=3, max_length=254, strip_whitespace=True) = Field(examples=['09121234567'])
+
+
+class PasswordResetConfirmIn(BaseModel):
+    identifier: constr(min_length=3, max_length=254, strip_whitespace=True)
+    code: constr(min_length=4, max_length=12, strip_whitespace=True) = Field(examples=['123456'])
+    new_password: Password
+
+
+class MessageResponse(BaseModel):
+    message: str

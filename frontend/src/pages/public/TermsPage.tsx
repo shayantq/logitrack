@@ -1,21 +1,9 @@
 /** صفحه «قوانین و مقررات» با فهرست مطالب ثابت و نشانگر بخش فعلی */
-import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { FileText, Printer } from "lucide-react";
 import { BRAND } from "@/brand";
-import { cn } from "@/ui/primitives";
-import { InfoLayout } from "./InfoLayout";
+import { LegalDoc, L, P, type Clause } from "./LegalDoc";
 
 const UPDATED = "۱۹ مهر ۱۴۰۵";
-
-type Clause = { id: string; title: string; body: ReactNode };
-
-const P = ({ children }: { children: ReactNode }) => <p className="leading-8 text-text-2">{children}</p>;
-const L = ({ items }: { items: ReactNode[] }) => (
-  <ul className="space-y-2.5">
-    {items.map((it, i) => <li key={i} className="flex gap-3 leading-8 text-text-2"><span className="mt-3 size-1.5 shrink-0 rounded-full bg-brand" />{it}</li>)}
-  </ul>
-);
 
 const CLAUSES: Clause[] = [
   {
@@ -69,6 +57,7 @@ const CLAUSES: Clause[] = [
         "اطلاعات تماسی که در فرم درخواست وارد می‌کنید، برای بررسی درخواست و ارتباط با شما استفاده می‌شود. پاسخ به پرسش «چطور با ما آشنا شدید؟» اختیاری است و فقط برای بهبود معرفی خدمت به کار می‌رود.",
         "ارائه‌دهنده برای حفظ امنیت، اقدامات فنی متعارف (از جمله جداسازی داده، محدودیت تعداد تلاش‌ها و ثبت تاریخچه تغییرات) را به کار می‌گیرد؛ با این حال هیچ سامانه آنلاینی از همه خطرها مصون نیست.",
         "در صورت درخواست مراجع قضایی صالح، ارائه‌دهنده طبق قانون موظف به همکاری است.",
+        <>جزئیات اینکه چه داده‌هایی، چرا و تا چه زمانی نگه‌داری می‌شوند، در <Link to="/privacy" className="font-medium text-brand hover:underline">سیاست حریم خصوصی</Link> آمده است.</>,
       ]} />
     </>,
   },
@@ -129,54 +118,9 @@ const CLAUSES: Clause[] = [
 ];
 
 export default function TermsPage() {
-  const [active, setActive] = useState(CLAUSES[0].id);
-
-  // بخشی که در دید است در فهرست مطالب پررنگ شود
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => {
-      const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (visible) setActive(visible.target.id);
-    }, { rootMargin: "-20% 0px -65% 0px" });
-    CLAUSES.forEach(c => { const el = document.getElementById(c.id); if (el) observer.observe(el); });
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <InfoLayout title="قوانین و مقررات" testId="terms-page" eyebrow="قوانین و مقررات"
+    <LegalDoc clauses={CLAUSES} title="قوانین و مقررات" prefix="terms" updated={UPDATED}
       heading="شرایط استفاده از سامانه"
-      lead={`این صفحه حقوق و تعهدات ${BRAND.nameFa} و سازمان‌ها، کاربران و مشتریانی را که از سامانه استفاده می‌کنند، شرح می‌دهد.`}
-      hero={
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3.5 py-1.5"><FileText className="size-4 text-brand" />آخرین به‌روزرسانی: {UPDATED}</span>
-          <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 transition hover:bg-surface hover:text-text"><Printer className="size-4" />چاپ</button>
-        </div>
-      }>
-      <section className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-12 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)]">
-        <nav className="hidden lg:sticky lg:top-24 lg:block lg:h-fit" aria-label="فهرست مطالب" data-testid="terms-toc">
-          <div className="eyebrow mb-4">فهرست مطالب</div>
-          <ol className="space-y-0.5 border-s border-border">
-            {CLAUSES.map((c, i) => (
-              <li key={c.id}>
-                <a href={`#${c.id}`} onClick={e => { e.preventDefault(); document.getElementById(c.id)?.scrollIntoView({ behavior: "smooth" }); history.replaceState(null, "", `#${c.id}`); }}
-                  className={cn("-ms-px flex gap-3 border-s-2 py-1.5 ps-4 text-sm transition",
-                    active === c.id ? "border-brand font-semibold text-brand" : "border-transparent text-text-2 hover:text-text")}>
-                  <span className="font-mono text-xs opacity-60 tnum">{String(i + 1).padStart(2, "0")}</span>{c.title}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-        <article className="max-w-3xl space-y-14">
-          {CLAUSES.map((c, i) => (
-            <section key={c.id} id={c.id} className="scroll-mt-28" data-testid="terms-clause">
-              <h2 className="mb-5 flex items-baseline gap-3 text-xl font-black tracking-tight sm:text-2xl">
-                <span className="font-mono text-sm text-brand tnum">{String(i + 1).padStart(2, "0")}</span>{c.title}
-              </h2>
-              <div className="space-y-4">{c.body}</div>
-            </section>
-          ))}
-        </article>
-      </section>
-    </InfoLayout>
+      lead={`این صفحه حقوق و تعهدات ${BRAND.nameFa} و سازمان‌ها، کاربران و مشتریانی را که از سامانه استفاده می‌کنند، شرح می‌دهد.`} />
   );
 }

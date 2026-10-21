@@ -10,8 +10,10 @@ import { ScrollTrigger, gsap, useReducedMotion } from "./motion";
 /** صفحه‌های اطلاع‌رسانی (جدا از بخش‌های صفحه اصلی) */
 export const SITE_PAGES = [
   { to: "/about", label: "درباره ما" },
+  { to: "/pricing", label: "تعرفه‌ها" },
   { to: "/faq", label: "سوالات متداول" },
   { to: "/terms", label: "قوانین و مقررات" },
+  { to: "/privacy", label: "حریم خصوصی" },
 ];
 
 export const LANDING_NAV = [
@@ -74,6 +76,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
           {landing && LANDING_NAV.map(n => (
             <a key={n.href} href={n.href} className="rounded-lg px-3 py-2 text-sm text-text-2 transition hover:bg-surface-2 hover:text-text">{n.label}</a>
           ))}
+          {landing && <Link to="/pricing" className="rounded-lg px-3 py-2 text-sm text-text-2 transition hover:bg-surface-2 hover:text-text" data-testid="nav-pricing-landing">تعرفه‌ها</Link>}
           {!landing && SITE_PAGES.slice(0, 2).map(p => (
             <NavLink key={p.to} to={p.to} data-testid={`nav-${p.to.slice(1)}`}
               className={({ isActive }) => cn("rounded-lg px-3 py-2 text-sm transition hover:bg-surface-2 hover:text-text", isActive ? "font-semibold text-brand" : "text-text-2")}>{p.label}</NavLink>

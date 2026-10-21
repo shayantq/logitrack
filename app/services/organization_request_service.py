@@ -20,7 +20,7 @@ from app.models import Organization, OrganizationRequest, PROFILE_FIELDS, RoleEn
 from app.schemas.organization import (
     OrganizationRequestApprove, OrganizationRequestCreate, OrganizationRequestReject,
 )
-from app.services import organization_service
+from app.services import messaging, organization_service
 from app.services.exceptions import ConflictError, NotFoundError
 
 _CODE_ALPHABET = string.ascii_uppercase + string.digits
@@ -59,6 +59,7 @@ def submit_request(db: Session, data: OrganizationRequestCreate, requester_ip: s
     db.add(request)
     db.commit()
     db.refresh(request)
+    messaging.organization_request_received(request)
     return request
 
 
@@ -131,6 +132,7 @@ def approve_request(db: Session, reviewer: User, request_id: int, data: Organiza
             username=username,
             email=email,
             full_name=request.contact_name,
+            mobile=request.contact_mobile,
             role=RoleEnum.ORG_ADMIN,
             hashed_password=bcrypt_context.hash(password),
         ))
@@ -145,6 +147,7 @@ def approve_request(db: Session, reviewer: User, request_id: int, data: Organiza
         db.rollback()
         raise
 
+    messaging.organization_request_approved(request, username, temporary_password)
     return {
         "organization": organization_service.get_organization(db, org.id),
         "admin_username": username,
@@ -160,4 +163,5 @@ def reject_request(db: Session, reviewer: User, request_id: int, data: Organizat
     request.reviewed_by_id = reviewer.id
     db.commit()
     db.refresh(request)
+    messaging.organization_request_rejected(request)
     return request

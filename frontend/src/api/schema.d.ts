@@ -41,6 +41,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔁 راه‌های فعال بازیابی رمز (پیامک/ایمیل) */
+        get: operations["password_reset_channels_auth_password_reset_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 🔁 درخواست کد بازیابی رمز
+         * @description پاسخ همیشه یکسان است تا وجود یا نبودِ حساب فاش نشود.
+         */
+        post: operations["password_reset_request_auth_password_reset_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔁 تأیید کد و تعیین رمز جدید */
+        post: operations["password_reset_confirm_auth_password_reset_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/me": {
         parameters: {
             query?: never;
@@ -3986,6 +4040,11 @@ export interface components {
                 [key: string]: string;
             } | null;
         };
+        /** MessageResponse */
+        MessageResponse: {
+            /** Message */
+            message: string;
+        };
         /** MyScheduleResponse */
         MyScheduleResponse: {
             /**
@@ -4756,6 +4815,27 @@ export interface components {
              * @enum {string}
              */
             service_level: "item" | "policy";
+        };
+        /** PasswordResetChannels */
+        PasswordResetChannels: {
+            /** Sms */
+            sms: boolean;
+            /** Email */
+            email: boolean;
+        };
+        /** PasswordResetConfirmIn */
+        PasswordResetConfirmIn: {
+            /** Identifier */
+            identifier: string;
+            /** Code */
+            code: string;
+            /** New Password */
+            new_password: string;
+        };
+        /** PasswordResetRequestIn */
+        PasswordResetRequestIn: {
+            /** Identifier */
+            identifier: string;
         };
         /** PasswordResetResponse */
         PasswordResetResponse: {
@@ -6552,6 +6632,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_channels_auth_password_reset_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetChannels"];
+                };
+            };
+        };
+    };
+    password_reset_request_auth_password_reset_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_reset_confirm_auth_password_reset_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
             /** @description Validation Error */

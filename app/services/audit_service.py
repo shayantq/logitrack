@@ -25,6 +25,7 @@ CATEGORIES = {
 }
 ACTION_CATEGORY = {
     "auth.login": "auth", "auth.login_failed": "auth", "auth.locked": "auth", "auth.password_changed": "auth",
+    "auth.reset_requested": "auth", "auth.password_reset": "auth",
     "user.create": "users", "user.update": "users", "user.deactivate": "users", "user.activate": "users",
     "user.reset_password": "users", "user.unlock": "users", "user.delete": "users",
     "org.profile": "settings", "org.logo": "settings", "org.brand": "settings", "commission.plan": "settings",

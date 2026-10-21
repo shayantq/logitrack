@@ -18,6 +18,9 @@ const DriverSupportPage = lazy(() => import("./pages/tickets/TicketsPage").then(
 const PlatformTicketsPage = lazy(() => import("./pages/tickets/TicketsPage").then(m => ({ default: m.PlatformTicketsPage })));
 const FaqPage = lazy(() => import("./pages/public/FaqPage"));
 const TermsPage = lazy(() => import("./pages/public/TermsPage"));
+const PrivacyPage = lazy(() => import("./pages/public/PrivacyPage"));
+const PricingPage = lazy(() => import("./pages/public/PricingPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const OrdersPage = lazy(() => import("./pages/orders/OrdersPage"));
@@ -126,8 +129,11 @@ export function App() {
           <Route path="/about" element={fade(<AboutPage />)} />
           <Route path="/faq" element={fade(<FaqPage />)} />
           <Route path="/terms" element={fade(<TermsPage />)} />
+          <Route path="/privacy" element={fade(<PrivacyPage />)} />
+          <Route path="/pricing" element={fade(<PricingPage />)} />
           <Route path="/support/:token" element={fade(<SupportPage />)} />
           <Route path="/app/login" element={fade(<LoginPage />)} />
+          <Route path="/app/forgot-password" element={fade(<ForgotPasswordPage />)} />
           <Route path="/app/change-password" element={<RequireLogin>{fade(<ChangePasswordPage />)}</RequireLogin>} />
           <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={guard(ORG_STAFF, <DashboardPage />)} />

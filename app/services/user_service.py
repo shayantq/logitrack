@@ -6,6 +6,8 @@
 مرحله ۱۵: ویرایش، غیرفعال‌سازی (به‌جای حذف کاربر دارای سابقه)، رمز موقت با اجبار تغییر،
 قفل موقت پس از تلاش‌های ناموفق ورود، و ثبت همه این‌ها در گزارش فعالیت (audit_service).
 """
+import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -13,12 +15,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import storage
-from app.core.iran import fa_digits
-from app.models import AuditLog, DriverDocument, Order, OrderStatusHistory, StockMovement, User, Vehicle, Warehouse
-from app.core.security import bcrypt_context
+from app.core.iran import fa_digits, latin_digits
+from app.models import AuditLog, DriverDocument, PasswordReset, Order, OrderStatusHistory, StockMovement, User, Vehicle, Warehouse
+from app.core.security import SECRET_KEY, bcrypt_context
 from app.core.tenancy import SKIP_TENANT_FILTER
 from app.schemas.user import CreateUserRequest
-from app.services import audit_service
+from app.services import audit_service, messaging
 from app.services.exceptions import ConflictError, DomainError, ForbiddenError, NotFoundError
 
 LOCK_AFTER = 5                      # تلاش ناموفق پشت‌سرهم
@@ -332,3 +334,101 @@ def change_own_password(db: Session, user: User, old_password: str, new_password
     db.commit()
     db.refresh(user)
     return user
+
+
+# ---------------------------------------------------------------------------
+# بازیابی رمز توسط خود کاربر (کد یک‌بارمصرف با پیامک یا ایمیل)
+# ---------------------------------------------------------------------------
+RESET_TTL = timedelta(minutes=10)
+RESET_MAX_ATTEMPTS = 5
+RESET_MAX_PER_HOUR = 3
+
+
+def reset_channels() -> dict:
+    return {"sms": messaging.sms_enabled(), "email": messaging.email_enabled()}
+
+
+def _normalize_mobile(value: str) -> str | None:
+    digits = "".join(ch for ch in value if ch.isdigit())
+    if digits.startswith("0098"):
+        digits = digits[4:]
+    elif digits.startswith("98") and len(digits) == 12:
+        digits = digits[2:]
+    if len(digits) == 10 and digits.startswith("9"):
+        digits = "0" + digits
+    return digits if len(digits) == 11 and digits.startswith("09") else None
+
+
+def _find_reset_user(db: Session, identifier: str) -> User | None:
+    ident = latin_digits((identifier or "").strip())
+    if not ident:
+        return None
+    conditions = [User.username == ident, func.lower(User.email) == ident.lower()]
+    mobile = _normalize_mobile(ident)
+    if mobile:
+        conditions.append(User.mobile == mobile)
+    users = db.query(User).filter(or_(*conditions)).execution_options(**SKIP_TENANT_FILTER).limit(2).all()
+    return users[0] if len(users) == 1 else None      # شناسه مبهم (مثلاً موبایل مشترک) ← هیچ
+
+
+def _reset_hash(user_id: int, code: str) -> str:
+    return hmac.new(SECRET_KEY.encode(), f"{user_id}:{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def request_password_reset(db: Session, identifier: str) -> None:
+    """
+    پاسخ همیشه یکسان است (چه حساب باشد چه نباشد) تا وجود حساب‌ها فاش نشود.
+    کد به موبایل کاربر (اگر پیامک فعال است) وگرنه به ایمیلش فرستاده می‌شود.
+    """
+    user = _find_reset_user(db, identifier)
+    if user is None or user.is_active is False:
+        return
+    if user.mobile and messaging.sms_enabled():
+        channel = "sms"
+    elif user.email and messaging.email_enabled():
+        channel = "email"
+    else:
+        return
+    now = _now()
+    recent = db.query(PasswordReset).filter(PasswordReset.user_id == user.id,
+                                            PasswordReset.created_at > now - timedelta(hours=1)).count()
+    if recent >= RESET_MAX_PER_HOUR:
+        return
+    db.query(PasswordReset).filter(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None)) \
+        .update({PasswordReset.used_at: now}, synchronize_session=False)
+    code = f"{secrets.randbelow(10 ** 6):06d}"
+    db.add(PasswordReset(user_id=user.id, code_hash=_reset_hash(user.id, code), channel=channel,
+                         created_at=now, expires_at=now + RESET_TTL))
+    audit_service.log(db, None, "auth.reset_requested",
+                      f"درخواست کد بازیابی رمز ({'پیامک' if channel == 'sms' else 'ایمیل'})", target=user,
+                      organization_id=user.organization_id)
+    db.commit()
+    messaging.password_reset_code(user, code, channel)
+
+
+INVALID_RESET = "کد نامعتبر است یا منقضی شده؛ دوباره درخواست کد بدهید."
+
+
+def confirm_password_reset(db: Session, identifier: str, code: str, new_password: str) -> None:
+    user = _find_reset_user(db, identifier)
+    now = _now()
+    reset = None
+    if user is not None:
+        reset = db.query(PasswordReset).filter(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None),
+                                               PasswordReset.expires_at > now) \
+            .order_by(PasswordReset.created_at.desc()).first()
+    if reset is None or reset.attempts >= RESET_MAX_ATTEMPTS:
+        raise ConflictError(INVALID_RESET)
+    if not hmac.compare_digest(reset.code_hash, _reset_hash(user.id, latin_digits((code or "").strip()))):
+        reset.attempts += 1
+        db.commit()
+        left = RESET_MAX_ATTEMPTS - reset.attempts
+        raise ConflictError(f"کد واردشده درست نیست. {fa_digits(str(left))} بار دیگر می‌توانید امتحان کنید." if left > 0
+                            else INVALID_RESET)
+    user.hashed_password = bcrypt_context.hash(new_password)
+    user.must_change_password = False
+    user.token_version = (user.token_version or 0) + 1          # خروج از همه دستگاه‌ها
+    user.failed_logins, user.locked_until = 0, None
+    reset.used_at = now
+    audit_service.log(db, user, "auth.password_reset", "رمز عبور را با کد بازیابی تغییر داد")
+    db.commit()

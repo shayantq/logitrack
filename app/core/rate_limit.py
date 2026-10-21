@@ -49,3 +49,7 @@ organization_request_limiter = RateLimiter(max_requests=5, window_seconds=3600)
 
 # ثبت‌نام عمومی راننده با لینک دعوت: حداکثر ۱۰ حساب در ساعت از هر IP
 driver_signup_limiter = RateLimiter(max_requests=10, window_seconds=3600)
+
+# بازیابی رمز: درخواست کد و تأیید کد از هر IP
+password_reset_request_limiter = RateLimiter(max_requests=10, window_seconds=3600)
+password_reset_confirm_limiter = RateLimiter(max_requests=30, window_seconds=3600)
