@@ -12,7 +12,7 @@ const fa = (n: number) => n.toLocaleString("fa-IR");
 const million = (n: number) => (n >= 1_000_000 ? `${fa(n / 1_000_000)} میلیون` : fa(n));
 
 function Price({ plan, billing }: { plan: Plan; billing: Billing }) {
-  if (plan.monthly === 0) return <div className="text-3xl font-black">رایگان<span className="ms-2 text-sm font-medium text-muted">۳۰ روز</span></div>;
+  if (plan.monthly === 0) return <div className="text-3xl font-black">رایگان<span className="ms-2 text-sm font-medium text-muted">به مدت ۳۰ روز</span></div>;
   if (plan.monthly === null) {
     return <div className="text-3xl font-black"><span className="me-1.5 text-base font-medium text-muted">از</span>{million(plan.fromMonthly ?? 0)}<span className="ms-1.5 text-sm font-medium text-muted">تومان در ماه</span></div>;
   }
@@ -59,7 +59,7 @@ export default function PricingPage() {
   return (
     <InfoLayout title="تعرفه‌ها" testId="pricing-page" eyebrow="تعرفه‌ها"
       heading="هزینه‌ای شفاف، متناسب با اندازه کسب‌وکارتان"
-      lead={`همه پلن‌ها برای کل سازمان است، نه هر کاربر. ۳۰ روز رایگان امتحان کنید و هر وقت خواستید پلن را عوض کنید.`}
+      lead="قیمت هر پلن برای کل سازمان است، نه برای هر کاربر. ۳۰ روز رایگان امتحان کنید و هر زمان خواستید، پلن را تغییر دهید."
       hero={
         <div className="flex flex-wrap items-center gap-3">
           <SegmentedControl value={billing} onChange={setBilling} options={[
@@ -76,7 +76,7 @@ export default function PricingPage() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map(p => <PlanCard key={p.id} plan={p} billing={billing} />)}
         </div>
-        <p className="mt-6 text-center text-xs text-muted">مبالغ به تومان است. فاکتور رسمی صادر می‌شود.</p>
+        <p className="mt-6 text-center text-xs text-muted">همه مبالغ به تومان است و برای هر پرداخت، فاکتور رسمی صادر می‌شود.</p>
 
         <div className="mt-16 overflow-x-auto rounded-3xl border border-border bg-surface" data-testid="pricing-compare">
           <table className="w-full min-w-[640px] text-sm">
