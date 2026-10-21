@@ -9,20 +9,26 @@ import { ANNUAL_MONTHS, EARLY_OFFER, FEATURES, PLANS, type Plan } from "./conten
 
 type Billing = "monthly" | "annual";
 const fa = (n: number) => n.toLocaleString("fa-IR");
-const million = (n: number) => (n >= 1_000_000 ? `${fa(n / 1_000_000)} میلیون` : fa(n));
-
-function Price({ plan, billing }: { plan: Plan; billing: Billing }) {
-  if (plan.monthly === 0) return <div className="text-3xl font-black">رایگان<span className="ms-2 text-sm font-medium text-muted">به مدت ۳۰ روز</span></div>;
-  if (plan.monthly === null) {
-    return <div className="text-3xl font-black"><span className="me-1.5 text-base font-medium text-muted">از</span>{million(plan.fromMonthly ?? 0)}<span className="ms-1.5 text-sm font-medium text-muted">تومان در ماه</span></div>;
-  }
-  const amount = billing === "annual" ? plan.monthly * ANNUAL_MONTHS : plan.monthly;
+/** مبلغ کامل با جداکننده هزارگان (اعشار فارسی «٫» شبیه «/» خوانده می‌شد)؛ واحد زیر عدد تا کارت‌ها هم‌تراز باشند */
+function Amount({ value, unit, prefix, note }: { value: string; unit: string; prefix?: string; note?: string }) {
   return (
-    <div>
-      <div className="text-3xl font-black" data-testid="plan-price">{million(amount)}<span className="ms-1.5 text-sm font-medium text-muted">تومان {billing === "annual" ? "در سال" : "در ماه"}</span></div>
-      {billing === "annual" && <div className="mt-1 text-xs text-success">معادل {million(Math.round(amount / 12))} تومان در ماه</div>}
+    <div data-testid="plan-price">
+      <div className="flex items-baseline gap-1.5">
+        {prefix && <span className="text-base font-medium text-muted">{prefix}</span>}
+        <span className="text-3xl font-black">{value}</span>
+      </div>
+      <div className="mt-1 text-sm text-muted">{unit}</div>
+      {note && <div className="mt-1 text-xs text-success">{note}</div>}
     </div>
   );
+}
+
+function Price({ plan, billing }: { plan: Plan; billing: Billing }) {
+  if (plan.monthly === 0) return <Amount value="رایگان" unit="به مدت ۳۰ روز" />;
+  if (plan.monthly === null) return <Amount prefix="از" value={fa(plan.fromMonthly ?? 0)} unit="تومان در ماه" />;
+  if (billing === "monthly") return <Amount value={fa(plan.monthly)} unit="تومان در ماه" />;
+  const yearly = plan.monthly * ANNUAL_MONTHS;
+  return <Amount value={fa(yearly)} unit="تومان در سال" note={`معادل ${fa(Math.round(yearly / 12 / 1000) * 1000)} تومان در ماه`} />;
 }
 
 function PlanCard({ plan, billing }: { plan: Plan; billing: Billing }) {
