@@ -30,7 +30,7 @@ export function waitingLabel(t: Pick<TicketRow, "status" | "waiting_on" | "sourc
   const w = t.waiting_on;
   if ((side === "org" && w === "org") || (side === "platform" && w === "platform") || (side === "requester" && w === "requester"))
     return { label: side === "requester" ? "پاسخ جدید دارید" : "منتظر پاسخ شما", mine: true };
-  if (w === "platform") return { label: "در انتظار پشتیبانی LogiTrack", mine: false };
+  if (w === "platform") return { label: "در انتظار پشتیبانی پسینه", mine: false };
   if (w === "org") return { label: side === "requester" ? "در حال بررسی" : "در انتظار سازمان", mine: false };
   if (w === "requester") return { label: side === "platform" && t.source === "org" ? "در انتظار سازمان" : "در انتظار درخواست‌کننده", mine: false };
   return null;

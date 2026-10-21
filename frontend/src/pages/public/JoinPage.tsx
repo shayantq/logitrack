@@ -16,7 +16,7 @@ export default function JoinPage() {
   const [form, setForm] = useState({ full_name: "", mobile: "", username: "", password: "", email: "" });
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  useEffect(() => { document.title = `ثبت‌نام راننده — ${BRAND.name}`; }, []);
+  useEffect(() => { document.title = `ثبت‌نام راننده — ${BRAND.nameFa}`; }, []);
   const invite = useQuery({
     queryKey: ["invite", code],
     queryFn: () => unwrap(api.GET("/driver-signup/{code}", { params: { path: { code } } })),

@@ -22,7 +22,7 @@ export default function RatePage() {
   const [score, setScore] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
-  useEffect(() => { document.title = `نظرسنجی تحویل — ${BRAND.name}`; }, []);
+  useEffect(() => { document.title = `نظرسنجی تحویل — ${BRAND.nameFa}`; }, []);
   const info = useQuery({
     queryKey: ["public-rating", code],
     queryFn: () => unwrap(api.GET("/public/ratings/{token}", { params: { path: { token: code } } })),

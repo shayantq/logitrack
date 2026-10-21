@@ -36,12 +36,12 @@ def categories(db: db_dependency, user: user_dependency):
 
 @router.get("/template", summary="📄 قالب اکسل کاتالوگ (با راهنما و نمونه)")
 def template(db: db_dependency, user: user_dependency):
-    return _xlsx(catalog_io.template(db), "LogiTrack_Catalog_Template.xlsx")
+    return _xlsx(catalog_io.template(db), "Pasineh_Catalog_Template.xlsx")
 
 
 @router.get("/export", summary="📥 خروجی اکسل کل کاتالوگ (قابل ویرایش و ورود دوباره)")
 def export(db: db_dependency, user: user_dependency):
-    return _xlsx(catalog_io.export(db, user), "LogiTrack_Catalog.xlsx")
+    return _xlsx(catalog_io.export(db, user), "Pasineh_Catalog.xlsx")
 
 
 @router.post("/import", response_model=ImportReport, summary="📤 ورود کاتالوگ از اکسل (پیش‌نمایش یا ثبت نهایی)")

@@ -86,7 +86,7 @@ export default function LoginPage() {
             <Button type="submit" size="lg" className="w-full" loading={submitting}>ورود <ArrowLeft className="size-4" /></Button>
           </form>
           <p className="mt-8 text-center text-sm text-muted">
-            هنوز سازمانتان در {BRAND.name} نیست؟ <Link to="/request" className="font-semibold text-brand hover:underline">درخواست استفاده بدهید</Link>
+            هنوز سازمانتان در {BRAND.nameFa} نیست؟ <Link to="/request" className="font-semibold text-brand hover:underline">درخواست استفاده بدهید</Link>
           </p>
         </div>
       </div>

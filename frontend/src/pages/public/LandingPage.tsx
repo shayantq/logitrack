@@ -8,7 +8,7 @@ import { ScrollTrigger } from "./motion";
 
 export default function LandingPage() {
   useEffect(() => {
-    document.title = `${BRAND.name} — ${BRAND.tagline}`;
+    document.title = `${BRAND.nameFa} — ${BRAND.tagline}`;
     // فونت‌ها و تصاویر ارتفاع بخش‌ها را عوض می‌کنند؛ نقاط شروع/پایان انیمیشن‌ها دوباره محاسبه شوند
     document.fonts?.ready.then(() => ScrollTrigger.refresh());
     // اگر با لینک لنگردار (مثل /#faq) آمده‌اند، بعد از رندر به آن بخش برو

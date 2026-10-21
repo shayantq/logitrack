@@ -25,7 +25,7 @@ export default function TrackPage() {
   const [phone, setPhone] = useState("");
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
   const code = routeCode.trim().toUpperCase();
-  useEffect(() => { document.title = `پیگیری سفارش — ${BRAND.name}`; setInput(routeCode); setVerifiedPhone(null); }, [routeCode]);
+  useEffect(() => { document.title = `پیگیری سفارش — ${BRAND.nameFa}`; setInput(routeCode); setVerifiedPhone(null); }, [routeCode]);
 
   const query = useQuery({
     queryKey: ["track", code, verifiedPhone],

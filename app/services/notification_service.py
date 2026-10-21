@@ -297,7 +297,7 @@ def ticket_event(db: Session, ticket: Ticket, side: str, body: str, actor: User 
         notify(db, **common, title="پاسخ تازه به تیکت شما", message=_preview(body), user_id=ticket.requester_user_id,
                link=f"/app/driver/support/{ticket.id}", dedupe_key=f"ticket:{ticket.id}:requester", details=details[:2])
     elif side == "platform" and ticket.source == "org" and ticket.requester_user_id:
-        notify(db, **common, title="پاسخ پشتیبانی LogiTrack", message=_preview(body), user_id=ticket.requester_user_id,
+        notify(db, **common, title="پاسخ پشتیبانی پسینه", message=_preview(body), user_id=ticket.requester_user_id,
                link=f"/app/tickets/{ticket.id}", dedupe_key=f"ticket:{ticket.id}:requester", details=details[:2])
 
 

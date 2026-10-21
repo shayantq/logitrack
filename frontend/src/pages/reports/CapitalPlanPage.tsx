@@ -55,7 +55,7 @@ export default function CapitalPlanPage() {
   });
   const data = plan.data;
   const s = data?.summary;
-  const download = (format: "excel" | "pdf") => exporter.run("/reports/generate", `LogiTrack_Purchase_Capital_Plan.${format === "pdf" ? "pdf" : "xlsx"}`,
+  const download = (format: "excel" | "pdf") => exporter.run("/reports/generate", `Pasineh_Purchase_Capital_Plan.${format === "pdf" ? "pdf" : "xlsx"}`,
     { report: "capital", format, months: Number(months), warehouse_id: warehouseId ? Number(warehouseId) : null }, `capital-${format}`);
 
   return (

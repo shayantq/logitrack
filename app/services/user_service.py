@@ -296,7 +296,7 @@ def authenticate(db: Session, username: str, password: str) -> User:
     if user.is_active is False:
         raise DomainError("حساب کاربری شما غیرفعال شده است؛ با ادمین سازمان تماس بگیرید.", 403)
     if user.organization_id is not None and (user.organization is None or not user.organization.is_active):
-        raise DomainError('حساب سازمان شما غیرفعال شده است؛ با پشتیبانی LogiTrack تماس بگیرید.', 403)
+        raise DomainError('حساب سازمان شما غیرفعال شده است؛ با پشتیبانی پسینه تماس بگیرید.', 403)
     user.failed_logins, user.locked_until, user.last_login_at = 0, None, now
     audit_service.log(db, user, "auth.login", "ورود به سامانه")
     db.commit()

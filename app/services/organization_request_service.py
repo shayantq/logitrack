@@ -48,7 +48,7 @@ def submit_request(db: Session, data: OrganizationRequestCreate, requester_ip: s
             f"برای این شناسه ملی از قبل یک درخواست در حال بررسی وجود دارد (کد پیگیری: {duplicate.tracking_code})."
         )
     if db.query(Organization).filter(Organization.national_id == data.national_id).first():
-        raise ConflictError("سازمانی با این شناسه ملی قبلاً در LogiTrack ثبت شده است.")
+        raise ConflictError("سازمانی با این شناسه ملی قبلاً در پسینه ثبت شده است.")
 
     request = OrganizationRequest(
         tracking_code=_new_tracking_code(db),

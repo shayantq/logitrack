@@ -4,7 +4,7 @@
 سه نقش در هر تیکت:
 - درخواست‌کننده (requester): مشتری بدون حساب (با لینک محرمانه)، راننده، یا خود سازمان (تیکت به پشتیبانی پلتفرم).
 - سازمان (org): ادمین سازمان و مدیر انبار.
-- پلتفرم (platform): ادمین و پشتیبان LogiTrack — فقط تیکت‌هایی را می‌بیند که سازمان به او ارجاع داده یا خود سازمان باز کرده.
+- پلتفرم (platform): ادمین و پشتیبان پسینه — فقط تیکت‌هایی را می‌بیند که سازمان به او ارجاع داده یا خود سازمان باز کرده.
 
 پیام‌ها سه سطح دید دارند: all (همه طرف‌ها از جمله درخواست‌کننده)، staff (سازمان و پلتفرم؛ مشتری نمی‌بیند)،
 side (یادداشت داخلی؛ فقط سمت نویسنده). «نوبت پاسخ» (waiting_on) بعد از هر پیام خودکار تعیین می‌شود تا هر طرف
@@ -43,7 +43,7 @@ CATEGORY_LABELS = {
 }
 MAX_IMAGE = 5 * 1024 * 1024
 MAX_OPEN_PER_ORDER = 3
-PLATFORM_NAME = "پشتیبانی LogiTrack"
+PLATFORM_NAME = "پشتیبانی پسینه"
 
 
 def _now() -> datetime:
@@ -107,10 +107,10 @@ def reply_options(ticket: Ticket, side: str) -> list[dict]:
         return [{"visibility": "all", "label": "ارسال پیام"}]
     if side == "org":
         if ticket.source == "org":
-            return [{"visibility": "all", "label": "پیام به پشتیبانی LogiTrack"}, {"visibility": "side", "label": "یادداشت داخلی"}]
+            return [{"visibility": "all", "label": "پیام به پشتیبانی پسینه"}, {"visibility": "side", "label": "یادداشت داخلی"}]
         options = [{"visibility": "all", "label": "پاسخ به مشتری" if ticket.source == "customer" else "پاسخ به راننده"}]
         if ticket.escalated_at is not None:
-            options.append({"visibility": "staff", "label": "پیام به پشتیبانی LogiTrack"})
+            options.append({"visibility": "staff", "label": "پیام به پشتیبانی پسینه"})
         options.append({"visibility": "side", "label": "یادداشت داخلی"})
         return options
     if ticket.source == "org":
@@ -363,14 +363,14 @@ def escalate(db: Session, user: User, ticket_id: int, reason: str) -> dict:
     ticket = _load(db, ticket_id)
     side = _check_access(user, ticket)
     if side != "org" or ticket.source == "org":
-        raise ForbiddenError("فقط سازمان می‌تواند تیکت مشتری یا راننده را به پشتیبانی LogiTrack ارجاع دهد.")
+        raise ForbiddenError("فقط سازمان می‌تواند تیکت مشتری یا راننده را به پشتیبانی پسینه ارجاع دهد.")
     if ticket.escalated_at is not None:
         raise ConflictError("این تیکت قبلاً ارجاع شده است.")
     if ticket.status == "closed":
         raise ConflictError("این تیکت بسته شده است.")
     ticket.escalated_at, ticket.escalation_reason = _now(), reason.strip()
     ticket.handler, ticket.waiting_on, ticket.status = "platform", "platform", "open"
-    _system(db, ticket, f"ارجاع به پشتیبانی LogiTrack توسط {_display_name(user)}: {reason.strip()}", visibility="staff")
+    _system(db, ticket, f"ارجاع به پشتیبانی پسینه توسط {_display_name(user)}: {reason.strip()}", visibility="staff")
     db.commit()
     db.refresh(ticket)
     return _detail(db, ticket, side)
@@ -385,7 +385,7 @@ def resolve(db: Session, user: User, ticket_id: int) -> dict:
     if side == "platform" and ticket.source != "org":
         # بررسی پلتفرم تمام شد؛ پاسخ نهایی به مشتری/راننده با سازمان است
         ticket.handler, ticket.waiting_on = "org", "org"
-        _system(db, ticket, "پشتیبانی LogiTrack بررسی را تمام کرد و تیکت به سازمان برگشت.", visibility="staff")
+        _system(db, ticket, "پشتیبانی پسینه بررسی را تمام کرد و تیکت به سازمان برگشت.", visibility="staff")
     else:
         ticket.status, ticket.waiting_on, ticket.resolved_at = "resolved", "none", _now()
         who = "درخواست‌کننده" if side == "requester" else (PLATFORM_NAME if side == "platform" else _display_name(user))

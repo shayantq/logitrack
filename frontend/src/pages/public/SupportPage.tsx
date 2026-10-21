@@ -24,7 +24,7 @@ export default function SupportPage() {
     refetchInterval: q => (q.state.data?.status === "closed" ? false : 15_000),
     retry: false,
   });
-  useEffect(() => { document.title = `پیگیری درخواست پشتیبانی — ${BRAND.name}`; }, []);
+  useEffect(() => { document.title = `پیگیری درخواست پشتیبانی — ${BRAND.nameFa}`; }, []);
   const [justCreated, setJustCreated] = useState(!!state?.created);
   const send = useMutation({
     mutationFn: ({ body, file }: { body: string; file: File | null }) =>

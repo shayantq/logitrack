@@ -1,4 +1,4 @@
-# CI/CD سامانه LogiTrack
+# CI/CD سامانه پسینه
 #   ۱. backend  — تست‌های pytest (واحد، API و یکپارچگی روی PostgreSQL واقعی)
 #   ۲. frontend — بررسی TypeScript و build اپ React
 #   ۳. e2e      — کل استک با Docker Compose + داده نمونه + تست سرتاسری Playwright در Chromium

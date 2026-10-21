@@ -100,7 +100,7 @@ const CLAUSES: Clause[] = [
   {
     id: "availability", title: "دسترس‌پذیری و پشتیبانی", body: <>
       <P>ارائه‌دهنده تلاش می‌کند سامانه به‌طور پیوسته در دسترس باشد. ممکن است برای نگه‌داری، به‌روزرسانی یا به دلایل خارج از اختیار (مانند اختلال اینترنت، زیرساخت یا حوادث غیرمترقبه) دسترسی موقتاً قطع یا محدود شود.</P>
-      <P>قابلیت‌های سامانه ممکن است به مرور اضافه یا تغییر کنند. پشتیبانی از طریق ایمیل <a href={`mailto:${BRAND.supportEmail}`} className="font-mono text-brand ltr">{BRAND.supportEmail}</a> انجام می‌شود.</P>
+      <P>قابلیت‌های سامانه ممکن است به مرور اضافه یا تغییر کنند. پشتیبانی از طریق ایمیل <a href={`mailto:${BRAND.supportEmail}`} className="font-mono text-brand ltr">{BRAND.supportEmail}</a> و تلفن <a href={`tel:${BRAND.phone}`} className="text-brand">{BRAND.phoneDisplay}</a> انجام می‌شود.</P>
     </>,
   },
   {
@@ -124,7 +124,7 @@ const CLAUSES: Clause[] = [
     id: "law", title: "قانون حاکم و حل اختلاف", body: <P>این قوانین تابع قوانین جمهوری اسلامی ایران است. طرفین ابتدا تلاش می‌کنند هر اختلافی را از راه گفت‌وگو حل کنند و در صورت عدم توافق، مراجع قضایی صالح ایران مرجع رسیدگی خواهند بود.</P>,
   },
   {
-    id: "contact", title: "تماس با ما", body: <P>پرسش درباره این قوانین را به <a href={`mailto:${BRAND.supportEmail}`} className="font-mono text-brand ltr">{BRAND.supportEmail}</a> بفرستید. برای پرسش‌های عمومی، صفحه <Link to="/faq" className="font-medium text-brand hover:underline">سوالات متداول</Link> را ببینید.</P>,
+    id: "contact", title: "تماس با ما", body: <P>پرسش درباره این قوانین را به <a href={`mailto:${BRAND.supportEmail}`} className="font-mono text-brand ltr">{BRAND.supportEmail}</a> بفرستید یا با <a href={`tel:${BRAND.phone}`} className="text-brand">{BRAND.phoneDisplay}</a> تماس بگیرید. برای پرسش‌های عمومی، صفحه <Link to="/faq" className="font-medium text-brand hover:underline">سوالات متداول</Link> را ببینید.</P>,
   },
 ];
 

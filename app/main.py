@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="🏢 LogiTrack Enterprise API",
+    title="🏢 Pasineh API",
     version="2.1.0",
     docs_url="/docs",
     redoc_url="/redoc",

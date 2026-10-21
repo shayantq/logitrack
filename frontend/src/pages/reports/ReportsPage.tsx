@@ -12,17 +12,17 @@ type ReportKey = "inventory" | "orders" | "ledger" | "finance" | "reorder" | "ca
 type Uses = "period" | "warehouse" | "status";
 
 const REPORTS: { key: ReportKey; title: string; text: string; icon: ReactNode; uses: Uses[]; adminOnly?: boolean; file: string }[] = [
-  { key: "inventory", title: "موجودی انبار", icon: <Boxes className="size-5" />, uses: ["warehouse"], file: "LogiTrack_Inventory",
+  { key: "inventory", title: "موجودی انبار", icon: <Boxes className="size-5" />, uses: ["warehouse"], file: "Pasineh_Inventory",
     text: "موجودی هر کالا در هر انبار، نقطه سفارش، وضعیت (ناموجود/کم) و ارزش ریالی موجودی با قیمت روز." },
-  { key: "orders", title: "سفارش‌ها", icon: <Package className="size-5" />, uses: ["period", "status"], file: "LogiTrack_Orders",
+  { key: "orders", title: "سفارش‌ها", icon: <Package className="size-5" />, uses: ["period", "status"], file: "Pasineh_Orders",
     text: "سفارش‌های بازه بر اساس روز تحویل: مشتری، مقصد، اقلام، وزن، مبلغ کالا، کرایه، راننده و وضعیت." },
-  { key: "ledger", title: "دفتر گردش کالا", icon: <BookOpen className="size-5" />, uses: ["period", "warehouse"], file: "LogiTrack_Ledger",
+  { key: "ledger", title: "دفتر گردش کالا", icon: <BookOpen className="size-5" />, uses: ["period", "warehouse"], file: "Pasineh_Ledger",
     text: "هر ورود، خروج، انتقال، ضایعات و انبارگردانی با مانده بعد از گردش و ثبت‌کننده." },
-  { key: "finance", title: "مالی حمل‌ونقل", icon: <Wallet className="size-5" />, uses: ["period"], adminOnly: true, file: "LogiTrack_Transport_Finance",
+  { key: "finance", title: "مالی حمل‌ونقل", icon: <Wallet className="size-5" />, uses: ["period"], adminOnly: true, file: "Pasineh_Transport_Finance",
     text: "کرایه سفرهای تحویل‌شده، سهم سازمان و رانندگان، به تفکیک راننده، استان مقصد و ماه — با جزئیات هر سفر." },
-  { key: "reorder", title: "نقطه سفارش و پیشنهاد خرید", icon: <ShoppingCart className="size-5" />, uses: ["warehouse"], file: "LogiTrack_Reorder_Points",
+  { key: "reorder", title: "نقطه سفارش و پیشنهاد خرید", icon: <ShoppingCart className="size-5" />, uses: ["warehouse"], file: "Pasineh_Reorder_Points",
     text: "نقطه سفارش فرمول و فعلی، موجودی اطمینان، فروش روزانه، روزهای پوشش و مقدار پیشنهادی خرید هر کالا." },
-  { key: "capital", title: "برآورد سرمایه خرید", icon: <PiggyBank className="size-5" />, uses: ["warehouse"], adminOnly: true, file: "LogiTrack_Purchase_Capital_Plan",
+  { key: "capital", title: "برآورد سرمایه خرید", icon: <PiggyBank className="size-5" />, uses: ["warehouse"], adminOnly: true, file: "Pasineh_Purchase_Capital_Plan",
     text: "نقدینگی لازم برای خرید کالا در ۶ ماه آینده، ماه‌به‌ماه و به تفکیک کالا — با پیش‌بینی فروش و تورم بها." },
 ];
 const USE_LABEL: Record<Uses, string> = { period: "بازه تاریخ", warehouse: "انبار", status: "وضعیت سفارش" };

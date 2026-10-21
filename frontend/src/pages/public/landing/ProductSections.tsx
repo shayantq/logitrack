@@ -73,7 +73,7 @@ function BrowserFrame({ path, children }: { path: string; children: ReactNode })
       <div className="flex items-center gap-3 border-b border-border bg-surface-2 px-4 py-2.5">
         <div className="flex gap-1.5 ltr"><span className="size-2.5 rounded-full bg-danger/70" /><span className="size-2.5 rounded-full bg-accent/80" /><span className="size-2.5 rounded-full bg-success/70" /></div>
         <div className="mx-auto flex h-7 w-full max-w-xs items-center justify-center rounded-lg bg-surface px-3 font-mono text-[11px] text-muted ltr">
-          <span className="text-brand">app</span>.logitrack.ir<span key={path} className="animate-rise text-text">{path.replace("/app", "")}</span>
+          passineh.ir<span className="text-brand">/app</span><span key={path} className="animate-rise text-text">{path.replace("/app", "")}</span>
         </div>
       </div>
       <div className="h-[340px] bg-bg sm:h-[420px]">{children}</div>

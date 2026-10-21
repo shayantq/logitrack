@@ -1,5 +1,5 @@
 """
-اسکریپت آماده‌سازی داده‌های نمونه (نسخه گسترده) برای LogiTrack
+اسکریپت آماده‌سازی داده‌های نمونه (نسخه گسترده) برای پسینه
 شامل:
   • کارکنان پلتفرم: ادمین پلتفرم و پشتیبان (بدون سازمان)
   • «سازمان پیش‌فرض»: انبارها، ادمین سازمان، مدیران انبار، رانندگان، خودروها،
@@ -174,10 +174,10 @@ def create_demo_order(org_id, items, status, city, vehicle, warehouse_id, days_a
     return order
 
 
-print("===== ۰. کارکنان پلتفرم LogiTrack (بدون سازمان) =====")
+print("===== ۰. کارکنان پلتفرم پسینه (بدون سازمان) =====")
 set_tenant(db, None)
-get_or_create_user("superadmin", "superadmin@logitrack.local", "superadmin123", RoleEnum.PLATFORM_ADMIN, full_name="ادمین پلتفرم")
-get_or_create_user("support", "support@logitrack.local", "support123", RoleEnum.PLATFORM_SUPPORT, full_name="پشتیبان پلتفرم")
+get_or_create_user("superadmin", "superadmin@pasineh.local", "superadmin123", RoleEnum.PLATFORM_ADMIN, full_name="ادمین پلتفرم")
+get_or_create_user("support", "support@pasineh.local", "support123", RoleEnum.PLATFORM_SUPPORT, full_name="پشتیبان پلتفرم")
 
 print("===== سازمان اول: سازمان پیش‌فرض =====")
 default_org = get_or_create_org("default", "سازمان پیش‌فرض")
@@ -191,12 +191,12 @@ wh_mashhad = get_or_create_warehouse("انبار مشهد", "مشهد")
 warehouses = [wh_tehran, wh_tabriz, wh_mashhad]
 
 print("===== ۲. ادمین =====")
-admin = get_or_create_user("admin", "admin@logitrack.local", "admin123", RoleEnum.ORG_ADMIN, full_name="مدیر ارشد سیستم")
+admin = get_or_create_user("admin", "admin@pasineh.local", "admin123", RoleEnum.ORG_ADMIN, full_name="مدیر ارشد سیستم")
 
 print("===== ۳. مدیران انبار (۳ نفر) =====")
-mgr_tehran = get_or_create_user("manager_tehran", "manager.tehran@logitrack.local", "manager123", RoleEnum.WAREHOUSE_MANAGER, full_name="کیانوش رادفر", warehouse_id=wh_tehran.id)
-mgr_tabriz = get_or_create_user("manager_tabriz", "manager.tabriz@logitrack.local", "manager123", RoleEnum.WAREHOUSE_MANAGER, full_name="پریسا امینی", warehouse_id=wh_tabriz.id)
-mgr_mashhad = get_or_create_user("manager_mashhad", "manager.mashhad@logitrack.local", "manager123", RoleEnum.WAREHOUSE_MANAGER, full_name="سعید طاهری", warehouse_id=wh_mashhad.id)
+mgr_tehran = get_or_create_user("manager_tehran", "manager.tehran@pasineh.local", "manager123", RoleEnum.WAREHOUSE_MANAGER, full_name="کیانوش رادفر", warehouse_id=wh_tehran.id)
+mgr_tabriz = get_or_create_user("manager_tabriz", "manager.tabriz@pasineh.local", "manager123", RoleEnum.WAREHOUSE_MANAGER, full_name="پریسا امینی", warehouse_id=wh_tabriz.id)
+mgr_mashhad = get_or_create_user("manager_mashhad", "manager.mashhad@pasineh.local", "manager123", RoleEnum.WAREHOUSE_MANAGER, full_name="سعید طاهری", warehouse_id=wh_mashhad.id)
 
 print("===== ۴. رانندگان (۱۲ نفر، با نام کامل و شهر) =====")
 drivers_data = [
@@ -215,7 +215,7 @@ drivers_data = [
 ]
 drivers = []
 for username, full_name, city in drivers_data:
-    d = get_or_create_user(username, f"{username}@logitrack.local", "driver123", RoleEnum.DRIVER, full_name=full_name, city=city)
+    d = get_or_create_user(username, f"{username}@pasineh.local", "driver123", RoleEnum.DRIVER, full_name=full_name, city=city)
     drivers.append(d)
 
 print("===== ۵. خودروها (یکی برای هر راننده، با نام واقعی خودرو) =====")
@@ -316,11 +316,11 @@ qazvin = get_or_create_org("qazvin-shop", "فروشگاه نمونه قزوین"
 set_tenant(db, qazvin.id)
 
 wh_qazvin = get_or_create_warehouse("انبار مرکزی قزوین", "قزوین")
-get_or_create_user("qazvin_admin", "qazvin.admin@logitrack.local", "admin123", RoleEnum.ORG_ADMIN, full_name="مدیر فروشگاه قزوین")
-get_or_create_user("qazvin_manager", "qazvin.manager@logitrack.local", "manager123", RoleEnum.WAREHOUSE_MANAGER,
+get_or_create_user("qazvin_admin", "qazvin.admin@pasineh.local", "admin123", RoleEnum.ORG_ADMIN, full_name="مدیر فروشگاه قزوین")
+get_or_create_user("qazvin_manager", "qazvin.manager@pasineh.local", "manager123", RoleEnum.WAREHOUSE_MANAGER,
                    full_name="نیما کاظمی", warehouse_id=wh_qazvin.id)
-q_driver1 = get_or_create_user("qazvin_driver1", "qazvin.driver1@logitrack.local", "driver123", RoleEnum.DRIVER, full_name="مهدی صالحی", city="قزوین")
-q_driver2 = get_or_create_user("qazvin_driver2", "qazvin.driver2@logitrack.local", "driver123", RoleEnum.DRIVER, full_name="لیلا مرادی", city="تهران")
+q_driver1 = get_or_create_user("qazvin_driver1", "qazvin.driver1@pasineh.local", "driver123", RoleEnum.DRIVER, full_name="مهدی صالحی", city="قزوین")
+q_driver2 = get_or_create_user("qazvin_driver2", "qazvin.driver2@pasineh.local", "driver123", RoleEnum.DRIVER, full_name="لیلا مرادی", city="تهران")
 q_vehicles = [
     get_or_create_vehicle("۲۹ایران۴۵۱ق۷۱", "وانت پیکان", "pickup", 1200, "available", q_driver1.id, "قزوین"),
     get_or_create_vehicle("۲۹ایران۸۸۲ق۷۱", "موتورسیکلت باکسر", "motorcycle", 40, "available", q_driver2.id, "تهران"),
@@ -372,7 +372,7 @@ fill_profile_if_empty(
     economic_code="10100000001", province="تهران", city="تهران", address="تهران، خیابان ولیعصر، پلاک ۱۰۰",
     postal_code="1415600000", phone="02188990011", employee_count="51-200", monthly_order_volume="1000-10000",
     warehouse_count=3, fleet_size=12, contact_name="مدیر ارشد سیستم", contact_mobile="09120000001",
-    contact_email="admin@logitrack.local",
+    contact_email="admin@pasineh.local",
 )
 fill_profile_if_empty(
     db.get(Organization, qazvin.id),
@@ -380,7 +380,7 @@ fill_profile_if_empty(
     province="قزوین", city="قزوین", address="قزوین، خیابان پیروزی، پلاک ۱۲", postal_code="3415100000",
     phone="02833334444", employee_count="11-50", monthly_order_volume="100-1000",
     warehouse_count=1, fleet_size=2, contact_name="مدیر فروشگاه قزوین", contact_mobile="09120000002",
-    contact_email="qazvin.admin@logitrack.local",
+    contact_email="qazvin.admin@pasineh.local",
 )
 
 if db.query(OrganizationRequest).count() == 0:

@@ -2,7 +2,7 @@
 سازنده گزارش با برند سازمان (مرحله ۱۴) — یک ساختار داده، دو خروجی: اکسل و PDF.
 
 سربرگ همه گزارش‌ها: لوگو، نام و نام ثبتی سازمان، شناسه ملی و کد اقتصادی، عنوان و بازه گزارش، زمان تولید و کاربر.
-جدول‌ها با رنگ سازمان، ارقام فارسی (PDF)، ردیف جمع، شماره صفحه و پانویس «تولیدشده با LogiTrack».
+جدول‌ها با رنگ سازمان، ارقام فارسی (PDF)، ردیف جمع، شماره صفحه و پانویس «تولیدشده با پسینه».
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ class Report:
     sections: list[Section]
     kpis: list[tuple[str, str]] = field(default_factory=list)
     landscape: bool = False
-    filename: str = "LogiTrack_Report"
+    filename: str = "Pasineh_Report"
 
 
 @dataclass
@@ -209,7 +209,7 @@ def to_excel(report: Report, b: Branding, now_local: datetime) -> bytes:
         ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
         if section.rows:
             ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(section.columns))}{header_row + len(section.rows)}"
-        ws.cell(row=row + 2, column=1, value="تولیدشده با LogiTrack").font = Font(size=8, color="9CA3AF")
+        ws.cell(row=row + 2, column=1, value="تولیدشده با پسینه").font = Font(size=8, color="9CA3AF")
         ws.oddFooter.center.text = "صفحه &P از &N"
     out = io.BytesIO()
     wb.save(out)
@@ -295,7 +295,7 @@ def to_pdf(report: Report, b: Branding, now_local: datetime) -> bytes:
         canvas.setFillColor(colors.HexColor("#9CA3AF"))
         canvas.setFont("Vazirmatn", 7)
         canvas.drawString(1.5 * cm, 0.8 * cm, _rtl(fa_digits(f"صفحه {doc.page}")))
-        canvas.drawRightString(right, 0.8 * cm, _rtl("تولیدشده با LogiTrack"))
+        canvas.drawRightString(right, 0.8 * cm, _rtl("تولیدشده با پسینه"))
         canvas.restoreState()
 
     header_height = 1.6 * cm + len(meta) * 0.38 * cm

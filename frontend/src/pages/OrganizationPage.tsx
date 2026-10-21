@@ -133,7 +133,7 @@ export default function OrganizationPage() {
   );
 }
 
-/** رنگ پیش‌فرض سربرگ گزارش‌ها — همان رنگ برند LogiTrack (report_builder.DEFAULT_COLOR) */
+/** رنگ پیش‌فرض سربرگ گزارش‌ها — همان رنگ برند پسینه (report_builder.DEFAULT_COLOR) */
 const DEFAULT_BRAND = "#0D9488";
 const SWATCHES = ["#0D9488", "#1D4ED8", "#4338CA", "#7C3AED", "#BE185D", "#B91C1C", "#C2410C", "#A16207", "#15803D", "#334155"];
 

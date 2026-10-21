@@ -40,9 +40,9 @@ export default function OrdersPage() {
         subtitle={me.role === "warehouse_manager" ? "سفارش‌های سازمان — ارسال از انبار شما را مدیریت کنید" : "ثبت، پیگیری و مدیریت سفارش‌ها"}
         actions={<>
           <Button variant="secondary" size="sm" loading={exporter.running === "/reports/export/orders/excel"} icon={<FileSpreadsheet className="size-4" />}
-            onClick={() => exporter.run("/reports/export/orders/excel", "LogiTrack_Orders.xlsx")}>اکسل</Button>
+            onClick={() => exporter.run("/reports/export/orders/excel", "Pasineh_Orders.xlsx")}>اکسل</Button>
           <Button variant="secondary" size="sm" loading={exporter.running === "/reports/export/orders/pdf"} icon={<FileText className="size-4" />}
-            onClick={() => exporter.run("/reports/export/orders/pdf", "LogiTrack_Orders.pdf")}>PDF</Button>
+            onClick={() => exporter.run("/reports/export/orders/pdf", "Pasineh_Orders.pdf")}>PDF</Button>
           <Button icon={<Plus className="size-4" />} onClick={() => setFormOpen(true)} data-testid="new-order">ثبت سفارش</Button>
         </>} />
 

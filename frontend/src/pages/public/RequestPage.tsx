@@ -43,7 +43,7 @@ export default function RequestPage() {
   const [done, setDone] = useState<Schemas["OrganizationRequestSubmitted"] | null>(null);
   const top = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { document.title = `درخواست دسترسی — ${BRAND.name}`; }, []);
+  useEffect(() => { document.title = `درخواست دسترسی — ${BRAND.nameFa}`; }, []);
   useEffect(() => {
     try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...form, company_fax: "" })); } catch { /* حالت خصوصی */ }
   }, [form]);

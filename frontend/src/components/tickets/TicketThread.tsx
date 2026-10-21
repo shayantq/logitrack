@@ -13,7 +13,7 @@ import { Button, Textarea, cn } from "@/ui/primitives";
 
 type Message = Ticket["messages"][number];
 
-const SIDE_NAME: Record<string, string> = { platform: "پشتیبانی LogiTrack", org: "سازمان", requester: "", system: "سیستم" };
+const SIDE_NAME: Record<string, string> = { platform: "پشتیبانی پسینه", org: "سازمان", requester: "", system: "سیستم" };
 
 function useImage(url: string, auth: boolean) {
   return useQuery({

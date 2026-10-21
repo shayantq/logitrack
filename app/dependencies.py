@@ -53,7 +53,7 @@ def get_current_user(
         if user.organization is None or not user.organization.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="حساب سازمان شما غیرفعال شده است؛ با پشتیبانی LogiTrack تماس بگیرید.",
+                detail="حساب سازمان شما غیرفعال شده است؛ با پشتیبانی پسینه تماس بگیرید.",
             )
         set_tenant(db, user.organization_id)
     else:

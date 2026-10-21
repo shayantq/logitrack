@@ -1055,7 +1055,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 📝 ثبت درخواست استفاده از LogiTrack برای یک کسب‌وکار */
+        /** 📝 ثبت درخواست استفاده از پسینه برای یک کسب‌وکار */
         post: operations["submit_request_organization_requests_post"];
         delete?: never;
         options?: never;
@@ -1881,7 +1881,7 @@ export interface paths {
         /** 📋 تیکت‌ها (راننده: فقط تیکت‌های خودش) */
         get: operations["list_tickets_tickets__get"];
         put?: never;
-        /** ➕ تیکت جدید (راننده ← سازمان، کارکنان سازمان ← پشتیبانی LogiTrack) */
+        /** ➕ تیکت جدید (راننده ← سازمان، کارکنان سازمان ← پشتیبانی پسینه) */
         post: operations["create_ticket_tickets__post"];
         delete?: never;
         options?: never;
@@ -1950,7 +1950,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** ⤴️ ارجاع به پشتیبانی LogiTrack */
+        /** ⤴️ ارجاع به پشتیبانی پسینه */
         post: operations["escalate_tickets__ticket_id__escalate_post"];
         delete?: never;
         options?: never;

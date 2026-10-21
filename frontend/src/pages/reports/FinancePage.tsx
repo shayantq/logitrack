@@ -51,7 +51,7 @@ export default function FinancePage() {
     queryFn: () => unwrap(api.GET("/reports/finance", { params: { query: { date_from: period.from, date_to: period.to } } })),
     placeholderData: keepPreviousData,
   });
-  const download = (format: "excel" | "pdf") => exporter.run("/reports/generate", `LogiTrack_Transport_Finance.${format === "pdf" ? "pdf" : "xlsx"}`,
+  const download = (format: "excel" | "pdf") => exporter.run("/reports/generate", `Pasineh_Transport_Finance.${format === "pdf" ? "pdf" : "xlsx"}`,
     { report: "finance", format, date_from: period.from, date_to: period.to }, `finance-${format}`);
   const k = data?.kpis;
 

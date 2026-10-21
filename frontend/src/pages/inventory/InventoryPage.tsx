@@ -179,11 +179,11 @@ export default function InventoryPage() {
       <PageHeader eyebrow="انبار" title="انبار و کالاها" subtitle="کاتالوگ کالا و موجودی انبارها"
         actions={<>
           <Button variant="secondary" size="sm" icon={<FileSpreadsheet className="size-4" />} loading={exporter.running === "/reports/export/inventory/excel"}
-            onClick={() => exporter.run("/reports/export/inventory/excel", "LogiTrack_Inventory.xlsx")}>اکسل</Button>
+            onClick={() => exporter.run("/reports/export/inventory/excel", "Pasineh_Inventory.xlsx")}>اکسل</Button>
           <Button variant="secondary" size="sm" icon={<FileText className="size-4" />} loading={exporter.running === "/reports/export/inventory/pdf"}
-            onClick={() => exporter.run("/reports/export/inventory/pdf", "LogiTrack_Inventory.pdf")}>PDF</Button>
+            onClick={() => exporter.run("/reports/export/inventory/pdf", "Pasineh_Inventory.pdf")}>PDF</Button>
           <Button variant="secondary" size="sm" icon={<Download className="size-4" />} data-testid="catalog-export"
-            onClick={() => downloadFile("/catalog/export", "LogiTrack_Catalog.xlsx").catch(e => toast.error(errorMessage(e)))}>خروجی کاتالوگ</Button>
+            onClick={() => downloadFile("/catalog/export", "Pasineh_Catalog.xlsx").catch(e => toast.error(errorMessage(e)))}>خروجی کاتالوگ</Button>
           <Button variant="secondary" size="sm" icon={<Upload className="size-4" />} onClick={() => setImportOpen(true)} data-testid="catalog-import-open">ورود از اکسل</Button>
           <Button variant="soft" icon={<ArrowLeftRight className="size-4" />} onClick={() => setMovementFor(null)} data-testid="new-movement">ثبت گردش / انتقال</Button>
           <Button icon={<PackagePlus className="size-4" />} onClick={() => setProductModal(true)}>کالای جدید</Button>

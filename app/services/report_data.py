@@ -106,7 +106,7 @@ def inventory(db: Session, user: User, warehouse_id: int | None = None, **_) -> 
             ("ارزش کل موجودی", _money(value_total)), ("ناموجود یا زیر نقطه سفارش", f"{low:,}")]
     scope = f"انبار {warehouses.get(wid)}" if wid else "همه انبارها"
     return Report(title=TITLES["inventory"], period=f"{scope} — در تاریخ {jalali(catalog_service.today_local())}",
-                  sections=[Section("موجودی کالاها", cols, rows)], kpis=kpis, landscape=True, filename="LogiTrack_Inventory")
+                  sections=[Section("موجودی کالاها", cols, rows)], kpis=kpis, landscape=True, filename="Pasineh_Inventory")
 
 
 def orders(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, status: str | None = None, **_) -> Report:
@@ -138,7 +138,7 @@ def orders(db: Session, user: User, date_from: date | None = None, date_to: date
             ("مبلغ کالا", _money(sum(r["goods"] for r in rows))), ("کرایه", _money(sum(r["fee"] for r in rows)))]
     title = TITLES["orders"] + (f" ({STATUS_LABELS.get(status, status)})" if status else "")
     return Report(title=title, period=period_text(start, end), sections=[Section("سفارش‌ها", cols, rows)], kpis=kpis,
-                  landscape=True, filename="LogiTrack_Orders")
+                  landscape=True, filename="Pasineh_Orders")
 
 
 def ledger(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, warehouse_id: int | None = None, **_) -> Report:
@@ -162,7 +162,7 @@ def ledger(db: Session, user: User, date_from: date | None = None, date_to: date
     kpis = [("گردش‌ها", f"{len(rows):,}"), ("کل ورود", f"{sum(r['in'] or 0 for r in rows):,}"),
             ("کل خروج", f"{sum(r['out'] or 0 for r in rows):,}")]
     return Report(title=TITLES["ledger"], period=period_text(start, end), sections=[Section("گردش کالا", cols, rows)], kpis=kpis,
-                  landscape=True, filename="LogiTrack_Ledger")
+                  landscape=True, filename="Pasineh_Ledger")
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ def finance(db: Session, user: User, date_from: date | None = None, date_to: dat
                                  Col("driver_share", "سهم راننده", "money", 13, True)], d["details"]),
     ]
     return Report(title=TITLES["finance"], period=period_text(d["start"], d["end"]), sections=sections, kpis=kpis, landscape=True,
-                  filename="LogiTrack_Transport_Finance")
+                  filename="Pasineh_Transport_Finance")
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ def reorder(db: Session, user: User, warehouse_id: int | None = None, **_) -> Re
             f"سطح خدمت {pol['service_level'] * 100:g}٪، تاریخچه {pol['history_days']} روز")
     return Report(title=TITLES["reorder"], period=f"در تاریخ {jalali(catalog_service.today_local())} — {note}",
                   sections=[Section("اقلام به ترتیب اولویت خرید", cols, rows)], kpis=kpis, landscape=True,
-                  filename="LogiTrack_Reorder_Points")
+                  filename="Pasineh_Reorder_Points")
 
 
 def capital(db: Session, user: User, warehouse_id: int | None = None, months: int | None = None, **_) -> Report:
@@ -317,7 +317,7 @@ def capital(db: Session, user: User, warehouse_id: int | None = None, months: in
     return Report(title=TITLES["capital"], period=period,
                   sections=[Section("سرمایه لازم به تفکیک ماه", month_cols, month_rows),
                             Section("سرمایه لازم به تفکیک کالا", item_cols, item_rows)],
-                  kpis=kpis, landscape=True, filename="LogiTrack_Purchase_Capital_Plan")
+                  kpis=kpis, landscape=True, filename="Pasineh_Purchase_Capital_Plan")
 
 
 BUILDERS = {"inventory": inventory, "orders": orders, "ledger": ledger, "finance": finance, "reorder": reorder, "capital": capital}

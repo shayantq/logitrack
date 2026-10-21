@@ -68,7 +68,7 @@ def tickets_summary(db: db_dependency, user: user_dependency):
 
 
 @router.post("/", response_model=TicketDetail, status_code=201,
-             summary="➕ تیکت جدید (راننده ← سازمان، کارکنان سازمان ← پشتیبانی LogiTrack)")
+             summary="➕ تیکت جدید (راننده ← سازمان، کارکنان سازمان ← پشتیبانی پسینه)")
 async def create_ticket(db: db_dependency, user: user_dependency, category: str = Form(...), body: str = Form(..., max_length=5000),
                         subject: Optional[str] = Form(None, max_length=200), priority: Literal["normal", "high", "urgent"] = Form("normal"),
                         order_id: Optional[int] = Form(None), file: Optional[UploadFile] = None):
@@ -90,7 +90,7 @@ async def post_message(db: db_dependency, user: user_dependency, ticket_id: int 
     return _call(ticket_service.post_message, db, user, ticket_id, body, visibility, data)
 
 
-@router.post("/{ticket_id}/escalate", response_model=TicketDetail, summary="⤴️ ارجاع به پشتیبانی LogiTrack")
+@router.post("/{ticket_id}/escalate", response_model=TicketDetail, summary="⤴️ ارجاع به پشتیبانی پسینه")
 def escalate(data: EscalateIn, db: db_dependency, user: user_dependency, ticket_id: int = Path(gt=0)):
     return _call(ticket_service.escalate, db, user, ticket_id, data.reason)
 

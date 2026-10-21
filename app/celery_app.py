@@ -15,7 +15,7 @@ from celery.schedules import crontab
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 celery_app = Celery(
-    "logitrack",
+    "pasineh",
     broker=REDIS_URL,
     backend=REDIS_URL,
 )

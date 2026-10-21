@@ -7,10 +7,10 @@ from app.core.tenancy import TenantScoped
 
 
 class RoleEnum(str, enum.Enum):
-    # کارکنان پلتفرم LogiTrack — به هیچ سازمانی تعلق ندارند
+    # کارکنان پلتفرم پسینه — به هیچ سازمانی تعلق ندارند
     PLATFORM_ADMIN = "platform_admin"
     PLATFORM_SUPPORT = "platform_support"
-    # کاربران یک سازمان (مشتری‌ای که LogiTrack را خریده)
+    # کاربران یک سازمان (مشتری‌ای که پسینه را خریده)
     ORG_ADMIN = "org_admin"
     WAREHOUSE_MANAGER = "warehouse_manager"
     DRIVER = "driver"
@@ -99,7 +99,7 @@ PROFILE_FIELDS = tuple(
 
 
 class Organization(OrganizationProfileMixin, Base):
-    """سازمان/کسب‌وکاری که از LogiTrack استفاده می‌کند — همه داده‌ها زیر یک سازمان‌اند."""
+    """سازمان/کسب‌وکاری که از پسینه استفاده می‌کند — همه داده‌ها زیر یک سازمان‌اند."""
     __tablename__ = "organizations"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -118,7 +118,7 @@ class Organization(OrganizationProfileMixin, Base):
 
 
 class OrganizationRequest(OrganizationProfileMixin, Base):
-    """درخواست استفاده از LogiTrack که از لندینگ پیج (بدون لاگین) ثبت و توسط ادمین پلتفرم بررسی می‌شود."""
+    """درخواست استفاده از پسینه که از لندینگ پیج (بدون لاگین) ثبت و توسط ادمین پلتفرم بررسی می‌شود."""
     __tablename__ = "organization_requests"
 
     id = Column(Integer, primary_key=True, index=True)

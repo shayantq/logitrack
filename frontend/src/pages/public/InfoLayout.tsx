@@ -1,7 +1,7 @@
 /** قالب مشترک صفحه‌های اطلاع‌رسانی (درباره ما، سوالات متداول، قوانین): سربرگ، بخش آغازین، محتوا، دعوت پایانی و پانویس */
 import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { BRAND } from "@/brand";
 import { buttonClass } from "@/ui/primitives";
 import { PublicFooter, PublicHeader } from "./chrome";
@@ -13,7 +13,7 @@ export function InfoLayout({ title, eyebrow, heading, lead, children, testId, ct
   /** محتوای اضافه زیر متن آغازین (مثل جست‌وجو) */
   hero?: ReactNode;
 }) {
-  useEffect(() => { document.title = `${title} — ${BRAND.name}`; }, [title]);
+  useEffect(() => { document.title = `${title} — ${BRAND.nameFa}`; }, [title]);
   return (
     <div className="min-h-svh bg-bg text-text" data-testid={testId}>
       <PublicHeader />
@@ -63,6 +63,7 @@ function ContactStrip() {
           <p className="mt-3 leading-8 text-text-2">درخواست دسترسی را ثبت کنید، یا اگر سؤالی دارید برایمان بنویسید.</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
+          <a href={`tel:${BRAND.phone}`} className={buttonClass("secondary", "lg")}><Phone className="size-4" /><span className="text-sm">{BRAND.phoneDisplay}</span></a>
           <a href={`mailto:${BRAND.supportEmail}`} className={buttonClass("secondary", "lg")}><Mail className="size-4" /><span className="font-mono text-sm ltr">{BRAND.supportEmail}</span></a>
           <Link to="/request" className={buttonClass("primary", "lg")}>درخواست دسترسی<ArrowLeft className="size-4" /></Link>
         </div>

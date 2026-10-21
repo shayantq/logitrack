@@ -1,6 +1,6 @@
 /**
  * میز پشتیبانی (مرحله ۱۱) — یک صفحه برای سه نقش:
- *   org: همه تیکت‌های مشتریان، رانندگان و تیکت‌های خود سازمان به پشتیبانی LogiTrack
+ *   org: همه تیکت‌های مشتریان، رانندگان و تیکت‌های خود سازمان به پشتیبانی پسینه
  *   driver: تیکت‌های خود راننده به سازمان
  *   platform: تیکت‌های ارجاعی همه سازمان‌ها
  * فهرست و گفت‌وگو کنار هم (روی موبایل جدا)؛ هر ۱۵ ثانیه به‌روز می‌شود.
@@ -27,11 +27,11 @@ type Tab = "waiting" | "open" | "resolved" | "all";
 
 const CONFIG: Record<Mode, { api: string; route: string; side: Side; title: string; subtitle: string; eyebrow: string }> = {
   org: { api: "/tickets", route: "/app/tickets", side: "org", eyebrow: "ارتباط", title: "پشتیبانی و تیکت‌ها",
-    subtitle: "درخواست‌های مشتریان و رانندگان، و تیکت‌های سازمان به پشتیبانی LogiTrack" },
+    subtitle: "درخواست‌های مشتریان و رانندگان، و تیکت‌های سازمان به پشتیبانی پسینه" },
   driver: { api: "/tickets", route: "/app/driver/support", side: "requester", eyebrow: "راننده", title: "پشتیبانی",
     subtitle: "مشکل یا سؤالتان را برای سازمان بفرستید و پاسخ را همین‌جا ببینید" },
   platform: { api: "/platform/tickets", route: "/app/platform/tickets", side: "platform", eyebrow: "پلتفرم", title: "تیکت‌های پشتیبانی",
-    subtitle: "تیکت‌هایی که سازمان‌ها باز کرده یا به پشتیبانی LogiTrack ارجاع داده‌اند" },
+    subtitle: "تیکت‌هایی که سازمان‌ها باز کرده یا به پشتیبانی پسینه ارجاع داده‌اند" },
 };
 
 const SOURCE_ICON = { customer: UserRound, driver: Truck, org: Building2 } as const;
@@ -62,7 +62,7 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
       <PageHeader eyebrow={cfg.eyebrow} title={cfg.title} subtitle={cfg.subtitle}
         actions={mode !== "platform" && (
           <Button icon={<MessageSquarePlus className="size-4" />} onClick={() => setNewOpen(true)} data-testid="ticket-new">
-            {mode === "org" ? "تیکت به پشتیبانی LogiTrack" : "تیکت جدید"}
+            {mode === "org" ? "تیکت به پشتیبانی پسینه" : "تیکت جدید"}
           </Button>
         )} />
 
@@ -205,7 +205,7 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
         </div>
         {t.escalation_reason && (
           <p className="mt-3 flex items-start gap-2 rounded-xl bg-violet-soft/50 px-3 py-2 text-xs text-text-2"><Share2 className="mt-0.5 size-3.5 shrink-0 text-violet" />
-            ارجاع به پشتیبانی LogiTrack: {t.escalation_reason}</p>
+            ارجاع به پشتیبانی پسینه: {t.escalation_reason}</p>
         )}
         {(t.can_escalate || t.can_resolve || t.can_close || t.can_manage) && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -225,8 +225,8 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
             </>}
             <div className="ms-auto flex flex-wrap gap-2">
               {t.can_escalate && <Button size="sm" variant="secondary" icon={<Share2 className="size-3.5" />} data-testid="ticket-escalate"
-                onClick={() => promptDialog({ title: "ارجاع به پشتیبانی LogiTrack", label: "چه کمکی از پشتیبانی LogiTrack لازم دارید؟", minLength: 5, maxLength: 1000,
-                  multiline: true, confirmLabel: "ارجاع", text: "پشتیبانی LogiTrack گفت‌وگو را می‌بیند (به‌جز یادداشت‌های داخلی) و با شما — نه مستقیم با مشتری — صحبت می‌کند." })
+                onClick={() => promptDialog({ title: "ارجاع به پشتیبانی پسینه", label: "چه کمکی از پشتیبانی پسینه لازم دارید؟", minLength: 5, maxLength: 1000,
+                  multiline: true, confirmLabel: "ارجاع", text: "پشتیبانی پسینه گفت‌وگو را می‌بیند (به‌جز یادداشت‌های داخلی) و با شما — نه مستقیم با مشتری — صحبت می‌کند." })
                   .then(reason => reason && action.mutate(() => unwrap(api.POST("/tickets/{ticket_id}/escalate", { ...path, body: { reason } }))))}>
                 ارجاع به پشتیبانی</Button>}
               {t.can_resolve && <Button size="sm" variant="soft" icon={<CheckCircle2 className="size-3.5" />} data-testid="ticket-resolve"
@@ -276,8 +276,8 @@ function NewTicketModal({ mode, onClose, onCreated }: { mode: Mode; onClose: () 
   const recent = useMemo(() => (orders.data ?? []).slice(0, 50), [orders.data]);
 
   return (
-    <Modal open onClose={onClose} title={mode === "org" ? "تیکت به پشتیبانی LogiTrack" : "تیکت جدید به سازمان"} testId="ticket-new-form"
-      description={mode === "org" ? "مشکل فنی، حساب کاربری، مالی یا پیشنهاد — تیم پشتیبانی LogiTrack پاسخ می‌دهد." : "پاسخ سازمان را همین‌جا و با نشان کنار منو می‌بینید."}
+    <Modal open onClose={onClose} title={mode === "org" ? "تیکت به پشتیبانی پسینه" : "تیکت جدید به سازمان"} testId="ticket-new-form"
+      description={mode === "org" ? "مشکل فنی، حساب کاربری، مالی یا پیشنهاد — تیم پشتیبانی پسینه پاسخ می‌دهد." : "پاسخ سازمان را همین‌جا و با نشان کنار منو می‌بینید."}
       footer={<><Button variant="secondary" onClick={onClose}>انصراف</Button><Button type="submit" form="new-ticket" loading={create.isPending} data-testid="ticket-submit">ثبت تیکت</Button></>}>
       <form id="new-ticket" className="grid gap-4 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); create.mutate(); }}>
         <Field label="موضوع *">

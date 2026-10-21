@@ -1,5 +1,5 @@
 """
-ساخت حساب ادمین پلتفرم LogiTrack (کارکنان پلتفرم سازمان ندارند و از پنل
+ساخت حساب ادمین پلتفرم پسینه (کارکنان پلتفرم سازمان ندارند و از پنل
 /platform سازمان‌ها را می‌سازند و مدیریت می‌کنند).
 
 نحوه اجرا (داخل کانتینر داکر):
@@ -26,7 +26,7 @@ def create_platform_admin(username: str, password: str, email: str | None = None
 
         db.add(User(
             username=username,
-            email=email or f"{username}@logitrack.local",
+            email=email or f"{username}@pasineh.local",
             full_name="ادمین پلتفرم",
             role=RoleEnum.PLATFORM_ADMIN,
             organization_id=None,

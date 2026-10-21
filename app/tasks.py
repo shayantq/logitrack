@@ -146,7 +146,7 @@ def generate_inventory_excel_task(organization_id, warehouse_id=None):
         )
         return {
             "organization_id": organization_id,
-            "filename": "LogiTrack_Inventory.xlsx",
+            "filename": "Pasineh_Inventory.xlsx",
             "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "content_b64": _dataframe_to_base64_xlsx(df, "موجودی انبار")
         }
@@ -172,7 +172,7 @@ def generate_orders_excel_task(organization_id):
         df = pd.DataFrame(data) if data else pd.DataFrame(columns=columns)
         return {
             "organization_id": organization_id,
-            "filename": "LogiTrack_Orders.xlsx",
+            "filename": "Pasineh_Orders.xlsx",
             "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "content_b64": _dataframe_to_base64_xlsx(df, "سفارشات")
         }
@@ -190,11 +190,11 @@ def generate_inventory_pdf_task(organization_id, warehouse_id=None):
     try:
         rows = [[p.sku, p.name, stock, p.weight_kg, p.price] for p, stock in _inventory_rows(db, warehouse_id)]
         content_b64 = _build_pdf_base64(
-            "گزارش موجودی انبار LogiTrack",
+            "گزارش موجودی انبار پسینه",
             ["SKU", "نام کالا", "موجودی", "وزن (کیلوگرم)", "قیمت"],
             rows
         )
-        return {"organization_id": organization_id, "filename": "LogiTrack_Inventory.pdf", "content_type": "application/pdf", "content_b64": content_b64}
+        return {"organization_id": organization_id, "filename": "Pasineh_Inventory.pdf", "content_type": "application/pdf", "content_b64": content_b64}
     finally:
         db.close()
 
@@ -210,11 +210,11 @@ def generate_orders_pdf_task(organization_id):
                 o.vehicle.license_plate if o.vehicle else "—", STATUS_LABELS.get(o.status, o.status),
             ])
         content_b64 = _build_pdf_base64(
-            "گزارش سفارشات LogiTrack",
+            "گزارش سفارشات پسینه",
             ["کد پیگیری", "اقلام", "تعداد", "مقصد", "خودرو", "وضعیت"],
             rows
         )
-        return {"organization_id": organization_id, "filename": "LogiTrack_Orders.pdf", "content_type": "application/pdf", "content_b64": content_b64}
+        return {"organization_id": organization_id, "filename": "Pasineh_Orders.pdf", "content_type": "application/pdf", "content_b64": content_b64}
     finally:
         db.close()
 

@@ -291,7 +291,7 @@ export function CatalogImportModal({ open, onClose }: { open: boolean; onClose: 
           <FileSpreadsheet className="size-5 text-success" />
           <span className="flex-1">قالب آماده با راهنما، نمونه و فهرست‌های کشویی را دانلود و پر کنید.</span>
           <Button size="sm" variant="secondary" icon={<Download className="size-4" />} data-testid="import-template"
-            onClick={() => downloadFile("/catalog/template", "LogiTrack_Catalog_Template.xlsx").catch(e => toast.error(errorMessage(e)))}>دانلود قالب</Button>
+            onClick={() => downloadFile("/catalog/template", "Pasineh_Catalog_Template.xlsx").catch(e => toast.error(errorMessage(e)))}>دانلود قالب</Button>
         </div>
         <Field label="فایل اکسل (.xlsx) *">
           <FileField file={file} onChange={f => { setFile(f); setReport(null); }} testId="import-file"

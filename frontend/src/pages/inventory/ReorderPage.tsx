@@ -72,7 +72,7 @@ export default function ReorderPage() {
       && (!needle || i.name.toLowerCase().includes(needle) || i.sku.toLowerCase().includes(needle) || (i.category ?? "").toLowerCase().includes(needle)));
   }, [list.data, q, status]);
   const s = list.data?.summary;
-  const download = (format: "excel" | "pdf") => exporter.run("/reports/generate", `LogiTrack_Reorder_Points.${format === "pdf" ? "pdf" : "xlsx"}`,
+  const download = (format: "excel" | "pdf") => exporter.run("/reports/generate", `Pasineh_Reorder_Points.${format === "pdf" ? "pdf" : "xlsx"}`,
     { report: "reorder", format, warehouse_id: warehouseId ? Number(warehouseId) : null }, `reorder-${format}`);
 
   return (

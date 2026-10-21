@@ -185,6 +185,7 @@ export function PublicFooter() {
             <li><Link to="/request#status" className="hover:text-brand">پیگیری درخواست سازمان</Link></li>
             <li><Link to="/app/login" className="hover:text-brand">ورود به پنل</Link></li>
             <li><a href={`mailto:${BRAND.supportEmail}`} className="font-mono text-xs hover:text-brand ltr">{BRAND.supportEmail}</a></li>
+            <li><a href={`tel:${BRAND.phone}`} className="hover:text-brand" data-testid="footer-phone">{BRAND.phoneDisplay}</a></li>
           </ul>
         </div>
       </div>

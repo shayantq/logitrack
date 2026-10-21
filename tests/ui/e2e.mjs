@@ -801,7 +801,7 @@ await session("map-public", null, null, async page => {
   check("map", "customer sees reported progress", (await page.locator("[data-testid=track-route] [data-testid=route-city][data-passed=true]").count()) === 2);
 }, { viewport: { width: 420, height: 900 } });
 
-// ---------------- مرحله ۱۱: تیکت پشتیبانی — مشتری ← سازمان ← پشتیبانی LogiTrack ----------------
+// ---------------- مرحله ۱۱: تیکت پشتیبانی — مشتری ← سازمان ← پشتیبانی پسینه ----------------
 let supportUrl = "", ticketCode = "";
 await session("tickets-customer", null, null, async page => {
   await page.goto(`${BASE}/track/${perfOrder.tracking_code}`);
@@ -838,7 +838,7 @@ await session("tickets-org", "qazvin_admin", "admin123", async page => {
   await page.fill("[data-testid=prompt-input]", "برای بررسی ادعای راننده کمک لازم داریم");
   await page.click("[data-testid=prompt-dialog] [data-testid=dialog-ok]");
   await page.waitForSelector("[data-testid=ticket-composer] [data-visibility=staff]");
-  check("tickets", "escalated to platform support", (await page.locator("[data-testid=ticket-detail]").textContent()).includes("ارجاع به پشتیبانی LogiTrack"));
+  check("tickets", "escalated to platform support", (await page.locator("[data-testid=ticket-detail]").textContent()).includes("ارجاع به پشتیبانی پسینه"));
 });
 
 await session("tickets-platform", "superadmin", "superadmin123", async page => {
@@ -1087,7 +1087,7 @@ await session("reports", "qazvin_admin", "admin123", async page => {
   check("reports", "admin sees all six report cards", (await page.locator("[data-testid^=report-card-]").count()) === 6);
   await page.click("[data-testid=period-picker] button >> text=امسال");
   const pdf = await grabDownload(page, "[data-testid=report-pdf-finance]");
-  check("reports", "finance PDF downloads with Jalali-stamped name", pdf.head === "%PDF" && /^LogiTrack_Transport_Finance_14\d\d-\d\d-\d\d\.pdf$/.test(pdf.name), pdf.name);
+  check("reports", "finance PDF downloads with Jalali-stamped name", pdf.head === "%PDF" && /^Pasineh_Transport_Finance_14\d\d-\d\d-\d\d\.pdf$/.test(pdf.name), pdf.name);
   const xlsx = await grabDownload(page, "[data-testid=report-excel-inventory]");
   check("reports", "inventory Excel downloads", xlsx.head.startsWith("PK") && xlsx.name.endsWith(".xlsx"), xlsx.name);
   const ledger = await grabDownload(page, "[data-testid=report-pdf-ledger]");
