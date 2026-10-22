@@ -63,6 +63,17 @@ function beamTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+/**
+ * لایه‌های نور (مخروط چراغ خودرو و لکه نور چراغ خیابان) کمی بالاتر از همه خط‌کشی‌ها (بالاترین: خط‌چین مسیر تا ۰٫۰۹)
+ * و پیاده‌رو (۰٫۱۴) رسم می‌شوند و با polygonOffset به دوربین نزدیک‌تر حساب می‌شوند؛ هم‌سطح بودن نور با رویه خط‌ها
+ * باعث سوسو (z-fighting) و بریده شدن نور روی خط‌چین‌ها بود.
+ */
+const LIGHT_Y = 0.16;
+const lightMaterial = (map: THREE.Texture, opacity = 1) => new THREE.MeshBasicMaterial({
+  map, opacity, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+});
+
 /** تولید عدد شبه‌تصادفی تکرارپذیر — شهر در هر بار بارگذاری یکسان است */
 function rng(seed: number) {
   return () => {
@@ -128,7 +139,7 @@ export class CityScene {
   private lampPools!: THREE.InstancedMesh;
   private lampDelay: number[] = [];
   /** مخروط نور جلوی همه خودروها یک متریال مشترک دارد؛ شب با opacity روشن می‌شود */
-  private beamMaterial = new THREE.MeshBasicMaterial({ map: beamTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+  private beamMaterial = lightMaterial(beamTexture(), 0);
   private glowMap = glowTexture();
   /** ۰ = روز، ۱ = شب کامل؛ روشن/خاموش شدن چراغ‌ها نرم و پشت‌سرهم انیمیت می‌شود */
   private night = 0;
@@ -414,7 +425,7 @@ export class CityScene {
     // مخروط نور روی آسفالت جلوی خودرو
     const beam = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.6), this.beamMaterial);
     beam.rotation.x = -Math.PI / 2;
-    beam.position.set(0, 0.07, length * 0.5 + 1.75);
+    beam.position.set(0, LIGHT_Y, length * 0.5 + 1.75);
     beam.renderOrder = 2;
     g.add(beam);
     return g;
@@ -443,14 +454,13 @@ export class CityScene {
     }
     const m = new THREE.Matrix4();
     this.lampHeads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 0.1, 0.26), new THREE.MeshBasicMaterial(), spots.length);
-    this.lampPools = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.4, 3.4),
-      new THREE.MeshBasicMaterial({ map: this.glowMap, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), spots.length);
+    this.lampPools = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.4, 3.4), lightMaterial(this.glowMap), spots.length);
     this.lampPools.renderOrder = 1;
     const flat = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
     spots.forEach((p, i) => {
       const hx = p.x + p.ax * 0.5, hz = p.z + p.az * 0.5;
       m.makeTranslation(hx, 0.14 + height - 0.02, hz); this.lampHeads.setMatrixAt(i, m);
-      m.copy(flat).setPosition(hx, 0.06, hz); this.lampPools.setMatrixAt(i, m);
+      m.copy(flat).setPosition(hx, LIGHT_Y, hz); this.lampPools.setMatrixAt(i, m);
       // روشن شدن موجی از سمت انبار به بیرون
       this.lampDelay.push(Math.hypot(hx - blockCenter(WAREHOUSE_BLOCK[0]), hz - blockCenter(WAREHOUSE_BLOCK[1])) / (N * PITCH * 1.4));
     });

@@ -10,9 +10,9 @@ import { ALL_FAQ, LANDING_FAQ_IDS } from "../content/faq";
 
 // ------------------------------------------------------------------ [03] محصول
 const SCREENS = [
-  { key: "orders", path: "/app/orders", title: "صف سفارش‌ها", text: "همه سفارش‌ها با وضعیت، شهر مقصد و راننده؛ جست‌وجو، فیلتر و خروجی اکسل. صفحه هر ۱۵ ثانیه خودش به‌روز می‌شود.", icon: ClipboardList },
-  { key: "ledger", path: "/app/ledger", title: "دفتر گردش انبار", text: "هر ورود و خروج کالا با موجودی بعد از تغییر. برای هر کالا می‌توانید تاریخچه کامل را ببینید.", icon: History },
-  { key: "driver", path: "/app/driver", title: "پنل راننده", text: "راننده روی موبایل فقط سفارش‌های خودش را می‌بیند و هر مرحله را با یک لمس ثبت می‌کند.", icon: Truck },
+  { key: "orders", path: "/app/orders", title: "برای مدیر: صف سفارش‌ها", text: "همه سفارش‌ها با وضعیت، مقصد و راننده؛ با جست‌وجو، فیلتر و خروجی اکسل.", icon: ClipboardList },
+  { key: "ledger", path: "/app/ledger", title: "برای انباردار: دفتر گردش", text: "هر ورود و خروج کالا با موجودی بعد از آن؛ تاریخچه هر کالا در یک نگاه.", icon: History },
+  { key: "driver", path: "/app/driver", title: "برای راننده: پنل موبایل", text: "راننده فقط سفارش‌های خودش را می‌بیند و هر مرحله را با یک لمس ثبت می‌کند.", icon: Truck },
 ] as const;
 
 export function ProductSection() {
@@ -28,7 +28,7 @@ export function ProductSection() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
           <div>
             <SectionTag label="محصول" />
-            <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl">یک سامانه، سه نگاه.</h2>
+            <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl">هر نفر، پنل مخصوص خودش.</h2>
             <ol className="mt-6 space-y-2 sm:mt-8">
               {SCREENS.map((s, i) => (
                 <li key={s.key} className={cn("rounded-2xl border p-4 transition-all duration-500",
@@ -111,7 +111,7 @@ function OrdersMock() {
         {MOCK_ORDERS.map(([code, city, status, tone, driver]) => (
           <div key={code} className="grid grid-cols-[1.1fr_0.8fr_1.3fr_0.6fr] items-center gap-2 border-b border-border px-3 py-2.5 last:border-0">
             <span className="font-mono font-semibold ltr text-right">{code}</span><span className="text-text-2">{city}</span>
-            <span><span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", TONE_CLS[tone])}>{status}</span></span>
+            <span><span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", TONE_CLS[tone])}>{status}</span></span>
             <span className="font-mono text-muted">{driver}</span>
           </div>
         ))}
@@ -150,7 +150,7 @@ function DriverMock() {
       <div className="w-56 rounded-[32px] border-4 border-text/80 bg-surface p-3 shadow-[var(--shadow-lg)] sm:w-60">
         <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-border-strong" />
         <div className="rounded-2xl border border-border p-3 text-xs">
-          <div className="flex items-center justify-between"><span className="font-mono font-bold ltr">LT-2481</span><span className="rounded-full bg-info-soft px-2 py-0.5 text-[10px] font-semibold text-info">در مسیر</span></div>
+          <div className="flex items-center justify-between"><span className="font-mono font-bold ltr">LT-2481</span><span className="rounded-full bg-info-soft px-2 py-0.5 text-[11px] font-semibold text-info">در مسیر</span></div>
           <div className="mt-3 flex gap-1">{[1, 1, 1, 1, 0].map((on, i) => <span key={i} className={cn("h-1 flex-1 rounded-full", on ? "bg-brand" : "bg-surface-2")} />)}</div>
           <div className="mt-3 space-y-1.5 text-text-2">
             <div className="flex gap-1.5"><MapPin className="size-3.5 shrink-0 text-danger" />تهران، سعادت‌آباد، خیابان سرو</div>
@@ -166,10 +166,10 @@ function DriverMock() {
 
 // ------------------------------------------------------------------ [04] شروع کار
 const HOW = [
-  { title: "فرم درخواست را پر کنید", text: "مشخصات کسب‌وکار، حجم سفارش ماهانه و بخش‌هایی که لازم دارید. یک کد پیگیری می‌گیرید." },
-  { title: "بررسی و ساخت سازمان", text: "پس از تأیید، فضای اختصاصی سازمان شما ساخته و نام کاربری ادمین برایتان فرستاده می‌شود." },
-  { title: "تعریف انبار، کالا و ناوگان", text: "انبارها، کالاها با موجودی اولیه، خودروها و کاربران (مدیر انبار و راننده) را اضافه کنید." },
-  { title: "اولین سفارش را ثبت کنید", text: "از همین لحظه موجودی، تخصیص خودرو و وضعیت هر سفارش خودکار دنبال می‌شود." },
+  { title: "فرم درخواست را پر کنید", text: "چند دقیقه بیشتر طول نمی‌کشد و همان لحظه کد پیگیری می‌گیرید." },
+  { title: "سازمان شما فعال می‌شود", text: "پس از تأیید، فضای اختصاصی سازمان ساخته و اطلاعات ورود برایتان ارسال می‌شود." },
+  { title: "انبار، کالا و ناوگان را تعریف کنید", text: "انبارها، کالاها (حتی از فایل اکسل)، خودروها و کاربران را اضافه کنید." },
+  { title: "اولین سفارش را ثبت کنید", text: "از همین لحظه موجودی، تخصیص خودرو و وضعیت سفارش‌ها خودکار دنبال می‌شود." },
 ];
 
 export function HowSection() {
@@ -181,8 +181,8 @@ export function HowSection() {
       <div className="mx-auto grid max-w-7xl gap-14 px-4 sm:px-6 lg:grid-cols-2">
         <div className="lg:sticky lg:top-32 lg:h-fit">
           <SectionTag label="شروع کار" />
-          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="از فرم درخواست تا اولین تحویل، در چهار قدم." />
-          <Link to="/request" className={buttonClass("primary", "lg", "mt-8")}>شروع با فرم درخواست<ArrowLeft className="size-4" /></Link>
+          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="از ثبت‌نام تا اولین تحویل، در چهار قدم." />
+          <Link to="/request?plan=trial" className={buttonClass("primary", "lg", "mt-8")}>شروع رایگان<ArrowLeft className="size-4" /></Link>
         </div>
         <ol ref={list} className="relative space-y-6">
           <span className="absolute right-[23px] top-6 bottom-6 w-0.5 bg-border" />
@@ -210,10 +210,10 @@ export function HowSection() {
 
 // ------------------------------------------------------------------ [05] اعتماد
 const TRUST = [
-  { icon: Layers, title: "جداسازی کامل سازمان‌ها", text: "هر پرس‌وجو در لایه پایگاه داده به سازمان کاربر محدود می‌شود؛ داده یک سازمان هیچ‌وقت در پنل سازمان دیگر دیده نمی‌شود." },
-  { icon: UserCog, title: "نقش‌ها و دسترسی‌ها", text: "ادمین سازمان، مدیر انبار و راننده هر کدام فقط همان بخشی را می‌بینند و تغییر می‌دهند که لازم دارند." },
-  { icon: History, title: "ردپای هر تغییر", text: "تاریخچه وضعیت سفارش و دفتر گردش انبار، با زمان و نام ثبت‌کننده. چیزی بی‌صدا عوض نمی‌شود." },
-  { icon: Sheet, title: "گزارش و خروجی", text: "داشبورد آماری سفارش‌ها و موجودی، با خروجی اکسل برای حسابداری و گزارش‌های مدیریتی." },
+  { icon: Layers, title: "جداسازی کامل سازمان‌ها", text: "داده‌های هر سازمان کاملاً جداست و در پنل هیچ سازمان دیگری دیده نمی‌شود." },
+  { icon: UserCog, title: "دسترسی بر اساس نقش", text: "مدیر، انباردار و راننده هر کدام فقط بخش مربوط به کار خودشان را می‌بینند." },
+  { icon: History, title: "ردپای هر تغییر", text: "هر تغییر در سفارش و انبار با زمان و نام ثبت‌کننده ذخیره می‌شود." },
+  { icon: Sheet, title: "گزارش‌های آماده", text: "داشبورد مدیریتی و خروجی اکسل و PDF برای حسابداری و جلسه‌های مدیریت." },
 ];
 
 export function TrustSection() {
@@ -222,9 +222,9 @@ export function TrustSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionTag label="اعتماد" />
         <div className="grid gap-10 lg:grid-cols-2 lg:items-end">
-          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="داده‌های شما، فقط برای سازمان شما." />
+          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="اطلاعات شما، امن و فقط برای شما." />
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-            {[[100, "٪", "جداسازی داده"], [9, "", "وضعیت استاندارد سفارش"], [5, "", "نقش دسترسی"], [15, "ث", "به‌روزرسانی خودکار"]].map(([v, s, l]) => (
+            {[[100, " درصد", "جداسازی داده سازمان‌ها"], [5, "", "نقش دسترسی جدا"], [15, " ثانیه", "به‌روزرسانی خودکار صفحه‌ها"], [30, " روز", "استفاده رایگان"]].map(([v, s, l]) => (
               <div key={l as string}>
                 <CountUp to={v as number} suffix={s as string} className="text-4xl font-black tracking-tight text-brand" />
                 <div className="mt-1 text-sm text-muted">{l as string}</div>
@@ -256,7 +256,7 @@ export function FaqSection() {
         <div>
           <SectionTag label="پرسش‌ها" />
           <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">پرسش‌های پرتکرار</h2>
-          <p className="mt-5 leading-8 text-text-2">پرتکرارترین پرسش‌ها این‌جاست؛ ده‌ها پرسش دیگر درباره سفارش، انبار، رانندگان و امنیت را در صفحه «سوالات متداول» ببینید.</p>
+          <p className="mt-5 leading-8 text-text-2">پاسخ پرتکرارترین پرسش‌ها این‌جاست. بقیه را در صفحه «سوالات متداول» ببینید.</p>
           <Link to="/faq" className={buttonClass("secondary", "lg", "mt-8")} data-testid="landing-faq-all">همه پرسش‌ها<ArrowLeft className="size-4" /></Link>
         </div>
         <Accordion.Root type="single" collapsible className="divide-y divide-border border-y border-border" dir="rtl">
@@ -297,13 +297,13 @@ export function CtaSection() {
           </svg>
           <div className="relative grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <div className="mb-4 flex items-center gap-2 text-sm font-semibold opacity-85"><ShieldCheck className="size-4" />فضای اختصاصی هر سازمان</div>
-              <h2 className="max-w-2xl text-3xl font-black leading-tight tracking-tight sm:text-5xl">سفارش بعدی را روی مسیر درست ثبت کنید.</h2>
-              <p className="mt-5 max-w-xl text-lg leading-8 opacity-85">درخواست دسترسی را ثبت کنید؛ پس از بررسی، سازمان شما ساخته می‌شود و می‌توانید همان روز اولین سفارش را ثبت کنید.</p>
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold opacity-85"><ShieldCheck className="size-4" />۳۰ روز رایگان، با همه امکانات</div>
+              <h2 className="max-w-2xl text-3xl font-black leading-tight tracking-tight sm:text-5xl">ارسال‌های شرکتتان را از همین امروز منظم کنید.</h2>
+              <p className="mt-5 max-w-xl text-lg leading-8 opacity-85">فرم کوتاه درخواست را پر کنید؛ پس از تأیید، سازمان شما ساخته می‌شود و همان روز اولین سفارش را ثبت می‌کنید.</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-              <Link to="/request" className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-bg px-8 font-bold text-text shadow-lg transition hover:scale-[1.02]">
-                <Building2 className="size-5" />درخواست دسترسی
+              <Link to="/request?plan=trial" className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-bg px-8 font-bold text-text shadow-lg transition hover:scale-[1.02]">
+                <Building2 className="size-5" />شروع رایگان
               </Link>
               <Link to="/app/login" className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-current/30 px-8 font-bold transition hover:bg-white/10">
                 <KeyRound className="size-5" />ورود به پنل

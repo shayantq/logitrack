@@ -60,12 +60,12 @@ function ContactStrip() {
       <div className="mx-auto flex max-w-7xl flex-col gap-6 rounded-[28px] border border-border bg-surface p-8 shadow-[var(--shadow)] sm:p-10 lg:flex-row lg:items-center">
         <div className="flex-1">
           <h2 className="text-2xl font-black tracking-tight sm:text-3xl">آماده‌اید سفارش‌ها را منظم کنید؟</h2>
-          <p className="mt-3 leading-8 text-text-2">درخواست دسترسی را ثبت کنید، یا اگر سؤالی دارید برایمان بنویسید.</p>
+          <p className="mt-3 leading-8 text-text-2">۳۰ روز رایگان امتحان کنید، یا اگر سؤالی دارید با ما تماس بگیرید.</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <a href={`tel:${BRAND.phone}`} className={buttonClass("secondary", "lg")}><Phone className="size-4" /><span className="text-sm">{BRAND.phoneDisplay}</span></a>
           <a href={`mailto:${BRAND.supportEmail}`} className={buttonClass("secondary", "lg")}><Mail className="size-4" /><span className="font-mono text-sm ltr">{BRAND.supportEmail}</span></a>
-          <Link to="/request" className={buttonClass("primary", "lg")}>درخواست دسترسی<ArrowLeft className="size-4" /></Link>
+          <Link to="/request?plan=trial" className={buttonClass("primary", "lg")}>شروع رایگان<ArrowLeft className="size-4" /></Link>
         </div>
       </div>
     </section>

@@ -17,7 +17,7 @@ export const SITE_PAGES = [
 ];
 
 export const LANDING_NAV = [
-  { href: "#problem", label: "چرا سامانه؟" },
+  { href: "#problem", label: "چرا پسینه؟" },
   { href: "#inventory", label: "انبار" },
   { href: "#product", label: "محصول" },
   { href: "#how", label: "شروع کار" },
@@ -67,7 +67,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link to="/" aria-label={BRAND.name}><Logo /></Link>
         {landing && (
-          <div className="hidden min-w-0 items-center gap-2 text-xs text-muted md:flex" data-testid="section-indicator">
+          <div className="hidden min-w-0 items-center gap-2 text-sm text-muted md:flex" data-testid="section-indicator">
             <span className="live-dot" />
             <SectionName key={section} value={section ?? "سفر یک سفارش"} />
           </div>
@@ -91,7 +91,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
           </Link>
           <div className="hidden items-center gap-1.5 sm:flex">
             <Link to="/app/login" className={buttonClass("ghost")}><LogIn className="size-4" />ورود</Link>
-            <Link to="/request" className={buttonClass("primary")} data-testid="cta-request">درخواست دسترسی<ArrowLeft className="size-4" /></Link>
+            <Link to="/request?plan=trial" className={buttonClass("primary")} data-testid="cta-request">شروع رایگان<ArrowLeft className="size-4" /></Link>
           </div>
           <div className="sm:hidden">
             <button className={buttonClass("ghost", "icon")} onClick={() => setOpen(o => !o)} aria-label="منو" data-testid="mobile-menu">
@@ -107,7 +107,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
           {SITE_PAGES.map(p => <Link key={p.to} to={p.to} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2.5 text-text-2 hover:bg-surface-2">{p.label}</Link>)}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link to="/app/login" className={buttonClass("secondary")}>ورود</Link>
-            <Link to="/request" className={buttonClass("primary")}>درخواست دسترسی</Link>
+            <Link to="/request?plan=trial" className={buttonClass("primary")}>شروع رایگان</Link>
           </div>
         </div>
       )}
@@ -138,7 +138,9 @@ export function PublicFooter() {
       frame = 0;
       const vh = window.innerHeight;
       const top = el.getBoundingClientRect().top;
-      const remaining = Math.max(0, document.documentElement.scrollHeight - vh - window.scrollY);
+      // چند پیکسل آخر (اسکرول کسری مرورگرها) = انتهای صفحه، تا نوشته در انتها کامل پر شود
+      const left = document.documentElement.scrollHeight - vh - window.scrollY;
+      const remaining = left < 3 ? 0 : left;
       const range = vh - (top - remaining);          // مسافت اسکرول از ورود نوشته به صفحه تا انتهای صفحه
       let p: number;
       if (range < 80) p = top < vh ? 1 : 0;          // صفحه کوتاه: نوشته از اول در دید است ← یک‌باره و نرم پر شود
@@ -171,24 +173,24 @@ export function PublicFooter() {
         <div>
           <div className="eyebrow mb-4">صفحه‌ها</div>
           <ul className="space-y-2.5 text-sm text-text-2">
-            {LANDING_NAV.map(n => <li key={n.href}><a href={`/${n.href}`} className="hover:text-brand">{n.label}</a></li>)}
+            {LANDING_NAV.map(n => <li key={n.href}><a href={`/${n.href}`} className="inline-block py-1 hover:text-brand">{n.label}</a></li>)}
           </ul>
         </div>
         <div>
           <div className="eyebrow mb-4">{BRAND.nameFa}</div>
           <ul className="space-y-2.5 text-sm text-text-2" data-testid="footer-site-pages">
-            {SITE_PAGES.map(p => <li key={p.to}><Link to={p.to} className="hover:text-brand">{p.label}</Link></li>)}
+            {SITE_PAGES.map(p => <li key={p.to}><Link to={p.to} className="inline-block py-1 hover:text-brand">{p.label}</Link></li>)}
           </ul>
         </div>
         <div>
           <div className="eyebrow mb-4">شروع</div>
           <ul className="space-y-2.5 text-sm text-text-2">
-            <li><Link to="/request" className="hover:text-brand">درخواست دسترسی سازمان</Link></li>
-            <li><Link to="/track" className="hover:text-brand">پیگیری سفارش</Link></li>
-            <li><Link to="/request#status" className="hover:text-brand">پیگیری درخواست سازمان</Link></li>
-            <li><Link to="/app/login" className="hover:text-brand">ورود به پنل</Link></li>
-            <li><a href={`mailto:${BRAND.supportEmail}`} className="font-mono text-xs hover:text-brand ltr">{BRAND.supportEmail}</a></li>
-            <li><a href={`tel:${BRAND.phone}`} className="hover:text-brand" data-testid="footer-phone">{BRAND.phoneDisplay}</a></li>
+            <li><Link to="/request" className="inline-block py-1 hover:text-brand">درخواست دسترسی سازمان</Link></li>
+            <li><Link to="/track" className="inline-block py-1 hover:text-brand">پیگیری سفارش</Link></li>
+            <li><Link to="/request#status" className="inline-block py-1 hover:text-brand">پیگیری درخواست سازمان</Link></li>
+            <li><Link to="/app/login" className="inline-block py-1 hover:text-brand">ورود به پنل</Link></li>
+            <li><a href={`mailto:${BRAND.supportEmail}`} className="inline-block py-1 font-mono text-xs hover:text-brand ltr">{BRAND.supportEmail}</a></li>
+            <li><a href={`tel:${BRAND.phone}`} className="inline-block py-1 hover:text-brand" data-testid="footer-phone">{BRAND.phoneDisplay}</a></li>
           </ul>
         </div>
       </div>

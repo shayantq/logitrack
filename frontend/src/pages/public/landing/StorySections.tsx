@@ -1,18 +1,19 @@
-/** بخش‌های «مسئله» (پیام‌های پراکنده ← سابقه ساختاریافته) و «انبار» (دفتر گردش زنده) */
+/** بخش‌های «چرا پسینه» (گفتگوی تیم با جواب‌های فوری ← پرونده کامل سفارش) و «انبار» (دفتر گردش زنده) */
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Check, CheckCheck, FileWarning, Lock, RotateCcw, Truck } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, CheckCheck, Lock, MessagesSquare, RotateCcw, Truck } from "lucide-react";
 import { faNumber } from "@/lib/format";
 import { cn } from "@/ui/primitives";
 import { Odometer, Reveal, ScrubText, SectionTag, useInView, useProgressState, useReducedMotion } from "../motion";
 
-// ------------------------------------------------------------------ [01] مسئله
+// ------------------------------------------------------------------ [01] چرا پسینه
+// تیمی که با پسینه کار می‌کند: هر سؤال در چند ثانیه از روی پنل جواب داده می‌شود
 const CHAT = [
-  { me: false, text: "سلام، بار سعادت‌آباد رفت؟", time: "۰۹:۰۲" },
-  { me: true, text: "کدوم بار؟ امروز سه‌تا سعادت‌آباد داشتیم", time: "۰۹:۱۵" },
-  { me: false, text: "همون که مشتریش دیروز زنگ زد 😅", time: "۰۹:۱۶" },
-  { me: true, text: "گوشی راننده خاموشه، بعداً خبر می‌دم", time: "۰۹:۴۸" },
-  { me: false, text: "اکسل موجودی رو کی آپدیت کرده؟ عددش با انبار نمی‌خونه", time: "۱۰:۰۳" },
-  { me: true, text: "فکر کنم دیروز یکی دستی عوضش کرد…", time: "۱۰:۲۱" },
+  { me: false, text: "سفارش فروشگاه سعادت‌آباد به کجا رسید؟", time: "۰۹:۰۲" },
+  { me: true, text: "تو پنل دیدم: در مسیره، حدود ۱۰:۳۰ می‌رسه 👌", time: "۰۹:۰۳" },
+  { me: false, text: "عالی. موجودی دستمال کاغذی برای سفارش‌های فردا کافیه؟", time: "۰۹:۰۵" },
+  { me: true, text: "۱٬۱۷۴ کارتن داریم؛ سامانه برای خرید بعدی هم یادآوری کرده", time: "۰۹:۰۶" },
+  { me: false, text: "تحویل سعادت‌آباد ثبت شد؟", time: "۱۰:۳۹" },
+  { me: true, text: "بله، ۱۰:۳۸ تحویل شد و مشتری ۵ ستاره داد ⭐", time: "۱۰:۴۰" },
 ];
 const RECORD = [
   ["کد رهگیری", "LT-2481-K7", true],
@@ -30,35 +31,35 @@ export function ProblemSection() {
   const swap = p > 0.55;
 
   return (
-    <section ref={section} id="problem" data-section="چرا یک سامانه یکپارچه؟" className={cn("relative", reduced ? "" : "h-[280vh]")}>
+    <section ref={section} id="problem" data-section="چرا پسینه؟" className={cn("relative", reduced ? "" : "h-[280vh]")}>
       {/* موبایل: فاصله‌ها و ارتفاع گفتگو کمتر تا کل بخش در یک صفحه جا شود و زیر سربرگ نرود */}
       <div className={cn("flex min-h-svh items-center pb-8 pt-20 lg:py-24", !reduced && "sticky top-0 h-svh")}>
         <div className="mx-auto grid w-full max-w-7xl items-center gap-6 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16">
           <div>
-            <SectionTag label="مشکل امروز، و راه‌حل ما" />
+            <SectionTag label="چرا پسینه؟" />
             <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">
-              {swap ? <span key="b" className="animate-rise block">یک سفارش،<br /><span className="text-brand">یک سابقه کامل.</span></span>
-                : <span key="a" className="animate-rise block">عملیات نباید<br /><span className="text-danger">لای پیام‌ها گم شود.</span></span>}
+              {swap ? <span key="b" className="animate-rise block">یک سفارش،<br /><span className="text-brand">یک پرونده کامل.</span></span>
+                : <span key="a" className="animate-rise block">هر سؤال تیم،<br /><span className="text-brand">جوابش آماده است.</span></span>}
             </h2>
             <p className="mt-4 max-w-lg text-base leading-7 text-text-2 sm:mt-6 sm:text-lg sm:leading-8">
               {swap
-                ? "هر سفارش کد رهگیری، وضعیت مشخص، خودرو و راننده و تاریخچه کامل دارد. کسی لازم نیست بپرسد — همه همان یک نسخه از حقیقت را می‌بینند."
-                : "وقتی سفارش‌ها در گروه‌های پیام‌رسان و اکسل‌های دستی دنبال می‌شوند، هر سؤال ساده یک زنجیره تماس می‌شود و عدد موجودی هیچ‌وقت قابل اعتماد نیست."}
+                ? "کد رهگیری، وضعیت، خودرو، راننده و تاریخچه هر سفارش در یک جاست و همه اعضای تیم همان اطلاعات به‌روز را می‌بینند."
+                : "وقتی سفارش، موجودی و رانندگان در یک سامانه ثبت می‌شوند، تیم شما به‌جای تماس و پیگیری، جواب را همان لحظه در پنل می‌بیند."}
             </p>
             <div className="mt-5 flex gap-6 text-sm sm:mt-8 [@media(max-height:700px)]:hidden">
-              <span className={cn("flex items-center gap-2 transition-colors", swap ? "text-muted line-through" : "text-danger")}><FileWarning className="size-4" />پیام و اکسل</span>
-              <span className={cn("flex items-center gap-2 transition-colors", swap ? "text-brand font-semibold" : "text-muted")}><CheckCheck className="size-4" />سابقه ساختاریافته</span>
+              <span className={cn("flex items-center gap-2 transition-colors", swap ? "text-muted" : "font-semibold text-brand")}><MessagesSquare className="size-4" />هماهنگی سریع تیم</span>
+              <span className={cn("flex items-center gap-2 transition-colors", swap ? "font-semibold text-brand" : "text-muted")}><CheckCheck className="size-4" />پرونده کامل سفارش</span>
             </div>
           </div>
 
           <div className="relative mx-auto h-[max(220px,40svh)] w-full max-w-md sm:h-[440px]" data-testid="problem-visual">
-            {/* گفتگوی پراکنده: پیام‌ها مثل پیام‌رسان واقعی از پایین اضافه و قدیمی‌ها به بالا رانده می‌شوند —
+            {/* گفتگوی تیم: پیام‌ها مثل پیام‌رسان واقعی از پایین اضافه و قدیمی‌ها به بالا رانده می‌شوند —
                 هیچ‌وقت از کارت بیرون نمی‌زنند (قبلاً پیام آخر از لبه پایین کارت بیرون می‌افتاد) */}
             <div data-testid="problem-chat" className={cn("absolute inset-0 flex flex-col overflow-hidden rounded-[28px] border border-border bg-surface p-4 shadow-[var(--shadow-lg)] transition-all duration-700",
               swap && "-rotate-3 scale-90 opacity-30 blur-[2px]")}>
               <div className="mb-3 flex shrink-0 items-center gap-3 border-b border-border pb-3">
-                <div className="grid size-9 place-items-center rounded-full bg-accent-soft text-sm">📦</div>
-                <div className="min-w-0"><div className="truncate text-sm font-bold">گروه هماهنگی ارسال</div><div className="truncate text-[11px] text-muted">۱۴ عضو · ۲۳۷ پیام خوانده‌نشده</div></div>
+                <div className="grid size-9 place-items-center rounded-full bg-brand-soft text-sm">📦</div>
+                <div className="min-w-0"><div className="truncate text-sm font-bold">تیم عملیات پخش</div><div className="flex items-center gap-1 truncate text-xs text-success"><CheckCheck className="size-3.5" />همه پیام‌ها پاسخ داده شد</div></div>
               </div>
               <div className="relative min-h-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_14%)]">
                 <div className="absolute inset-x-0 bottom-0 space-y-2">
@@ -68,7 +69,7 @@ export function ProblemSection() {
                       <div key={i} className={cn("grid transition-all duration-500", shown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
                         <div className={cn("flex min-h-0 overflow-hidden", m.me ? "justify-start" : "justify-end")}>
                           <div className={cn("max-w-[82%] break-words rounded-2xl px-3 py-2 text-sm leading-6", m.me ? "rounded-tr-sm bg-brand-soft text-text" : "rounded-tl-sm bg-surface-2 text-text")}>
-                            {m.text}<div className="mt-0.5 text-left text-[10px] text-muted">{m.time}</div>
+                            {m.text}<div className="mt-0.5 text-left text-[11px] text-muted">{m.time}</div>
                           </div>
                         </div>
                       </div>
@@ -141,12 +142,12 @@ export function InventorySection() {
       <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-2">
         <div>
           <SectionTag label="انبار" />
-          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="موجودی‌ای که می‌شود به آن اعتماد کرد." />
+          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="موجودی انبار، همیشه دقیق." />
           <Reveal className="mt-8 space-y-5">
             {[
-              [Lock, "دفتر گردش غیرقابل‌ویرایش", "هر تغییر موجودی یک ردیف ثبت‌شده با علت، مقدار، موجودی بعد از تغییر و نام ثبت‌کننده است. هیچ عددی بی‌صدا عوض نمی‌شود."],
-              [ArrowUpRight, "اتصال مستقیم به سفارش‌ها", "ثبت سفارش موجودی را کسر می‌کند و لغو یا عدم تحویل آن را برمی‌گرداند — بدون کار دستی."],
-              [Check, "چند انبار، یک تصویر", "ورود، اصلاح، ضایعات و انتقال بین انبارها، با هشدار خودکار وقتی کالایی کمتر از حد سفارش شد."],
+              [Lock, "هر تغییر، ثبت و ماندگار", "هر ورود و خروج کالا با علت، مقدار و نام ثبت‌کننده در دفتر گردش می‌ماند."],
+              [ArrowUpRight, "هماهنگ با سفارش‌ها", "ثبت سفارش موجودی را کم می‌کند و لغو آن، کالا را خودکار به انبار برمی‌گرداند."],
+              [Check, "چند انبار، یک نگاه", "موجودی همه انبارها یک‌جا، با هشدار خودکار وقتی کالایی رو به اتمام است."],
             ].map(([Icon, title, text]) => {
               const I = Icon as typeof Lock;
               return (
@@ -184,7 +185,7 @@ export function InventorySection() {
               );
             })}
           </ul>
-          <div className="border-t border-border bg-surface-2 px-6 py-3 text-xs text-muted">ردیف‌ها فقط اضافه می‌شوند — اصلاح هم خودش یک ردیف جدید است.</div>
+          <div className="border-t border-border bg-surface-2 px-6 py-3 text-sm text-text-2">هیچ عددی دستی عوض نمی‌شود؛ هر اصلاح هم یک ردیف جدید است.</div>
         </div>
       </div>
     </section>

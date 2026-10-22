@@ -4,25 +4,30 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Check, ChevronsDown, Package, Truck, Warehouse, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Check, ChevronsDown, CircleCheck, Package, Truck, Warehouse, type LucideIcon } from "lucide-react";
+import { BRAND } from "@/brand";
 import { useTheme } from "@/theme/ThemeProvider";
 import { faNumber } from "@/lib/format";
 import { buttonClass, cn } from "@/ui/primitives";
 import type { CityScene } from "../city/CityScene";
+import { TRIAL_DAYS } from "../content/pricing";
 import { range, useInView, useReducedMotion, useScrubProgress } from "../motion";
 
 type Stage = { at: number; n: string; title: string; text: string; icon: LucideIcon; time: string };
 const STAGES: Stage[] = [
   { at: 0.1, n: "۰۱", title: "سفارش ثبت شد", icon: Package, time: "۰۹:۱۲",
-    text: "اقلام، وزن، بازه تحویل و نشانی در یک فرم ثبت می‌شود. موجودی همان لحظه از انبار کسر و در دفتر گردش نوشته می‌شود؛ اگر سفارش لغو شود، کالا خودکار برمی‌گردد." },
+    text: "اقلام، بازه تحویل و نشانی در یک فرم ثبت می‌شود و موجودی همان لحظه از انبار کم می‌شود." },
   { at: 0.26, n: "۰۲", title: "بارگیری در انبار", icon: Warehouse, time: "۰۹:۴۰",
-    text: "یک خودروی آزاد با ظرفیت کافی — ترجیحاً در شهر مقصد — خودکار تخصیص می‌یابد. راننده در پنل خودش «بار را تحویل گرفتم» را می‌زند." },
+    text: "خودروی آزاد با ظرفیت کافی خودکار انتخاب می‌شود و راننده تحویل بار را در موبایلش تأیید می‌کند." },
   { at: 0.42, n: "۰۳", title: "در مسیر مقصد", icon: Truck, time: "۱۰:۰۵",
-    text: "هر تغییر وضعیت با زمان و نام ثبت‌کننده در تاریخچه سفارش می‌ماند. پشتیبانی بدون حتی یک تماس می‌داند بار کجاست." },
+    text: "شما و مشتری وضعیت سفارش را لحظه‌به‌لحظه می‌بینید؛ بدون حتی یک تماس با راننده." },
   { at: 0.88, n: "۰۴", title: "تحویل داده شد", icon: Check, time: "۱۰:۳۸",
-    text: "تحویل یا عدم تحویل با علت ثبت می‌شود و گزارش‌ها، داشبورد و وضعیت خودرو همان لحظه به‌روز می‌شوند." },
+    text: "تحویل با یک لمس ثبت می‌شود و داشبورد و گزارش‌ها همان لحظه به‌روز می‌شوند." },
 ];
 const ROUTE_KM = 12.4;
+/** مسافت باقی‌مانده به کیلومتر کامل (اعشار فارسی «٫» شبیه «/» خوانده می‌شد) */
+const kmLeft = (u: number) => { const km = (1 - u) * ROUTE_KM; return km < 1 && km > 0 ? "کمتر از ۱" : faNumber(Math.round(km)); };
+const VALUE_POINTS = ["موجودی انبار، همیشه دقیق", "پیگیری لحظه‌ای هر سفارش", "پنل موبایل برای رانندگان"];
 const TRIP_MIN = 33;
 
 /** پیشرفت اسکرول بخش ← پیشرفت صحنه: ۸٪ اول صحنه توقف درِ انبار است */
@@ -87,7 +92,7 @@ export function Hero() {
             <MapChip tone={delivered ? "success" : "accent"} icon={delivered ? Check : Package}>{delivered ? "تحویل داده شد" : "مقصد سفارش"}</MapChip>
           </div>
           <div ref={labels.van} className={cn("absolute left-0 top-0 transition-opacity", progress > 0.42 && !delivered ? "opacity-100" : "opacity-0")}>
-            <span className="rounded-full bg-text px-2.5 py-1 font-mono text-[10px] text-bg shadow-lg ltr">{faNumber(Math.round((1 - u) * ROUTE_KM * 10) / 10)} km</span>
+            <span className="whitespace-nowrap rounded-full bg-text px-2.5 py-1 text-xs font-semibold text-bg shadow-lg">{kmLeft(u)} کیلومتر</span>
           </div>
         </div>
 
@@ -101,19 +106,24 @@ export function Hero() {
             <div className="relative">
               {/* معرفی */}
               <div className={cn("transition-all duration-700", stageIndex < 0 ? "translate-y-0 opacity-100" : "pointer-events-none absolute inset-x-0 bottom-0 -translate-y-6 opacity-0")}>
-                <div className="eyebrow mb-5">سامانه مدیریت ارسال و انبار</div>
-                <h1 className="text-4xl font-black leading-[1.15] tracking-tight sm:text-5xl lg:text-6xl">
-                  هر سفارش،<br /><span className="bg-linear-to-l from-brand to-accent bg-clip-text text-transparent">یک مسیر روشن.</span>
+                <div className="eyebrow mb-5">نرم‌افزار آنلاین مدیریت انبار و پخش</div>
+                <h1 className="text-4xl font-black leading-[1.2] tracking-tight sm:text-5xl lg:text-6xl">
+                  سفارش، انبار و رانندگان،<br /><span className="bg-linear-to-l from-brand to-accent bg-clip-text text-transparent">همه در یک سامانه.</span>
                 </h1>
                 <p className="mt-5 max-w-md text-base leading-8 text-text-2 sm:text-lg">
-                  از لحظه ثبت سفارش تا تحویل درِ خانه مشتری: موجودی انبار، خودرو، راننده و وضعیت سفارش — همه در یک سامانه، برای هر سازمان جدا.
+                  {BRAND.nameFa} به شرکت‌های پخش و فروشگاه‌ها کمک می‌کند هر سفارش را از انبار تا درِ خانه مشتری، بی‌دردسر مدیریت کنند.
                 </p>
+                <ul className="mt-5 space-y-2 max-md:[@media(max-height:740px)]:hidden" data-testid="hero-values">
+                  {VALUE_POINTS.map(v => (
+                    <li key={v} className="flex items-center gap-2 font-medium"><CircleCheck className="size-5 shrink-0 text-success" />{v}</li>
+                  ))}
+                </ul>
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <Link to="/request" className={buttonClass("primary", "lg")}>درخواست دسترسی<ArrowLeft className="size-4" /></Link>
-                  <a href="#problem" className={buttonClass("secondary", "lg")}>چطور کار می‌کند؟</a>
+                  <Link to="/request?plan=trial" className={buttonClass("primary", "lg")} data-testid="hero-cta">{`${faNumber(TRIAL_DAYS)} روز رایگان امتحان کنید`}<ArrowLeft className="size-4" /></Link>
+                  <Link to="/pricing" className={buttonClass("secondary", "lg")}>تعرفه‌ها</Link>
                 </div>
                 {!reduced && (
-                  <div className="mt-10 hidden items-center gap-2 text-xs text-muted md:flex">
+                  <div className="mt-10 hidden items-center gap-2 text-sm text-muted md:flex">
                     <ChevronsDown className="size-4 animate-bounce" />اسکرول کنید تا یک سفارش را دنبال کنید
                   </div>
                 )}
@@ -125,7 +135,7 @@ export function Hero() {
                   className={cn("transition-all duration-700",
                     i === stageIndex ? "relative translate-y-0 opacity-100 blur-0" : "pointer-events-none absolute inset-x-0 bottom-0 opacity-0 blur-sm",
                     i < stageIndex && "-translate-y-8", i > stageIndex && "translate-y-8")}>
-                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs text-muted backdrop-blur">
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-sm text-muted backdrop-blur">
                     <span className="font-semibold text-brand">مرحله {faNumber(i + 1)} از {faNumber(STAGES.length)}</span>
                     <span className="size-1 rounded-full bg-border-strong" /><span className="tnum">{s.time}</span>
                   </div>
@@ -165,10 +175,10 @@ function TripCard({ stageIndex, u, delivered }: { stageIndex: number; u: number;
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <div className="text-[11px] text-muted">کد رهگیری</div>
+            <div className="text-xs text-muted">کد رهگیری</div>
             <div className="font-mono text-sm font-bold ltr">LT-2481-K7</div>
           </div>
-          <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-bold", delivered ? "bg-success-soft text-success" : "bg-brand-soft text-brand-strong")}>
+          <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", delivered ? "bg-success-soft text-success" : "bg-brand-soft text-brand-strong")}>
             {stageIndex >= 0 ? STAGES[stageIndex].title : "—"}
           </span>
         </div>
@@ -185,14 +195,14 @@ function TripCard({ stageIndex, u, delivered }: { stageIndex: number; u: number;
                   {active && <span className="size-2 animate-pulse rounded-full bg-brand" />}
                 </span>
                 <span className={cn("flex-1 text-sm transition-colors", i <= stageIndex ? "font-semibold text-text" : "text-muted")}>{s.title}</span>
-                <span className="font-mono text-[11px] text-muted">{i <= stageIndex ? s.time : "--:--"}</span>
+                <span className="font-mono text-xs text-muted">{i <= stageIndex ? s.time : "--:--"}</span>
               </li>
             );
           })}
         </ol>
         <div className="border-t border-border px-4 py-3">
-          <div className="mb-2 flex justify-between text-[11px] text-muted">
-            <span>باقی‌مانده: <b className="tnum text-text">{faNumber(Math.round((1 - u) * ROUTE_KM * 10) / 10)}</b> کیلومتر</span>
+          <div className="mb-2 flex justify-between text-xs text-muted">
+            <span>باقی‌مانده: <b className="text-text">{kmLeft(u)}</b> کیلومتر</span>
             <span>رسیدن: <b className="tnum text-text">{faNumber(Math.round((1 - u) * TRIP_MIN))}</b> دقیقه</span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">

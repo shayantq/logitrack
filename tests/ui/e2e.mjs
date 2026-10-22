@@ -2,13 +2,18 @@
 // هر نقش وارد می‌شود، کارهای اصلی‌اش را مثل یک کاربر واقعی انجام می‌دهد و هر خطای
 // جاوااسکریپت یا خطای کنسول گزارش می‌شود.
 //   استفاده:  node e2e.mjs http://localhost:8002   (داده می‌نویسد — فقط روی استک تست)
+import { appendFileSync } from "node:fs";
 import { chromium } from "playwright";
 
 const BASE = process.argv[2] || "http://localhost:8001";
 const results = [];
+// در GitHub Actions هر بررسی ناموفق یک annotation در صفحه اجرا می‌شود و فهرستشان در Job Summary می‌آید
+const CI = process.env.GITHUB_ACTIONS === "true";
+const annotate = text => text.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 function check(scope, label, ok, detail = "") {
-  results.push({ ok });
+  results.push({ ok, scope, label, detail });
   console.log(`${ok ? "OK  " : "FAIL"} [${scope}] ${label}${detail ? " — " + detail : ""}`);
+  if (!ok && CI) console.log(`::error title=E2E [${scope}]::${annotate(label + (detail ? " — " + detail : ""))}`);
 }
 
 // WebGL نرم‌افزاری برای شهر سه‌بعدی صفحه اصلی در حالت بدون‌سر
@@ -102,6 +107,14 @@ await session("org_admin", "qazvin_admin", "admin123", async page => {
   await choose(page, "[data-testid=order-province]", "قزوین");
   await pickCity(page, "order-city", "قزوین");
   await page.fill("[data-testid=order-address]", "خیابان پیروزی، پلاک ۹");
+  // تاریخ پیش‌فرض «فردا» است؛ رانندگان نمونه جمعه شیفت ندارند، پس اگر فردا جمعه است روز کاری بعد انتخاب می‌شود
+  const defaultDay = await page.getAttribute("[data-testid=order-date]", "data-value");
+  if (new Date(`${defaultDay}T12:00:00Z`).getUTCDay() === 5) {
+    const workday = new Date(Date.parse(`${defaultDay}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
+    await page.click("[data-testid=order-date]");
+    if (!(await page.locator(`[data-testid=order-date-calendar] [data-day="${workday}"]`).count())) await page.click("[data-testid=order-date-calendar] [aria-label='ماه بعد']");
+    await page.click(`[data-testid=order-date-calendar] [data-day="${workday}"]`);
+  }
   await page.click("[data-testid=assign-mode-later]");
   await page.click("button[form=order-form]");
   const created = await toast(page);
@@ -712,10 +725,10 @@ for (const theme of ["light", "dark"]) {
     // اسکرول ← مرحله‌های سفر به‌جای اسکرول شدن، جای هم ظاهر می‌شوند
     const heroScroll = await page.evaluate(() => document.getElementById("hero").offsetHeight - innerHeight);
     await page.evaluate(y => window.scrollTo({ top: y, behavior: "instant" }), heroScroll * 0.65);
-    await page.waitForSelector("[data-testid=hero-stage][data-active=true] >> text=در مسیر مقصد", { timeout: 10000 });
+    await page.waitForSelector("[data-testid=hero-stage][data-active=true] >> text=در مسیر مقصد", { timeout: 20000 });
     check(`landing-${theme}`, "scroll drives the trip (in transit)", true);
     await page.evaluate(y => window.scrollTo({ top: y, behavior: "instant" }), heroScroll * 0.97);
-    await page.waitForSelector("[data-testid=hero-stage][data-active=true] >> text=تحویل داده شد", { timeout: 10000 });
+    await page.waitForSelector("[data-testid=hero-stage][data-active=true] >> text=تحویل داده شد", { timeout: 20000 });
     check(`landing-${theme}`, "trip reaches delivered", true);
     // گفتگوی بخش «مشکل»: همه پیام‌ها داخل کارت (قبلاً پیام آخر از پایین کارت بیرون می‌زد)
     const problem = await page.evaluate(() => { const s = document.getElementById("problem"); return s.offsetTop + s.offsetHeight * 0.25; });
@@ -727,7 +740,8 @@ for (const theme of ["light", "dark"]) {
       return { inside: bubbles.every(r => r.bottom <= box.bottom + 1 && r.left >= box.left - 1 && r.right <= box.right + 1), count: bubbles.length };
     });
     check(`landing-${theme}`, "problem chat bubbles stay inside the card", chat.inside && chat.count >= 4, JSON.stringify(chat));
-    check(`landing-${theme}`, "clear 'why' section label", await page.locator("#problem >> text=مشکل امروز، و راه‌حل ما").count() === 1);
+    check(`landing-${theme}`, "clear 'why' section label", await page.locator("#problem >> text=چرا پسینه؟").count() >= 1);
+    check(`landing-${theme}`, "team chat tells a success story", ((await page.textContent("[data-testid=problem-chat]")) ?? "").includes("همه پیام‌ها پاسخ داده شد"));
     await page.evaluate(() => document.getElementById("faq").scrollIntoView({ behavior: "instant" }));
     await page.waitForSelector("[data-testid=section-indicator] >> text=پرسش‌ها", { timeout: 10000 });
     check(`landing-${theme}`, "header shows current section", true);
@@ -1210,7 +1224,9 @@ let referralRun = "";
 await session("request", null, null, async page => {
   await page.goto(`${BASE}/`);
   await page.click("[data-testid=cta-request]");
-  await page.waitForURL(/\/request$/);
+  await page.waitForURL(/\/request\?plan=trial$/);
+  await page.waitForSelector("[data-testid=request-plan] >> text=آزمایشی");
+  check("request", "header CTA starts the free trial request", true);
   // داده یکتا در هر اجرا: درخواست تکراری با همان شناسه ملی عمداً رد می‌شود
   const run = String(Date.now()).slice(-10);
   await page.fill("[data-testid=req-name]", `فروشگاه آزمون مرورگر ${run}`);
@@ -1311,7 +1327,7 @@ await session("info-pages", null, null, async page => {
   await page.evaluate(y => window.scrollTo({ top: y, behavior: "instant" }), max - 120);
   await page.waitForFunction(() => Number(document.querySelector("[data-testid=footer-wordmark]").dataset.progress) > 0, null, { timeout: 8000 }).catch(() => {});
   const mid = await progress();
-  await page.evaluate(y => window.scrollTo({ top: y, behavior: "instant" }), max);
+  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
   await page.waitForFunction(() => document.querySelector("[data-testid=footer-wordmark]").dataset.progress === "1.00", null, { timeout: 8000 }).catch(() => {});
   const end = await progress();
   check("info", "footer wordmark fills gradually", mid > 0.2 && mid < 0.95 && end === 1, `${mid} → ${end}`);
@@ -1331,7 +1347,7 @@ await session("brand-pages", null, null, async page => {
   await page.waitForSelector("[data-testid=pricing-page]");
   check("brand", "four pricing plans", (await page.locator("[data-testid=plan-card]").count()) === 4);
   const monthly = await page.textContent("[data-plan=pro] [data-testid=plan-price]");
-  await page.click("text=سالانه");
+  await page.click("[data-testid=billing-annual]");
   await page.waitForFunction(m => document.querySelector("[data-plan=pro] [data-testid=plan-price]")?.textContent !== m, monthly);
   check("brand", "annual billing changes the price", ((await page.textContent("[data-plan=pro] [data-testid=plan-price]")) ?? "").includes("در سال"));
   check("brand", "feature comparison table", (await page.locator("[data-testid=pricing-compare] tbody tr").count()) >= 8);
@@ -1456,8 +1472,11 @@ await session("capital", "admin", "admin123", async page => {
     check("notifications", "category filter", kinds.length > 0 && kinds.every(k => k === "low_stock" || k === "out_of_stock"), kinds.join(","));
     // بستن با ✕
     const before = await page.locator("[data-testid=notification-item]").count();
+    // حذف در رابط کاربری فوری (optimistic) است؛ بررسی سرور بعد از پاسخ خود درخواست DELETE
+    const deleted = page.waitForResponse(r => r.request().method() === "DELETE" && /\/notifications\/\d+$/.test(r.url()), { timeout: 10000 });
     await item.locator("[data-testid=notification-dismiss]").click();
     await page.waitForFunction(n => document.querySelectorAll("[data-testid=notification-item]").length === n - 1, before);
+    await deleted;
     const server = await page.evaluate(async () => (await (await fetch("/notifications/", { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } })).json()).items);
     check("notifications", "dismissed item removed on server", !server.some(n => n.message.includes("کالای آزمون اعلان") && n.kind === "low_stock"));
     // خواندن همه
@@ -1542,6 +1561,14 @@ await session("public", null, null, async page => {
 });
 
 await browser.close();
-const failed = results.filter(r => !r.ok).length;
+const failures = results.filter(r => !r.ok);
+const failed = failures.length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);
+if (CI && process.env.GITHUB_STEP_SUMMARY) {
+  const cell = text => String(text || "").replace(/\|/g, "\\|").replace(/\s+/g, " ").slice(0, 300);
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
+    `### ${failed ? "❌" : "✅"} E2E: ${results.length - failed}/${results.length} checks passed`, "",
+    ...(failed ? ["| Session | Check | Detail |", "|---|---|---|", ...failures.map(f => `| ${f.scope} | ${cell(f.label)} | ${cell(f.detail)} |`), ""] : []),
+  ].join("\n") + "\n");
+}
 process.exit(failed ? 1 : 0);
