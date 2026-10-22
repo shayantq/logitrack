@@ -99,7 +99,11 @@ function ScrollManager() {
       const target = document.querySelector(hash);
       if (target) { target.scrollIntoView(); return; }
     }
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+    const toTop = () => window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+    toTop();
+    // یک فریم بعد دوباره: صفحه تنبل‌بارگذاری‌شده تازه رسم شده یا اسکرول نرم صفحه قبل هنوز در جریان است
+    const frame = requestAnimationFrame(toTop);
+    return () => cancelAnimationFrame(frame);
   }, [pathname, hash]);
   return null;
 }

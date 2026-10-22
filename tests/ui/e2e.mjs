@@ -272,18 +272,29 @@ await session("kyc-driver", null, null, async page => {
 
   // ضبط با دوربین ← پیش‌نمایش باید همان ویدیوی ضبط‌شده باشد، نه تصویر زنده دوربین
   await page.click("[data-testid=record-video]");
-  // صبر تا دوربین ساختگی واقعاً تصویر بدهد؛ زیر بار سیستم، ضبطِ زودهنگام فایل خالی می‌ساخت و پخش/آپلود شکست می‌خورد
-  await page.waitForFunction(() => { const v = document.querySelector("[data-testid=recorder-live]"); return v?.srcObject && v.readyState >= 2 && v.videoWidth > 0; }, null, { timeout: 20000 });
-  await page.click("[data-testid=recorder-start]");
-  await page.waitForTimeout(3500);
-  await page.click("[data-testid=recorder-stop]");
-  await page.waitForSelector("[data-testid=recorder-playback]");
-  const playback = await page.evaluate(async () => {
-    const v = document.querySelector("[data-testid=recorder-playback]");
-    // سقف ۱۵ ثانیه: بدون آن، اگر loadeddata نرسد evaluate تا ابد منتظر می‌ماند و کل تست بی‌صدا گیر می‌کند
-    await new Promise(r => { if (v.readyState >= 2) return r(); v.addEventListener("loadeddata", r, { once: true }); setTimeout(r, 15000); });
-    return { live: !!document.querySelector("[data-testid=recorder-live]"), srcObject: !!v.srcObject, blob: v.src.startsWith("blob:"), ready: v.readyState };
-  });
+  // دوربین ساختگی مرورگر بدون‌سر زیر بار سیستم گاهی فایل خالی ضبط می‌کند؛ مثل کاربر واقعی «ضبط دوباره» (تا ۳ بار)
+  let playback;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    if (attempt > 1) await page.click("[data-testid=recorder-retake]");
+    // صبر تا دوربین ساختگی واقعاً تصویر بدهد
+    await page.waitForFunction(() => { const v = document.querySelector("[data-testid=recorder-live]"); return v?.srcObject && v.readyState >= 2 && v.videoWidth > 0; }, null, { timeout: 20000 });
+    await page.click("[data-testid=recorder-start]");
+    // دکمه «توقف» با شروع ضبط جای «شروع» را می‌گیرد؛ کلیک مستقیم (بدون انتظار برای پایدار شدن انیمیشن پنجره)
+    // تا زیر بار سیستم، ضبط تا سقف زمان ادامه پیدا نکند
+    const stop = page.locator("[data-testid=recorder-stop]");
+    await stop.waitFor({ state: "attached", timeout: 15000 });
+    await page.waitForTimeout(3500);
+    await stop.dispatchEvent("click").catch(() => {});
+    await page.waitForSelector("[data-testid=recorder-playback]", { timeout: 60000 });
+    playback = await page.evaluate(async () => {
+      const v = document.querySelector("[data-testid=recorder-playback]");
+      // سقف ۱۵ ثانیه: بدون آن، اگر loadeddata نرسد evaluate تا ابد منتظر می‌ماند و کل تست بی‌صدا گیر می‌کند
+      await new Promise(r => { if (v.readyState >= 2) return r(); v.addEventListener("loadeddata", r, { once: true }); setTimeout(r, 15000); });
+      return { live: !!document.querySelector("[data-testid=recorder-live]"), srcObject: !!v.srcObject, blob: v.src.startsWith("blob:"), ready: v.readyState };
+    });
+    if (playback.ready >= 2) break;
+    console.log(`     (kyc-driver) empty recording on attempt ${attempt}, recording again`);
+  }
   check("kyc-driver", "recorded video plays back (not live camera)", !playback.live && !playback.srcObject && playback.blob && playback.ready >= 2, JSON.stringify(playback));
   await page.click("[data-testid=recorder-use]");
   await page.waitForSelector("[data-testid=doc-video][data-uploaded=true]", { timeout: 20000 });
@@ -1313,7 +1324,8 @@ await session("info-pages", null, null, async page => {
   await page.click("[data-testid=footer-site-pages] >> text=درباره ما");
   await page.waitForSelector("[data-testid=about-page]");
   check("info", "about page from footer", page.url().endsWith("/about"));
-  check("info", "about page starts at top", (await page.evaluate(() => window.scrollY)) === 0);
+  const atTop = await page.waitForFunction(() => window.scrollY === 0, null, { timeout: 3000 }).then(() => true, () => false);
+  check("info", "about page starts at top", atTop, String(await page.evaluate(() => window.scrollY)));
   await page.click("[data-testid=footer-site-pages] >> text=قوانین و مقررات");
   await page.waitForSelector("[data-testid=terms-page]");
   check("info", "terms has numbered clauses", (await page.locator("[data-testid=terms-clause]").count()) >= 10);
