@@ -62,13 +62,13 @@ def _delivered_orders(client, db, w, fares=(1_000_000, 3_000_000), city="تهر�
     pid = res.json()["product"]["id"]
     now = datetime.now(timezone.utc)
     ids = []
-    for i, fare in enumerate(fares):
+    for _ in fares:
         r = client.post("/orders/", json=order_payload(pid, w["vehicle"].id, city=city, delivery_window_start=now.isoformat(),
                                                        delivery_window_end=(now + timedelta(hours=4)).isoformat()), headers=_auth(w["admin"]))
         assert r.status_code == 201, r.text
         ids.append(r.json()["id"])
     set_tenant(db, None)
-    for i, (oid, fare) in enumerate(zip(ids, fares)):
+    for i, (oid, fare) in enumerate(zip(ids, fares, strict=False)):
         o = db.get(Order, oid)
         o.status = "delivered"
         o.driver_id = w["driver"].id

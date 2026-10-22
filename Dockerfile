@@ -1,5 +1,5 @@
 # ---------- مرحله ۱: ساخت اپ React (فقط برای build؛ در image نهایی Node وجود ندارد) ----------
-FROM node:20-alpine AS frontend
+FROM node:22-alpine AS frontend
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund

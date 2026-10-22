@@ -37,7 +37,7 @@ class CommissionPlanIn(BaseModel):
             raise ValueError("سطح اول باید بدون شرط باشد (همه رانندگان از آن شروع می‌کنند).")
         if len({lv.code for lv in self.levels}) != len(self.levels):
             raise ValueError("کد سطح‌ها باید یکتا باشد.")
-        for a, b in zip(self.levels, self.levels[1:]):
+        for a, b in zip(self.levels, self.levels[1:], strict=False):
             if b.min_deliveries < a.min_deliveries or b.min_days < a.min_days:
                 raise ValueError("شرط هر سطح نباید از سطح پایین‌تر کمتر باشد (سطح‌ها را از پایین به بالا مرتب کنید).")
         trips = [t.from_trip for t in self.tiers]

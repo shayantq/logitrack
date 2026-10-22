@@ -11,13 +11,13 @@ from sqlalchemy.orm import sessionmaker
 from app import tasks
 from app.models import User, RoleEnum, Vehicle, Product, Inventory, Order, Warehouse
 from app.models_notification import Notification
-from app.schemas.order import OrderRequest, OrderStatusRequest
+from app.schemas.order import OrderStatusRequest
 from app.schemas.product import ProductCreate, StockUpdate
 from app.schemas.user import CreateUserRequest
 from app.schemas.vehicle import VehicleStatusRequest
 from app.services import order_service, inventory_service, user_service, vehicle_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
-from tests.factories import order_request, order_payload
+from tests.factories import order_request
 
 
 # ---------------------------------------------------------------------------

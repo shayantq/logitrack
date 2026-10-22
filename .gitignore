@@ -21,6 +21,9 @@ backups/
 
 # خروجی تست‌ها و اسکرین‌شات‌های عیب‌یابی E2E
 /e2e-*.png
+.coverage
+coverage.xml
+pytest-report.xml
 tests/ui/*.png
 *.log
 

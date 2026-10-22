@@ -21,7 +21,7 @@ from app.models import (
     ACTIVE_ORDER_STATUSES, Order, OrderCheckpoint, OrderStatusHistory, User, Vehicle, Warehouse,
 )
 from app.services import commission_service, dispatch_service, order_service
-from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
+from app.services.exceptions import ConflictError, ForbiddenError
 
 BEFORE_DEPARTURE = ("pending", "assigned", "picking_up", "picked_up")
 STOPPED = ("failed", "canceled", "expired")

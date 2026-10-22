@@ -1,4 +1,4 @@
-from app.core.security import bcrypt_context, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.security import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.schemas.user import CreateUserRequest, MessageResponse, PasswordResetChannels, PasswordResetConfirmIn, PasswordResetRequestIn, UserResponse
 from app.models import User
 from app.database import db_dependency

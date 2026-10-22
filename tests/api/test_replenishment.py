@@ -13,7 +13,7 @@ import pytest
 
 from app.core.security import create_access_token
 from app.core.tenancy import set_tenant
-from app.models import Inventory, Organization, Product, ProductPrice, RoleEnum, StockMovement, User, Warehouse
+from app.models import Inventory, Organization, Product, ProductPrice, RoleEnum, User, Warehouse
 from app.services import dispatch_service, replenishment_service as rs, stock_ledger
 
 

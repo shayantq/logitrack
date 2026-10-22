@@ -1,0 +1,7 @@
+[run]
+source = app
+omit =
+    app/static/*
+
+[report]
+skip_empty = true

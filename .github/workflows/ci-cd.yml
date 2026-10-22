@@ -1,8 +1,22 @@
-# CI/CD سامانه پسینه
-#   ۱. backend  — تست‌های pytest (واحد، API و یکپارچگی روی PostgreSQL واقعی)
-#   ۲. frontend — بررسی TypeScript و build اپ React
-#   ۳. e2e      — کل استک با Docker Compose + داده نمونه + تست سرتاسری Playwright در Chromium
-#   ۴. deploy   — فقط push روی main و فقط اگر سرور تنظیم شده باشد (Secrets)؛ به‌روزرسانی سرور با SSH
+# =============================================================================
+# خط لوله‌ی ادغام و استقرار مداوم (CI/CD) — سامانه پسینه
+#
+#   lint ─► test ─────┐
+#   frontend ─────────┴─► e2e ─► deploy ─► report
+#                    preflight ──┘
+#
+# - lint:      Ruff روی کد پایتون (خطاهای واقعی، importهای بی‌استفاده، باگ‌های رایج)
+# - test:      مایگریشن‌ها (بالا ← برگشت کامل ← بالا) + تطابق مدل‌ها با دیتابیس + pytest با پوشش کد،
+#              روی PostgreSQL واقعی
+# - frontend:  بررسی TypeScript و build اپ React
+# - e2e:       کل استک با Docker Compose + داده نمونه + تست سرتاسری Playwright در Chromium
+# - preflight: فقط push روی main — آیا Secrets سرور تنظیم شده‌اند؟
+# - deploy:    به‌روزرسانی سرور با SSH (پشتیبان ← دریافت کد ← build ← بررسی سلامت)
+# - report:    جدول نتیجه‌ی همه مراحل در Job Summary همین اجرا
+#
+# شکست هر مرحله مراحل بعدی را متوقف می‌کند (needs) — کد خراب هرگز به سرور نمی‌رسد.
+# تا وقتی Secrets استقرار تنظیم نشده‌اند، deploy با یک پیام توضیحی رد می‌شود (بنگرید README).
+# =============================================================================
 
 name: CI/CD
 
@@ -14,16 +28,45 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-cd-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "22"
+
 jobs:
-  backend:
-    name: Backend tests (pytest)
+  # ---------------------------------------------------------------------------
+  # گام ۱: کیفیت کد پایتون
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (Ruff)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # فقط خود ابزار (نه کل وابستگی‌ها) — نسخه هم‌خوان با requirements-dev.txt
+      - name: Install Ruff
+        run: pip install ruff==0.8.4
+
+      - name: Ruff (errors & style)
+        run: ruff check --output-format=github .
+
+  # ---------------------------------------------------------------------------
+  # گام ۲: مایگریشن‌ها و تست‌های واحد، API و یکپارچگی روی PostgreSQL واقعی
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests (Pytest)
+    runs-on: ubuntu-latest
+    needs: lint
     timeout-minutes: 30
     services:
       postgres:
@@ -32,49 +75,88 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: logitrack_test
-        ports:
-          - 5432:5432
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres -d logitrack_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      # تست‌های یکپارچگی (قفل هم‌زمانی SELECT ... FOR UPDATE) فقط روی این دیتابیس جدا اجرا می‌شوند
-      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/logitrack_test
       SECRET_KEY: ci-only-secret-key
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: requirements.txt
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Run pytest
-        run: pytest -q -rs
+      - uses: actions/checkout@v5
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # کل زنجیره مایگریشن‌ها روی دیتابیس خالی اجرا، تا ابتدا برگردانده و دوباره اعمال می‌شود؛
+      # سپس alembic check تأیید می‌کند مدل‌ها و آخرین مایگریشن دقیقاً یکی‌اند
+      - name: Database migrations (upgrade → downgrade → upgrade → check)
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/logitrack_test
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
+
+      # تست‌های یکپارچگی (قفل هم‌زمانی SELECT ... FOR UPDATE) روی همین دیتابیس جدا اجرا می‌شوند
+      - name: Pytest (unit + API + integration) with coverage
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/logitrack_test
+        run: pytest -q -rs --junitxml=pytest-report.xml --cov --cov-report=term --cov-report=xml
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pytest-report
+          path: |
+            pytest-report.xml
+            coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # بیلد فرانت‌اند (TypeScript + Vite) — هم‌زمان با lint/test
+  # ---------------------------------------------------------------------------
   frontend:
-    name: Frontend build (TypeScript + Vite)
+    name: Frontend build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci --no-audit --no-fund
-      - name: Type-check and build
-        run: npm run build
 
+      - run: npm ci --no-audit --no-fund
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build
+        run: npx vite build
+
+  # ---------------------------------------------------------------------------
+  # گام ۳: تست E2E — شبیه‌سازی کاربر واقعی در مرورگر روی کل سیستم
+  # ---------------------------------------------------------------------------
   e2e:
-    name: End-to-end tests (Playwright)
-    needs: [backend, frontend]
+    name: E2E (Playwright)
     runs-on: ubuntu-latest
+    needs: [test, frontend]
     timeout-minutes: 90
     env:
       WEB_PORT: 8001
@@ -82,17 +164,17 @@ jobs:
       POSTGRES_PASSWORD: ci-db-password
       SECRET_KEY: ci-only-secret-key
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Start the stack (web, worker, beat, PostgreSQL, Redis)
+      - name: Start full stack (web, worker, beat, PostgreSQL, Redis)
         run: docker compose up -d --build --wait --wait-timeout 300
 
       - name: Seed demo data
         run: docker compose exec -T web python seed_demo_data.py
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: tests/ui/package-lock.json
 
@@ -102,10 +184,12 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - name: Run E2E scenarios
         working-directory: tests/ui
         shell: bash
-        run: node e2e.mjs http://localhost:${WEB_PORT} 2>&1 | tee e2e.log
+        run: |
+          set -o pipefail
+          node e2e.mjs http://localhost:${WEB_PORT} 2>&1 | tee e2e.log
 
       - name: Collect service logs
         if: failure()
@@ -113,7 +197,7 @@ jobs:
 
       - name: Upload E2E report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-report
           path: |
@@ -123,29 +207,56 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Stop the stack
+      - name: Stop stack
         if: always()
         run: docker compose down -v
 
+  # ---------------------------------------------------------------------------
+  # آیا Secrets لازم برای استقرار تنظیم شده‌اند؟
+  # ---------------------------------------------------------------------------
+  preflight:
+    name: Deploy preflight
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      server_ready: ${{ steps.check.outputs.server_ready }}
+    steps:
+      - id: check
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          server_ready=false
+          if [[ -n "$DEPLOY_HOST" && -n "$DEPLOY_USER" && -n "$DEPLOY_PATH" && -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_KNOWN_HOSTS" ]]; then server_ready=true; fi
+          echo "server_ready=$server_ready" >> "$GITHUB_OUTPUT"
+          [[ "$server_ready" == true ]] || echo "::notice::Secrets سرور (DEPLOY_*) تنظیم نشده‌اند — مرحله deploy رد می‌شود."
+
+  # ---------------------------------------------------------------------------
+  # گام ۴: اتصال امن SSH به سرور و به‌روزرسانی
+  # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to production
-    needs: [e2e]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    needs: [e2e, preflight]
+    if: needs.preflight.outputs.server_ready == 'true'
     timeout-minutes: 30
-    environment: production
+    environment:
+      name: production
+      url: https://passineh.ir
     concurrency:
       group: deploy-production
       cancel-in-progress: false
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
     steps:
-      - name: Skip when no server is configured
-        if: env.DEPLOY_HOST == ''
-        run: echo "::notice::DEPLOY_HOST secret is not set — deployment skipped."
-
+      # کلید خصوصی فقط در حافظه همین Runner موقت؛ known_hosts از قبل ثبت‌شده (نه ssh-keyscan در لحظه)
       - name: Configure SSH
-        if: env.DEPLOY_HOST != ''
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -157,13 +268,8 @@ jobs:
 
       # روی سرور: پشتیبان دیتابیس ← دریافت آخرین نسخه main ← build و اجرای دوباره (مایگریشن‌ها خودکار) ← بررسی سلامت
       - name: Update the server
-        if: env.DEPLOY_HOST != ''
-        env:
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$DEPLOY_PATH'" <<'REMOTE'
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$DEPLOY_PATH'" <<'REMOTE'
           set -euo pipefail
           cd "$1"
           mkdir -p backups
@@ -174,6 +280,52 @@ jobs:
           git pull --ff-only origin main
           docker compose up -d --build --wait --wait-timeout 300
           docker image prune -f
-          port=$(grep -E '^WEB_PORT=' .env 2>/dev/null | cut -d= -f2 || true)
+          port=$(grep -E '^WEB_PORT=' .env 2>/dev/null | cut -d= -f2 | sed 's/.*://' || true)
           curl -fsS "http://localhost:${port:-8001}/health"
           REMOTE
+
+      - name: Sanity check on production domain
+        run: curl -fsS --retry 5 --retry-delay 5 https://passineh.ir/health
+
+  # ---------------------------------------------------------------------------
+  # گام ۵: گزارش نهایی
+  # ---------------------------------------------------------------------------
+  report:
+    name: Report
+    runs-on: ubuntu-latest
+    needs: [lint, test, frontend, e2e, preflight, deploy]
+    if: always()
+    steps:
+      - name: Summarize
+        env:
+          LINT: ${{ needs.lint.result }}
+          TEST: ${{ needs.test.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+          E2E: ${{ needs.e2e.result }}
+          DEPLOY: ${{ needs.deploy.result }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          icon() { case "$1" in success) echo "✅";; failure) echo "❌";; cancelled) echo "⏹️";; *) echo "⏭️";; esac; }
+          overall=success
+          for result in "$LINT" "$TEST" "$FRONTEND" "$E2E" "$DEPLOY"; do
+            if [[ "$result" == failure || "$result" == cancelled ]]; then overall=failure; fi
+          done
+          {
+            echo "## $( [[ $overall == success ]] && echo '✅ خط لوله موفق بود' || echo '❌ خط لوله با شکست مواجه شد')"
+            echo ""
+            echo "| مرحله | نتیجه |"
+            echo "|---|---|"
+            echo "| Lint (Ruff) | $(icon "$LINT") $LINT |"
+            echo "| Tests (Pytest) | $(icon "$TEST") $TEST |"
+            echo "| Frontend build | $(icon "$FRONTEND") $FRONTEND |"
+            echo "| E2E (Playwright) | $(icon "$E2E") $E2E |"
+            echo "| Deploy | $(icon "$DEPLOY") $DEPLOY |"
+            echo ""
+            echo "**برنچ:** \`$BRANCH\` · **Commit:** \`${GITHUB_SHA::7}\` · **توسط:** $ACTOR"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # خود Report همیشه اجرا می‌شود؛ ولی اگر مرحله‌ای شکست خورده، کل Workflow قرمز بماند
+      - name: Fail workflow if any stage failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

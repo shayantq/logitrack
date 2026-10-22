@@ -3,7 +3,7 @@
   - هر فیلتر جستجوی پیشرفته نتیجه درست برگرداند (کد، کالا، راننده، پلاک، تاریخ تحویل، استان، فوری و ترکیب‌ها)
   - مشتری با پیگیری عمومی فقط سفارش خودش را ببیند؛ جزئیات فقط با ۴ رقم آخر موبایل
 """
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 
 import pytest
 

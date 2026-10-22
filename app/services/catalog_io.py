@@ -68,7 +68,7 @@ SAMPLE = [
 def _style_sheet(ws, warehouses: list[str]) -> None:
     ws.sheet_view.rightToLeft = True
     head = PatternFill("solid", fgColor="0D9488")
-    for i, (key, title, required, width, _) in enumerate(COLUMNS, start=1):
+    for i, (_key, title, required, width, _) in enumerate(COLUMNS, start=1):
         cell = ws.cell(row=1, column=i, value=title + (" *" if required else ""))
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = head
@@ -123,7 +123,7 @@ def _guide_sheet(wb: Workbook) -> None:
     r = len(lines) + 1
     ws.cell(row=r, column=1, value="ستون").font = Font(bold=True)
     ws.cell(row=r, column=2, value="توضیح").font = Font(bold=True)
-    for key, title, required, _, hint in COLUMNS:
+    for _key, title, required, _, hint in COLUMNS:
         r += 1
         ws.cell(row=r, column=1, value=title + (" (اجباری)" if required else ""))
         ws.cell(row=r, column=2, value=hint)

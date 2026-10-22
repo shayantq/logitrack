@@ -234,7 +234,7 @@ vehicles_data = [
     ("۱۳ایران۲۲۲الف۱۱", "وانت فوتون", "pickup", 1800, "available"),
 ]
 vehicles = []
-for (plate, name, vtype, capacity, vstatus), driver in zip(vehicles_data, drivers):
+for (plate, name, vtype, capacity, vstatus), driver in zip(vehicles_data, drivers, strict=False):
     v = get_or_create_vehicle(plate, name, vtype, capacity, vstatus, driver.id, driver.city)
     vehicles.append(v)
 
@@ -437,7 +437,7 @@ def seed_schedule(org_id, driver, shifts, employment="full_time", intercity=Fals
 
 
 default_org = db.query(Organization).filter(Organization.slug != "qazvin-shop").order_by(Organization.id).first()
-for i, (driver, vehicle) in enumerate(zip(drivers, vehicles)):
+for i, (driver, vehicle) in enumerate(zip(drivers, vehicles, strict=False)):
     part_time = i % 4 == 3
     seed_schedule(default_org.id, driver, PART_TIME if part_time else FULL_TIME, "part_time" if part_time else "full_time",
                   intercity=vehicle.type in ("truck", "van"), max_daily=4 if part_time else 8)
@@ -566,7 +566,7 @@ print("===== انبارگردانی نمونه (مرحله ۱۲) =====")
 if not db.query(Stocktake).execution_options(**SKIP_TENANT_FILTER).first():
     set_tenant(db, default_org.id)
     _whs = db.query(Warehouse).order_by(Warehouse.id).all()
-    for _w, _days in zip(_whs, (30, 90, 180)):
+    for _w, _days in zip(_whs, (30, 90, 180), strict=False):
         _w.stocktake_interval_days = _days
     if _whs:
         _wh = _whs[0]

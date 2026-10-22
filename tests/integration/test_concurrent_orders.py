@@ -12,7 +12,6 @@ overselling) یک قابلیت قفل سطح ردیف واقعی در PostgreSQL
     docker compose exec web pytest tests/integration -v -m integration
 """
 import threading
-from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -20,10 +19,9 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.tenancy import set_tenant
 from app.models import User, RoleEnum, Vehicle, Product, Inventory, Organization
-from app.schemas.order import OrderRequest
 from app.services import order_service
 from app.services.exceptions import ConflictError
-from tests.factories import order_request, order_payload
+from tests.factories import order_request
 from tests.integration.conftest import TEST_DATABASE_URL
 
 pytestmark = [

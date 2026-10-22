@@ -301,7 +301,7 @@ def route(origin: City, destination: City) -> list[tuple[City, int]]:
     path[0], path[-1] = origin, destination          # مختصات دقیق مبدأ و مقصد
     graph = _graph()
     result, km = [(path[0], 0)], 0.0
-    for a, b in zip(path, path[1:]):
+    for a, b in zip(path, path[1:], strict=False):
         edge = next((k for n, k in graph.get(a.name, []) if n == b.name), None) if _road_node(a) and _road_node(b) else None
         km += edge if edge is not None else _road_km(a, b)
         result.append((b, round(km)))

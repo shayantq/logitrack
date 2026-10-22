@@ -9,7 +9,7 @@ import pytest
 from app.core.security import create_access_token
 from app.core.tenancy import set_tenant
 from app.models import User, RoleEnum, Vehicle, Product, Inventory, Organization
-from tests.factories import order_request, order_payload
+from tests.factories import order_payload
 
 
 @pytest.fixture()

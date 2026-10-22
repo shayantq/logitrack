@@ -17,7 +17,7 @@ from datetime import datetime, time, timedelta
 
 from sqlalchemy.orm import joinedload
 
-from app.core.tenancy import SKIP_TENANT_FILTER, set_tenant
+from app.core.tenancy import set_tenant
 from app.models import Inventory, Organization, ProductPrice, StockMovement
 from app.models_notification import Notification
 from app.services import dispatch_service, notification_service, replenishment_service, stock_ledger
@@ -116,7 +116,7 @@ def seed(db) -> None:
                 m.balance_after = balance
         # بهای خرید (≈ ۷۸٪ قیمت فروش)؛ هر هفتمین کالا بدون بها
         priced = 0
-        for i, row in enumerate(db.query(ProductPrice).filter(ProductPrice.cost_price.is_(None)).order_by(ProductPrice.product_id).all()):
+        for row in db.query(ProductPrice).filter(ProductPrice.cost_price.is_(None)).order_by(ProductPrice.product_id).all():
             if row.product_id % 7 == 0:
                 continue
             row.cost_price = round((row.final_price or 0) * 0.78, -3)

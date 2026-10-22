@@ -168,7 +168,7 @@ def generate_orders_excel_task(organization_id):
                 _items_summary(o), o.total_quantity, o.total_weight_kg, o.total_price, _destination(o),
                 o.destination_address or "", STATUS_LABELS.get(o.status, o.status),
                 o.vehicle.license_plate if o.vehicle else "—", "بله" if o.priority else "خیر",
-            ])))
+            ], strict=False)))
         df = pd.DataFrame(data) if data else pd.DataFrame(columns=columns)
         return {
             "organization_id": organization_id,

@@ -1,0 +1,16 @@
+# بررسی کیفیت کد پایتون (در CI مرحله‌ی Lint)
+target-version = "py313"
+line-length = 140
+extend-exclude = ["frontend", "tests/ui", "alembic/versions"]
+
+[lint]
+# خطاهای واقعی: نحو، نام‌های تعریف‌نشده، importهای بی‌استفاده و باگ‌های رایج
+select = ["E4", "E7", "E9", "F", "W6", "B"]
+ignore = [
+  "B008",  # Depends(...) در امضای endpointهای FastAPI
+  "B904",  # تبدیل DomainError به HTTPException عمداً بدون زنجیره‌ی خطا
+  "E741",  # نام‌های کوتاه مثل l در حلقه‌های محاسباتی
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["B006", "B023", "E731"]

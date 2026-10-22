@@ -28,7 +28,7 @@ from statistics import NormalDist
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.iran import fa_digits, gregorian_to_jalali, jalali_to_gregorian
-from app.models import Inventory, Organization, Product, ProductPrice, StockMovement, User, Warehouse
+from app.models import Inventory, Organization, Product, ProductPrice, StockMovement, User
 from app.services import audit_service, dispatch_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
@@ -585,7 +585,7 @@ def plan(db: Session, user: User, months: int = 6, warehouse_id: int | None = No
         "key": m["key"], "label": m["label"], "start": m["start"].isoformat(), "end": m["end"].isoformat(), "days": m["days"],
         "partial": m["days"] < m["full_days"], "capital": round(t["capital"]), "orders": t["orders"], "units": t["units"],
         "demand_units": round(t["demand_units"]), "stock_value_end": round(t["stock_value_end"]), "stockout_items": t["stockout_items"],
-    } for m, t in zip(horizon, month_totals)]
+    } for m, t in zip(horizon, month_totals, strict=False)]
     running = 0
     for row in month_rows:
         running += row["capital"]

@@ -39,7 +39,7 @@ class ScheduleUpdate(BaseModel):
             by_day.setdefault(s.weekday, []).append(s)
         for items in by_day.values():
             items.sort(key=lambda s: s.start_time)
-            for a, b in zip(items, items[1:]):
+            for a, b in zip(items, items[1:], strict=False):
                 if b.start_time < a.end_time:
                     raise ValueError("شیفت‌های یک روز نباید هم‌پوشانی داشته باشند.")
         return self

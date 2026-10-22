@@ -5,13 +5,12 @@
 با PostgreSQL واقعی انجام می‌شود. اینجا فقط درستیِ منطق تجاری را می‌سنجیم.
 """
 import pytest
-from datetime import datetime, timedelta, timezone
 
 from app.models import DriverProfile, User, RoleEnum, Vehicle, Product, Inventory
-from app.schemas.order import OrderRequest, OrderStatusRequest
+from app.schemas.order import OrderStatusRequest
 from app.services import order_service
 from app.services.exceptions import ConflictError, ForbiddenError
-from tests.factories import order_request, order_payload
+from tests.factories import order_request
 
 
 def _make_user(db, role, city=None, tag=""):

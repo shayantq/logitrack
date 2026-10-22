@@ -4,18 +4,17 @@
 قانون اصلی که بعد از هر عملیات بررسی می‌شود:
     مانده هر ردیف موجودی == مجموع گردش‌هایش == balance_after آخرین گردش
 """
-from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
 
-from app.models import Inventory, Order, Product, RoleEnum, StockMovement, User, Vehicle, Warehouse
-from app.schemas.order import OrderRequest, OrderStatusRequest
+from app.models import Inventory, Product, RoleEnum, StockMovement, User, Vehicle, Warehouse
+from app.schemas.order import OrderStatusRequest
 from app.schemas.product import ProductCreate, StockMovementCreate, StockTransferCreate, StockUpdate
 from app.services import inventory_service, order_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError
 from app.services.stock_ledger import LedgerViolationError
-from tests.factories import order_request, order_payload
+from tests.factories import order_request
 
 
 def _user(db, role, tag, warehouse_id=None):

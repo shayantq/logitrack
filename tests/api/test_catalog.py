@@ -2,7 +2,7 @@
 مرحله ۱۳: کاتالوگ کالا — قیمت تاریخ‌دار با یارانه (سفارش قیمت روز تحویل را می‌گیرد)، تنوع، و ورود/خروج اکسل.
 """
 import io
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from openpyxl import Workbook, load_workbook

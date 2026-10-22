@@ -16,7 +16,7 @@ from app.models import (
     Organization, User, RoleEnum, Warehouse, Product, Inventory, Vehicle, Order, OrderItem,
 )
 from app.models_notification import Notification
-from tests.factories import order_request, order_payload
+from tests.factories import order_payload
 
 PASSWORD = "secret123"
 PASSWORD_HASH = bcrypt_context.hash(PASSWORD)

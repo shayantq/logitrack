@@ -1,0 +1,4 @@
+# وابستگی‌های توسعه و CI (علاوه بر requirements.txt)
+-r requirements.txt
+ruff==0.8.4
+pytest-cov==6.0.0
