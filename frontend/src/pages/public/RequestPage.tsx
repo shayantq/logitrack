@@ -11,7 +11,7 @@ import { faDate, latinDigits, normalizeDigits } from "@/lib/format";
 import { Badge, Button, Field, Input, Select, Textarea, buttonClass, cn } from "@/ui/primitives";
 import { CitySelect } from "@/components/CitySelect";
 import { PublicFooter, PublicHeader } from "./chrome";
-import { planById } from "./content/pricing";
+import { customFromQuery, customSummary, planById } from "./content/pricing";
 
 type Body = Schemas["OrganizationRequestCreate"];
 type FormState = Record<
@@ -36,10 +36,17 @@ const DRAFT_KEY = "request-draft";
 export default function RequestPage() {
   const { hash, search } = useLocation();
   const plan = planById(new URLSearchParams(search).get("plan"));
+  // پلن سفارشی از ماشین‌حساب تعرفه‌ها
+  const custom = customFromQuery(search);
+  const planLabel = plan ? plan.name : custom ? "سفارشی" : null;
   const { data: provinces = [] } = useProvinces();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(() => {
-    try { return { ...EMPTY, ...JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "{}") }; } catch { return EMPTY; }
+    let draft: FormState = EMPTY;
+    try { draft = { ...EMPTY, ...JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "{}") }; } catch { /* پیش‌نویس خراب */ }
+    // تعداد انبار و ناوگان از پلن سفارشی، اگر کاربر قبلاً چیزی ننوشته
+    if (custom) draft = { ...draft, warehouse_count: draft.warehouse_count || String(custom.warehouses), fleet_size: draft.fleet_size || String(custom.drivers) };
+    return draft;
   });
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Schemas["OrganizationRequestSubmitted"] | null>(null);
@@ -62,7 +69,8 @@ export default function RequestPage() {
       const body: Record<string, unknown> = { ...form };
       for (const k of DIGITS) body[k] = normalizeDigits(form[k].trim());
       if (!form.referral_source) body.referral_detail = null;
-      if (plan) body.notes = [`پلن انتخابی: ${plan.name}`, form.notes.trim()].filter(Boolean).join("\n");
+      const planNote = plan ? `پلن انتخابی: ${plan.name}` : custom ? `پلن سفارشی: ${customSummary(custom)}` : null;
+      if (planNote) body.notes = [planNote, form.notes.trim()].filter(Boolean).join("\n");
       for (const [k, v] of Object.entries(body)) if (typeof v === "string" && v.trim() === "") body[k] = null;
       body.warehouse_count = form.warehouse_count === "" ? null : Number(normalizeDigits(form.warehouse_count));
       body.fleet_size = form.fleet_size === "" ? null : Number(normalizeDigits(form.fleet_size));
@@ -113,9 +121,9 @@ export default function RequestPage() {
           <div>
             {done ? <Success result={done} onAgain={() => { setDone(null); setForm(EMPTY); setStep(0); }} /> : (
               <form id="request-form" onSubmit={next} className="card p-6 sm:p-8" data-testid="request-step" data-step={step}>
-                {plan && (
+                {planLabel && (
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-soft px-4 py-2.5 text-sm text-brand-strong" data-testid="request-plan">
-                    <span>پلن انتخابی: <b>{plan.name}</b></span>
+                    <span>پلن انتخابی: <b>{planLabel}</b>{custom && <span className="mt-1 block text-xs leading-5">{customSummary(custom)}</span>}</span>
                     <Link to="/pricing" className="text-xs font-medium hover:underline">تغییر پلن</Link>
                   </div>
                 )}

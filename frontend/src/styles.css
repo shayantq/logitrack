@@ -154,6 +154,26 @@
   .tap-target::after { content: ""; position: absolute; inset: -10px -8px; }
 }
 
+/* اسلایدر (ماشین‌حساب تعرفه): مسیر پرشده با رنگ برند تا --fill، دستگیره بزرگ برای انگشت؛ Chrome/Safari و Firefox */
+.range-slider { -webkit-appearance: none; appearance: none; height: 32px; background: transparent; cursor: pointer; touch-action: pan-y; }
+.range-slider::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(to right, var(--brand) 0 var(--fill, 0%), var(--border) var(--fill, 0%) 100%);
+}
+.range-slider::-moz-range-track { height: 8px; border-radius: 999px; background: var(--border); }
+.range-slider::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--brand); }
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 26px; height: 26px; margin-top: -9px; border-radius: 999px;
+  background: var(--surface); border: 3px solid var(--brand); box-shadow: 0 2px 6px rgb(16 42 67 / .25); transition: transform .15s;
+}
+.range-slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 999px; background: var(--surface); border: 3px solid var(--brand); box-shadow: 0 2px 6px rgb(16 42 67 / .25);
+}
+.range-slider:active::-webkit-slider-thumb { transform: scale(1.12); }
+.range-slider:focus-visible { outline: none; }
+.range-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 30%, transparent); }
+.range-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 30%, transparent); }
+
 /* Safari در iOS روی فیلدهایی با فونت کوچک‌تر از ۱۶px هنگام فوکوس صفحه را بزرگ می‌کند؛ روی صفحه لمسی ۱۶px می‌شوند
    (بیرون از @layer تا بر کلاس‌های اندازه متن غلبه کند) */
 @media (pointer: coarse) {

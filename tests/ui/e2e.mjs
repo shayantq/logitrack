@@ -1363,6 +1363,32 @@ await session("brand-pages", null, null, async page => {
   await page.waitForFunction(m => document.querySelector("[data-plan=pro] [data-testid=plan-price]")?.textContent !== m, monthly);
   check("brand", "annual billing changes the price", ((await page.textContent("[data-plan=pro] [data-testid=plan-price]")) ?? "").includes("در سال"));
   check("brand", "feature comparison table", (await page.locator("[data-testid=pricing-compare] tbody tr").count()) >= 8);
+
+  // ماشین‌حساب پلن سفارشی: قیمت لحظه‌ای، ماژول‌ها، پیشنهاد پلن ارزان‌تر و انتقال به فرم درخواست
+  const calcTotal = () => page.getAttribute("[data-testid=calc-total]", "data-monthly").then(Number);
+  const slide = async (id, key, times = 1) => { await page.focus(`[data-testid=calc-${id}-range]`); for (let i = 0; i < times; i++) await page.keyboard.press(key); };
+  const t0 = await calcTotal();
+  await page.click("[data-testid=calc-drivers-plus]");
+  await page.waitForFunction(t => Number(document.querySelector("[data-testid=calc-total]").dataset.monthly) > t, t0);
+  check("brand", "calculator price follows the + button", true);
+  await slide("orders", "End");
+  check("brand", "orders slider reaches 20,000", ((await page.textContent("[data-testid=calc-orders-value]")) ?? "").includes("۲۰٬۰۰۰"));
+  const t1 = await calcTotal();
+  await page.click("[data-testid=calc-module-phone]");
+  await page.waitForFunction(t => Number(document.querySelector("[data-testid=calc-total]").dataset.monthly) === t + 100000, t1);
+  check("brand", "module toggle adds its price", (await page.locator("[data-testid=calc-lines] li").count()) >= 6);
+  // نیازهای کوچک ← پیشنهاد پلن پایه
+  await slide("warehouses", "Home"); await slide("orders", "Home"); await slide("users", "Home");
+  await slide("drivers", "Home"); await slide("drivers", "ArrowRight", 4);
+  await page.click("[data-testid=calc-module-phone]"); await page.click("[data-testid=calc-module-reorder]");
+  await page.waitForSelector("[data-testid=calc-better-plan] >> text=پایه");
+  check("brand", "calculator suggests the cheaper fixed plan", true);
+  await page.click("[data-testid=calc-cta]");
+  await page.waitForSelector("[data-testid=request-plan] >> text=سفارشی");
+  check("brand", "custom plan carried into the request form", page.url().includes("plan=custom") && page.url().includes("d=5"));
+  await page.goto(`${BASE}/pricing`);
+  await page.waitForSelector("[data-testid=plan-card]");
+
   await page.click("[data-plan=pro] [data-testid=plan-cta]");
   await page.waitForSelector("[data-testid=request-plan] >> text=حرفه‌ای");
   check("brand", "chosen plan carried into the request form", page.url().includes("plan=pro"));

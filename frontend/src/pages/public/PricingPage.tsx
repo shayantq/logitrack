@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import * as Accordion from "@radix-ui/react-accordion";
-import { ArrowLeft, CalendarCheck, Check, ChevronDown, ClipboardList, Gift, Minus, Phone, Receipt, Truck, UserRound, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Check, ChevronDown, ClipboardList, Gift, Minus, Phone, Receipt, SlidersHorizontal, Truck, UserRound, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { BRAND } from "@/brand";
 import { buttonClass, cn } from "@/ui/primitives";
 import { InfoLayout } from "./InfoLayout";
+import { PricingCalculator } from "./PricingCalculator";
 import { ANNUAL_MONTHS, EARLY_OFFER, FEATURE_GROUPS, PLANS, PRICING_FAQ, TRIAL_DAYS, type Plan } from "./content/pricing";
 
 type Billing = "monthly" | "annual";
@@ -163,7 +164,12 @@ export default function PricingPage() {
       lead={`بدون هزینه به ازای هر کاربر. ${fa(TRIAL_DAYS)} روز رایگان امتحان کنید و هر زمان خواستید، پلن را تغییر دهید.`}
       hero={
         <div className="flex flex-col items-start gap-4">
-          <BillingToggle value={billing} onChange={setBilling} />
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <BillingToggle value={billing} onChange={setBilling} />
+            <a href="#custom-plan" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline" data-testid="custom-plan-link">
+              <SlidersHorizontal className="size-4" />یا پلن خودتان را بسازید
+            </a>
+          </div>
           {EARLY_OFFER && (
             <div className="flex items-center gap-3 rounded-2xl border border-success/30 bg-success-soft px-4 py-3 text-success" data-testid="early-offer">
               <Gift className="size-5 shrink-0" /><span className="text-sm font-semibold leading-6 sm:text-base">{EARLY_OFFER}</span>
@@ -185,6 +191,12 @@ export default function PricingPage() {
             </div>
           ))}
         </div>
+
+        <section id="custom-plan" className="mt-20 scroll-mt-24">
+          <h2 className="text-2xl font-black tracking-tight sm:text-3xl">پلن خودتان را بسازید</h2>
+          <p className="mt-2 text-text-2">فقط برای همان چیزی که لازم دارید هزینه کنید؛ قیمت همزمان با تغییرات محاسبه می‌شود.</p>
+          <div className="mt-6"><PricingCalculator billing={billing} /></div>
+        </section>
 
         <div className="mt-20">
           <h2 className="text-2xl font-black tracking-tight sm:text-3xl">مقایسه کامل پلن‌ها</h2>
