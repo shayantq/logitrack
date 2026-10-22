@@ -39,7 +39,7 @@ function RouteIllustration() {
 /** چارچوب مشترک صفحه‌های ورود و بازیابی رمز: فرم در یک ستون، تصویر مسیر در ستون دیگر */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="grid min-h-dvh lg:grid-cols-2">
       <div className="flex flex-col px-6 py-6 sm:px-12">
         <div className="flex items-center justify-between">
           <Link to="/"><Logo /></Link>

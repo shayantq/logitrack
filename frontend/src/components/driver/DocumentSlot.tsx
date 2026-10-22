@@ -120,8 +120,8 @@ export function DocumentSlot({ kind, doc, fileUrl, uploadUrl, required, disabled
       {viewing && preview && (
         <Modal open onClose={() => setViewing(false)} title={meta.label} size="lg" testId="doc-viewer">
           {isVideo
-            ? <video src={preview} controls autoPlay playsInline className="max-h-[70vh] w-full rounded-xl bg-black" data-testid="doc-viewer-video" />
-            : <img src={preview} alt={meta.label} className="mx-auto max-h-[70vh] rounded-xl object-contain" />}
+            ? <video src={preview} controls autoPlay playsInline className="max-h-[70dvh] w-full rounded-xl bg-black" data-testid="doc-viewer-video" />
+            : <img src={preview} alt={meta.label} className="mx-auto max-h-[70dvh] rounded-xl object-contain" />}
         </Modal>
       )}
     </div>

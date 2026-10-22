@@ -17,7 +17,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-[rise_.2s_ease-out]" />
         <Dialog.Content data-testid={testId} dir="rtl"
-          className={cn("fixed inset-x-3 top-[4vh] z-50 mx-auto flex max-h-[92vh] flex-col rounded-2xl border border-border bg-surface shadow-float",
+          className={cn("fixed inset-x-3 top-[4dvh] z-50 mx-auto flex max-h-[92dvh] flex-col rounded-2xl border border-border bg-surface shadow-float",
             "data-[state=open]:animate-[rise_.25s_cubic-bezier(.2,.7,.2,1)]", MODAL_SIZES[size])}>
           <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
             <div>

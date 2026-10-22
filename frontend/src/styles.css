@@ -125,8 +125,13 @@
 }
 
 @layer base {
-  html { font-family: var(--font-sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
-  body { min-height: 100vh; background: var(--bg); }
+  /* موبایل: بدون بزرگ‌نمایی خودکار متن در چرخش گوشی (iOS) و بدون کادر آبی لمس (Android) */
+  html { font-family: var(--font-sans); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+  /* dvh: ارتفاع واقعی صفحه با درنظرگرفتن نوار آدرس جمع‌شونده مرورگر موبایل */
+  body { min-height: 100vh; min-height: 100dvh; background: var(--bg); }
+  /* لمس سریع بدون تأخیر و بدون بزرگ‌نمایی با دو ضربه روی دکمه‌ها */
+  a, button, [role="button"], label, summary { touch-action: manipulation; }
   ::selection { background: var(--brand); color: var(--brand-ink); }
   :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
   input, select, textarea, button { font: inherit; }
@@ -144,6 +149,15 @@
   .table-base thead th { @apply sticky top-0 z-10 bg-surface-2 px-4 py-3 text-start text-xs font-medium text-muted whitespace-nowrap; }
   .table-base tbody td { @apply border-t border-border px-4 py-3 align-middle; }
   .table-base tbody tr.clickable { @apply cursor-pointer transition-colors hover:bg-surface-2; }
+  /* لینک‌های متنی کوچک (مثل «همه سفارش‌ها ←»): ناحیه لمس بزرگ‌تر برای انگشت، بدون تغییر چیدمان */
+  .tap-target { position: relative; }
+  .tap-target::after { content: ""; position: absolute; inset: -10px -8px; }
+}
+
+/* Safari در iOS روی فیلدهایی با فونت کوچک‌تر از ۱۶px هنگام فوکوس صفحه را بزرگ می‌کند؛ روی صفحه لمسی ۱۶px می‌شوند
+   (بیرون از @layer تا بر کلاس‌های اندازه متن غلبه کند) */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px; }
 }
 
 /* کاربرانی که انیمیشن را در سیستم خاموش کرده‌اند */

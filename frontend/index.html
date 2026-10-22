@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#4672ad" />
+    <meta name="theme-color" content="#f7fbfc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#091540" media="(prefers-color-scheme: dark)" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="پسینه" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>پسینه — مدیریت هوشمند ارسال و انبار</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="description" content="از انبار تا درِ خانه‌ی مشتری: سفارش، ناوگان، دفتر گردش کالا و پیگیری لحظه‌ای در یک سامانه." />
@@ -25,6 +33,9 @@
           var dark = pref === "dark" || (pref === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.dataset.theme = dark ? "dark" : "light";
         } catch (e) { document.documentElement.dataset.theme = "light"; }
+        // رنگ نوار بالای مرورگر موبایل با تم انتخاب‌شده در سایت (نه فقط تم سیستم)
+        var bar = document.documentElement.dataset.theme === "dark" ? "#091540" : "#f7fbfc";
+        document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.setAttribute("content", bar); m.removeAttribute("media"); });
       })();
     </script>
   </head>

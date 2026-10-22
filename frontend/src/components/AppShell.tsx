@@ -172,9 +172,9 @@ function Shell() {
   useEffect(() => setMobileOpen(false), [location.pathname]);
 
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div className="flex min-h-dvh bg-bg">
       {/* سایدبار دسکتاپ */}
-      <aside className={cn("sticky top-0 hidden h-screen shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-300 lg:flex",
+      <aside className={cn("sticky top-0 hidden h-dvh shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-300 lg:flex",
         collapsed ? "w-[76px]" : "w-64")}>
         <div className={cn("flex h-16 items-center border-b border-border", collapsed ? "justify-center" : "px-5")}>
           {collapsed ? <LogoMark /> : <Logo />}

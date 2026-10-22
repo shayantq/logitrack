@@ -37,7 +37,7 @@ function Attachment({ url, auth }: { url: string; auth: boolean }) {
         <img src={src} alt="پیوست" className="max-h-48 max-w-full object-cover transition hover:scale-[1.02]" />
       </button>
       <Modal open={open} onClose={() => setOpen(false)} title="تصویر پیوست" size="lg">
-        <img src={src} alt="پیوست" className="mx-auto max-h-[70vh] rounded-xl" />
+        <img src={src} alt="پیوست" className="mx-auto max-h-[70dvh] rounded-xl" />
       </Modal>
     </>
   );

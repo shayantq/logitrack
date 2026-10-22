@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
-          <CardHeader title="آخرین سفارش‌ها" icon={<Package className="size-[18px]" />} tone="info" actions={<Link to="/app/orders" className="inline-flex items-center gap-1 text-sm font-medium text-brand">همه سفارش‌ها <ArrowLeft className="size-4" /></Link>} />
+          <CardHeader title="آخرین سفارش‌ها" icon={<Package className="size-[18px]" />} tone="info" actions={<Link to="/app/orders" className="tap-target inline-flex items-center gap-1 text-sm font-medium text-brand">همه سفارش‌ها <ArrowLeft className="size-4" /></Link>} />
           {!recent.data ? <div className="p-5"><Skeleton className="h-40" /></div> : recent.data.length === 0 ? <EmptyState title="هنوز سفارشی ثبت نشده" /> : (
             <ul className="divide-y divide-border">
               {recent.data.map((o: Schemas["OrderResponse"]) => (
@@ -81,7 +81,7 @@ export default function DashboardPage() {
         </Card>
         <Card className="lg:col-span-2">
           <CardHeader title="کالاهای رو‌به‌اتمام" subtitle="به تفکیک انبار" icon={<AlertTriangle className="size-[18px]" />} tone="warning"
-            actions={<Link to="/app/reorder" className="text-xs font-medium text-brand hover:underline">نقطه سفارش ←</Link>} />
+            actions={<Link to="/app/reorder" className="tap-target text-xs font-medium text-brand hover:underline">نقطه سفارش ←</Link>} />
           {!data ? <div className="p-5"><Skeleton className="h-40" /></div> : data.low_stock_products.length === 0 ? (
             <EmptyState title="همه کالاها بالای حد آستانه‌اند" icon={<PackageCheck className="size-5" />} />
           ) : (

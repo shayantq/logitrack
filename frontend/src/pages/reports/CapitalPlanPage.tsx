@@ -86,7 +86,7 @@ export default function CapitalPlanPage() {
           <Field label="رشد ماهانه فروش (٪)" className="w-40" hint={data ? `پیش‌فرض: ${faNumber(Math.round(data.assumptions.demand_growth_monthly * 1000) / 10)}٪` : undefined}>
             <Input inputMode="decimal" value={demandGrowth} onChange={e => setDemandGrowth(e.target.value)} placeholder="سیاست سازمان" />
           </Field>
-          <Link to="/app/reorder" className="mb-2 text-xs font-medium text-brand hover:underline">تنظیم زمان تأمین و سطح خدمت ←</Link>
+          <Link to="/app/reorder" className="tap-target mb-2 text-xs font-medium text-brand hover:underline">تنظیم زمان تأمین و سطح خدمت ←</Link>
         </div>
       </Card>
 

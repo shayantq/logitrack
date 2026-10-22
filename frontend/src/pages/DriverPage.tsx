@@ -222,8 +222,8 @@ function MySchedule() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           {data.max_daily_orders ? <p className="text-xs text-muted">سقف سفارش روزانه: {faNumber(data.max_daily_orders)}</p> : <span />}
           <div className="flex gap-2">
-            <Link to="/app/driver/agenda" className="text-sm font-medium text-brand">برنامه و کارنامه ←</Link>
-            <Link to="/app/driver/requests?new=leave" className="text-sm font-medium text-brand" data-testid="quick-leave">درخواست مرخصی ←</Link>
+            <Link to="/app/driver/agenda" className="tap-target text-sm font-medium text-brand">برنامه و کارنامه ←</Link>
+            <Link to="/app/driver/requests?new=leave" className="tap-target text-sm font-medium text-brand" data-testid="quick-leave">درخواست مرخصی ←</Link>
           </div>
         </div>
         {data.time_off.length > 0 && (

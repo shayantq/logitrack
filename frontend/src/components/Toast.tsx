@@ -21,7 +21,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed bottom-5 left-5 z-[60] flex max-w-[90vw] flex-col gap-2" role="status" aria-live="polite">
+      <div className="pointer-events-none fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-5 z-[60] flex max-w-[calc(100vw-2.5rem)] flex-col gap-2" role="status" aria-live="polite">
         {toasts.map(t => (
           <div key={t.id} data-testid="toast"
             className={`lt-toast pointer-events-auto flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium shadow-float animate-rise ${

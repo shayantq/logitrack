@@ -87,13 +87,22 @@ def serve_react_app(path: str = "", code: str = ""):
     return JSONResponse(status_code=404, content={"error": "اپ React ساخته نشده است (cd frontend && npm run build)."})
 
 
-PUBLIC_FILES = {"favicon.svg": "image/svg+xml", "og.png": "image/png"}
+PUBLIC_FILES = {
+    "favicon.svg": "image/svg+xml", "og.png": "image/png", "manifest.webmanifest": "application/manifest+json",
+    "apple-touch-icon.png": "image/png", "icon-192.png": "image/png", "icon-512.png": "image/png",
+    "icon-maskable-512.png": "image/png",
+}
 
 
 @app.get("/favicon.svg", include_in_schema=False)
 @app.get("/og.png", include_in_schema=False)
+@app.get("/manifest.webmanifest", include_in_schema=False)
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+@app.get("/icon-192.png", include_in_schema=False)
+@app.get("/icon-512.png", include_in_schema=False)
+@app.get("/icon-maskable-512.png", include_in_schema=False)
 def serve_public_file(request: Request):
-    """فایل‌های ثابت ریشه سایت: آیکن و تصویر پیش‌نمایش لینک (واتس‌اپ، تلگرام و ...)."""
+    """فایل‌های ثابت ریشه سایت: آیکن‌ها، manifest نصب روی گوشی (PWA) و تصویر پیش‌نمایش لینک."""
     name = request.url.path.lstrip("/")
     path = FRONTEND_DIST / name
     if path.exists():

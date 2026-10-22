@@ -39,7 +39,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = resolved;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#091540" : "#4672ad");
+    // نوار بالای مرورگر موبایل (Android Chrome / Safari) هم‌رنگ پس‌زمینه سایت
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.setAttribute("content", resolved === "dark" ? "#091540" : "#f7fbfc"); m.removeAttribute("media"); });
     window.dispatchEvent(new CustomEvent("themechange", { detail: resolved }));
   }, [resolved]);
 

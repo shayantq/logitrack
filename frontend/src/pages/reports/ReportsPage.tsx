@@ -50,7 +50,7 @@ export default function ReportsPage() {
     <>
       <PageHeader eyebrow="گزارش‌ها" title="گزارش‌های اکسل و PDF"
         subtitle="همه فایل‌ها با نام، لوگو و رنگ سازمان شما، تاریخ شمسی و راست‌به‌چپ ساخته می‌شوند — آماده چاپ و ارسال."
-        actions={isAdmin ? <Link to="/app/organization" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"><Palette className="size-4" />لوگو و رنگ سربرگ</Link> : undefined} />
+        actions={isAdmin ? <Link to="/app/organization" className="tap-target inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"><Palette className="size-4" />لوگو و رنگ سربرگ</Link> : undefined} />
       <Card className="mb-6 p-4">
         <div className="flex flex-wrap items-end gap-4">
           <Field label="بازه تاریخ"><PeriodPicker value={period} onChange={setPeriod} /></Field>
@@ -81,7 +81,7 @@ export default function ReportsPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {r.uses.map(u => <Badge key={u} tone="muted">{USE_LABEL[u]}</Badge>)}
-              {(r.key === "finance" || r.key === "capital" || r.key === "reorder") && <Link to={r.key === "finance" ? "/app/finance" : r.key === "capital" ? "/app/capital" : "/app/reorder"} className="text-xs font-medium text-brand hover:underline">نمایش داشبورد ←</Link>}
+              {(r.key === "finance" || r.key === "capital" || r.key === "reorder") && <Link to={r.key === "finance" ? "/app/finance" : r.key === "capital" ? "/app/capital" : "/app/reorder"} className="tap-target text-xs font-medium text-brand hover:underline">نمایش داشبورد ←</Link>}
             </div>
             <div className="mt-4 flex gap-2 border-t border-border pt-4">
               <Button size="sm" variant="secondary" icon={<FileSpreadsheet className="size-4" />} data-testid={`report-excel-${r.key}`}

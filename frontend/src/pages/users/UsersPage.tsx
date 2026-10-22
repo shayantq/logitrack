@@ -41,7 +41,7 @@ export default function UsersPage() {
     <>
       <PageHeader eyebrow="تیم" title="کاربران و رانندگان" subtitle="حساب کارکنان سازمان، نقش و دسترسی هر نفر، وضعیت حساب و آخرین ورود"
         actions={<>
-          <Link to="/app/activity" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"><History className="size-4" />گزارش فعالیت</Link>
+          <Link to="/app/activity" className="tap-target inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"><History className="size-4" />گزارش فعالیت</Link>
           <Button icon={<UserPlus className="size-4" />} onClick={() => setCreating(true)} data-testid="user-new">کاربر جدید</Button>
         </>} />
       <Card>

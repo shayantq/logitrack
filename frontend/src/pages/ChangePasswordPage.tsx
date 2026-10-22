@@ -13,7 +13,7 @@ export default function ChangePasswordPage() {
   if (!me.must_change_password) return <Navigate to={homePathFor(me)} replace />;
 
   return (
-    <div className="flex min-h-screen flex-col px-6 py-6 sm:px-12">
+    <div className="flex min-h-dvh flex-col px-6 py-6 sm:px-12">
       <div className="flex items-center justify-between">
         <Link to="/"><Logo /></Link>
         <ThemeToggle />
