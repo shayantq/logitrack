@@ -102,7 +102,7 @@ export function Hero() {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-linear-to-b from-bg to-transparent" />
 
         <div className="relative mx-auto flex h-full max-w-7xl items-end px-4 pb-10 pt-20 sm:px-6 md:items-center md:pb-0">
-          <div className="w-full max-w-xl">
+          <div className="relative w-full max-w-xl">
             <div className="relative">
               {/* معرفی */}
               <div className={cn("transition-all duration-700", stageIndex < 0 ? "translate-y-0 opacity-100" : "pointer-events-none absolute inset-x-0 bottom-0 -translate-y-6 opacity-0")}>
@@ -113,7 +113,7 @@ export function Hero() {
                 <p className="mt-5 max-w-md text-base leading-8 text-text-2 sm:text-lg">
                   {BRAND.nameFa} به شرکت‌های پخش و فروشگاه‌ها کمک می‌کند هر سفارش را از انبار تا درِ خانه مشتری، بی‌دردسر مدیریت کنند.
                 </p>
-                <ul className="mt-5 space-y-2 max-md:[@media(max-height:740px)]:hidden" data-testid="hero-values">
+                <ul className="mt-5 space-y-2 [@media(max-height:700px)]:hidden" data-testid="hero-values">
                   {VALUE_POINTS.map(v => (
                     <li key={v} className="flex items-center gap-2 font-medium"><CircleCheck className="size-5 shrink-0 text-success" />{v}</li>
                   ))}
@@ -123,7 +123,7 @@ export function Hero() {
                   <Link to="/pricing" className={buttonClass("secondary", "lg")}>تعرفه‌ها</Link>
                 </div>
                 {!reduced && (
-                  <div className="mt-10 hidden items-center gap-2 text-sm text-muted md:flex">
+                  <div className="mt-10 hidden items-center gap-2 text-sm text-muted md:flex [@media(max-height:760px)]:!hidden">
                     <ChevronsDown className="size-4 animate-bounce" />اسکرول کنید تا یک سفارش را دنبال کنید
                   </div>
                 )}
@@ -170,8 +170,10 @@ function MapChip({ children, icon: Icon, tone }: { children: string; icon: Lucid
 /** کارت رهگیری سفر که با پیشرفت اسکرول پر می‌شود */
 function TripCard({ stageIndex, u, delivered }: { stageIndex: number; u: number; delivered: boolean }) {
   return (
-    <div className={cn("mt-8 hidden w-full max-w-sm transition-all duration-700 md:block",
-      stageIndex >= 0 ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0")} data-testid="trip-card">
+    // تا شروع سفر بیرون از جریان صفحه است (فضا نمی‌گیرد) تا متن معرفی وسط صفحه بماند و زیر سربرگ نرود؛
+    // در صفحه‌های کوتاه (لپ‌تاپ با ارتفاع کم) اصلاً نمایش داده نمی‌شود
+    <div className={cn("mt-8 hidden w-full max-w-sm transition-all duration-700 md:block [@media(max-height:700px)]:!hidden",
+      stageIndex >= 0 ? "translate-y-0 opacity-100" : "pointer-events-none absolute inset-x-0 top-full translate-y-6 opacity-0")} data-testid="trip-card">
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
