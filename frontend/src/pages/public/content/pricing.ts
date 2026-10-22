@@ -1,7 +1,63 @@
 /**
- * تعرفه‌ها — تنها جایی که قیمت و امکانات پلن‌ها تعریف می‌شود (صفحه /pricing و فرم درخواست از همین می‌خوانند).
+ * تعرفه‌ها — تنها جایی که قیمت و امکانات پلن‌ها تعریف می‌شود (صفحه /pricing، ماشین‌حساب و فرم درخواست از همین می‌خوانند).
+ * قیمت همه پلن‌ها با همان فرمول ماشین‌حساب پلن سفارشی از روی مشخصاتشان حساب می‌شود؛
+ * پس وارد کردن مشخصات یک پلن در ماشین‌حساب دقیقاً همان قیمت را می‌دهد.
  * مبالغ به تومان در ماه؛ پرداخت سالانه = ۱۰ برابر ماهانه (۲ ماه رایگان).
  */
+export const ANNUAL_MONTHS = 10;
+export const TRIAL_DAYS = 30;
+
+// ---------------------------------------------------------------------------
+// نرخ‌ها (تومان در ماه). با این نرخ‌ها: پایه ۱٬۵۰۰٬۰۰۰، حرفه‌ای ۳٬۹۰۰٬۰۰۰، سازمانی ۱۲٬۳۰۰٬۰۰۰
+// ---------------------------------------------------------------------------
+export const CUSTOM_RATES = {
+  /** سامانه با ۱ انبار، ۱ کاربر، همه امکانات اصلی و پشتیبانی تیکتی */
+  base: 1_200_000,
+  perExtraWarehouse: 250_000,
+  perDriver: 30_000,
+  per100Orders: 20_000,
+  perExtraUser: 25_000,
+};
+
+export type ResourceId = "warehouses" | "drivers" | "orders" | "users";
+/** مقادیر مجاز هر اسلایدر؛ سفارش‌ها غیرخطی تا حرکت اسلایدر در عددهای کوچک دقیق باشد */
+const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+export const RESOURCES: { id: ResourceId; label: string; unit: string; steps: number[]; default: number }[] = [
+  { id: "warehouses", label: "تعداد انبار", unit: "انبار", steps: range(1, 10), default: 2 },
+  { id: "drivers", label: "تعداد راننده", unit: "راننده", steps: range(1, 100), default: 10 },
+  { id: "orders", label: "سفارش در ماه", unit: "سفارش", steps: [100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000], default: 1000 },
+  { id: "users", label: "کاربر پنل مدیریت", unit: "کاربر", steps: range(1, 50), default: 5 },
+];
+
+export type ModuleId = "reorder" | "stocktake" | "branding" | "phone";
+export const MODULES: { id: ModuleId; label: string; hint: string; monthly: number }[] = [
+  { id: "reorder", label: "نقطه سفارش هوشمند", hint: "پیشنهاد زمان و مقدار خرید و برآورد سرمایه لازم", monthly: 300_000 },
+  { id: "stocktake", label: "انبارگردانی کور", hint: "شمارش بدون دیدن موجودی سیستم و تأیید مغایرت", monthly: 150_000 },
+  { id: "branding", label: "گزارش با لوگو و رنگ سازمان", hint: "سربرگ اختصاصی در خروجی‌های اکسل و PDF", monthly: 75_000 },
+  { id: "phone", label: "پشتیبانی تلفنی", hint: "علاوه بر تیکت، تماس مستقیم با پشتیبانی", monthly: 100_000 },
+];
+const ALL_MODULES = MODULES.map(m => m.id);
+
+export type CustomConfig = Record<ResourceId, number> & { modules: ModuleId[] };
+
+const fa = (v: number) => v.toLocaleString("fa-IR");
+
+export function customLines(c: CustomConfig): { label: string; amount: number }[] {
+  const r = CUSTOM_RATES;
+  const lines = [{ label: "سامانه پایه (۱ انبار، ۱ کاربر، پشتیبانی تیکتی)", amount: r.base }];
+  if (c.warehouses > 1) lines.push({ label: `${fa(c.warehouses - 1)} انبار اضافه`, amount: (c.warehouses - 1) * r.perExtraWarehouse });
+  lines.push({ label: `${fa(c.drivers)} راننده`, amount: c.drivers * r.perDriver });
+  lines.push({ label: `${fa(c.orders)} سفارش در ماه`, amount: (c.orders / 100) * r.per100Orders });
+  if (c.users > 1) lines.push({ label: `${fa(c.users - 1)} کاربر اضافه`, amount: (c.users - 1) * r.perExtraUser });
+  for (const m of MODULES) if (c.modules.includes(m.id)) lines.push({ label: m.label, amount: m.monthly });
+  return lines;
+}
+
+export const customMonthly = (c: CustomConfig) => customLines(c).reduce((sum, l) => sum + l.amount, 0);
+
+// ---------------------------------------------------------------------------
+// پلن‌های ثابت: مشخصات عددی + ماژول‌ها؛ قیمت از فرمول بالا
+// ---------------------------------------------------------------------------
 export type PlanId = "trial" | "basic" | "pro" | "enterprise";
 
 export type Plan = {
@@ -9,11 +65,10 @@ export type Plan = {
   name: string;
   /** برای چه کسب‌وکاری مناسب است — یک جمله کوتاه */
   audience: string;
-  /** null = توافقی */
-  monthly: number | null;
-  /** «از ... تومان» برای پلن توافقی */
-  fromMonthly?: number;
-  limits: { warehouses: string; drivers: string; orders: string; users: string };
+  /** قیمت ماهانه؛ آزمایشی = ۰ (رایگان در دوره آزمایشی) */
+  monthly: number;
+  limits: Record<ResourceId, number>;
+  modules: ModuleId[];
   /** عنوان فهرست امکانات کارت؛ مثلاً «همه امکانات پایه، به‌علاوه:» */
   includesTitle: string;
   includes: string[];
@@ -21,46 +76,73 @@ export type Plan = {
   highlight?: boolean;
 };
 
-export const ANNUAL_MONTHS = 10;
-export const TRIAL_DAYS = 30;
+type PlanSpec = Omit<Plan, "monthly"> & { free?: boolean };
+const plan = (spec: PlanSpec): Plan => ({ ...spec, monthly: spec.free ? 0 : customMonthly({ ...spec.limits, modules: spec.modules }) });
 
 export const PLANS: Plan[] = [
-  {
-    id: "trial", name: "آزمایشی", audience: "برای آشنایی با سامانه، بدون پرداخت",
-    monthly: 0, limits: { warehouses: "۱", drivers: "۳", orders: "۱۰۰", users: "۲" },
+  plan({
+    id: "trial", name: "آزمایشی", audience: "برای آشنایی با سامانه، بدون پرداخت", free: true,
+    limits: { warehouses: 1, drivers: 3, orders: 100, users: 2 }, modules: ALL_MODULES,
     includesTitle: "در دوره آزمایشی:",
     includes: ["همه امکانات پلن حرفه‌ای", "پنل موبایل راننده", "صفحه پیگیری سفارش برای مشتری", "پشتیبانی تیکتی"],
     cta: "شروع رایگان",
-  },
-  {
+  }),
+  plan({
     id: "basic", name: "پایه", audience: "برای کسب‌وکارهای کوچک با یک انبار",
-    monthly: 1_500_000, limits: { warehouses: "۱", drivers: "۵", orders: "۵۰۰", users: "۳" },
+    limits: { warehouses: 1, drivers: 5, orders: 500, users: 3 }, modules: [],
     includesTitle: "امکانات اصلی:",
     includes: ["ثبت سفارش و تخصیص خودکار خودرو", "دفتر گردش کالا و هشدار کمبود", "پنل موبایل راننده", "گزارش اکسل و PDF"],
     cta: "انتخاب پلن پایه",
-  },
-  {
+  }),
+  plan({
     id: "pro", name: "حرفه‌ای", audience: "برای پخش در چند شهر با چند انبار",
-    monthly: 3_900_000, limits: { warehouses: "۳", drivers: "۲۵", orders: "۳٬۰۰۰", users: "۱۰" },
+    limits: { warehouses: 3, drivers: 25, orders: 3000, users: 10 }, modules: ALL_MODULES,
     includesTitle: "همه امکانات پایه، به‌علاوه:",
     includes: ["نقطه سفارش هوشمند و برآورد خرید", "انبارگردانی کور", "گزارش با لوگو و رنگ سازمان", "ورود کالاها از اکسل", "پشتیبانی تلفنی"],
     cta: "انتخاب پلن حرفه‌ای", highlight: true,
-  },
-  {
-    id: "enterprise", name: "سازمانی", audience: "برای شرکت‌های پخش بزرگ با نیاز اختصاصی",
+  }),
+  plan({
     // سقف‌ها متناسب با ظرفیت سرور مشترک فعلی؛ بیشتر از این روی سرور اختصاصی و با قرارداد جدا
-    monthly: null, fromMonthly: 9_000_000, limits: { warehouses: "۱۰", drivers: "۱۰۰", orders: "۲۰٬۰۰۰", users: "۵۰" },
+    id: "enterprise", name: "سازمانی", audience: "برای شرکت‌های پخش بزرگ با نیاز اختصاصی",
+    limits: { warehouses: 10, drivers: 100, orders: 20000, users: 50 }, modules: ALL_MODULES,
     includesTitle: "همه امکانات حرفه‌ای، به‌علاوه:",
     includes: ["تا ۱۰ انبار و ۱۰۰ راننده", "پشتیبان اختصاصی", "راه‌اندازی کامل و حضوری", "آموزش تیم شما", "ظرفیت بیشتر روی سرور اختصاصی (توافقی)"],
     cta: "مشاوره رایگان",
-  },
+  }),
 ];
 
-/** جدول مقایسه: true = دارد، false = ندارد، یا متن */
+export const planById = (id: string | null | undefined) => PLANS.find(p => p.id === id);
+
+/** پلن‌هایی که همه نیازهای انتخاب‌شده (منابع و ماژول‌ها) را پوشش می‌دهند */
+const covers = (p: Plan, c: CustomConfig) => RESOURCES.every(r => c[r.id] <= p.limits[r.id]) && c.modules.every(m => p.modules.includes(m));
+
+/**
+ * پیشنهاد ماشین‌حساب:
+ * - «trial»: در سقف دوره آزمایشی است ← ۳۰ روز رایگان
+ * - «same»: دقیقاً مشخصات یک پلن ثابت است
+ * - «cheaper»: یک پلن ثابت همه نیازها را با همان هزینه یا کمتر (و ظرفیت بیشتر) پوشش می‌دهد
+ */
+export type PlanMatch = { kind: "trial" | "same" | "cheaper"; plan: Plan; saving: number };
+export function matchPlan(c: CustomConfig): PlanMatch | undefined {
+  const total = customMonthly(c);
+  const trial = PLANS[0];
+  for (const p of PLANS.slice(1)) {
+    const same = RESOURCES.every(r => c[r.id] === p.limits[r.id]) && c.modules.length === p.modules.length && covers(p, c);
+    if (same) return { kind: "same", plan: p, saving: 0 };
+  }
+  const cheaper = PLANS.slice(1).find(p => covers(p, c) && p.monthly <= total);
+  if (cheaper) return { kind: "cheaper", plan: cheaper, saving: total - cheaper.monthly };
+  if (covers(trial, c)) return { kind: "trial", plan: trial, saving: total };
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// جدول مقایسه: true = دارد، false = ندارد، یا متن
+// ---------------------------------------------------------------------------
 export type FeatureRow = { label: string; values: Record<PlanId, boolean | string> };
 const all: Record<PlanId, boolean> = { trial: true, basic: true, pro: true, enterprise: true };
-const proUp: Record<PlanId, boolean> = { trial: true, basic: false, pro: true, enterprise: true };
-const limit = (key: keyof Plan["limits"]) => Object.fromEntries(PLANS.map(p => [p.id, p.limits[key]])) as Record<PlanId, string>;
+const hasModule = (m: ModuleId) => Object.fromEntries(PLANS.map(p => [p.id, p.modules.includes(m)])) as Record<PlanId, boolean>;
+const limit = (key: ResourceId) => Object.fromEntries(PLANS.map(p => [p.id, fa(p.limits[key])])) as Record<PlanId, string>;
 
 export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
   {
@@ -86,8 +168,8 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
     rows: [
       { label: "دفتر گردش کالا و انتقال بین انبارها", values: all },
       { label: "هشدار خودکار کمبود موجودی", values: all },
-      { label: "انبارگردانی کور", values: proUp },
-      { label: "نقطه سفارش هوشمند و برآورد سرمایه خرید", values: proUp },
+      { label: "انبارگردانی کور", values: hasModule("stocktake") },
+      { label: "نقطه سفارش هوشمند و برآورد سرمایه خرید", values: hasModule("reorder") },
     ],
   },
   {
@@ -96,7 +178,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
       { label: "احراز هویت آنلاین رانندگان", values: all },
       { label: "پورسانت، سطح‌بندی و امتیاز رانندگان", values: all },
       { label: "داشبورد مدیریتی و خروجی اکسل و PDF", values: all },
-      { label: "گزارش با لوگو و رنگ سازمان", values: proUp },
+      { label: "گزارش با لوگو و رنگ سازمان", values: hasModule("branding") },
     ],
   },
   {
@@ -118,70 +200,8 @@ export const PRICING_FAQ: { q: string; a: string }[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// پلن سفارشی (ماشین‌حساب): نرخ‌ها به تومان در ماه.
-// طوری تنظیم شده که هر پلن ثابت از ساختن همان امکانات به‌صورت سفارشی ارزان‌تر باشد
-// (پایه ≈ ۱٬۷۰۵٬۰۰۰ در برابر ۱٬۵۰۰٬۰۰۰، حرفه‌ای ≈ ۴٬۴۰۰٬۰۰۰ در برابر ۳٬۹۰۰٬۰۰۰).
+// پیکربندی سفارشی در آدرس فرم درخواست (?plan=custom&w=2&d=10&o=1000&u=5&m=reorder,phone)
 // ---------------------------------------------------------------------------
-export const CUSTOM_RATES = {
-  /** سامانه با ۱ انبار، ۱ کاربر، همه امکانات اصلی و پشتیبانی تیکتی */
-  base: 1_300_000,
-  perExtraWarehouse: 200_000,
-  perDriver: 40_000,
-  per100Orders: 25_000,
-  perExtraUser: 40_000,
-};
-
-export type ResourceId = "warehouses" | "drivers" | "orders" | "users";
-/** مقادیر مجاز هر اسلایدر؛ سفارش‌ها غیرخطی تا حرکت اسلایدر در عددهای کوچک دقیق باشد */
-const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
-export const RESOURCES: { id: ResourceId; label: string; unit: string; steps: number[]; default: number }[] = [
-  { id: "warehouses", label: "تعداد انبار", unit: "انبار", steps: range(1, 10), default: 2 },
-  { id: "drivers", label: "تعداد راننده", unit: "راننده", steps: range(1, 100), default: 10 },
-  { id: "orders", label: "سفارش در ماه", unit: "سفارش", steps: [100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000], default: 1000 },
-  { id: "users", label: "کاربر پنل مدیریت", unit: "کاربر", steps: range(1, 50), default: 5 },
-];
-
-export type ModuleId = "reorder" | "stocktake" | "branding" | "phone";
-export const MODULES: { id: ModuleId; label: string; hint: string; monthly: number }[] = [
-  { id: "reorder", label: "نقطه سفارش هوشمند", hint: "پیشنهاد زمان و مقدار خرید و برآورد سرمایه لازم", monthly: 300_000 },
-  { id: "stocktake", label: "انبارگردانی کور", hint: "شمارش بدون دیدن موجودی سیستم و تأیید مغایرت", monthly: 120_000 },
-  { id: "branding", label: "گزارش با لوگو و رنگ سازمان", hint: "سربرگ اختصاصی در خروجی‌های اکسل و PDF", monthly: 70_000 },
-  { id: "phone", label: "پشتیبانی تلفنی", hint: "علاوه بر تیکت، تماس مستقیم با پشتیبانی", monthly: 100_000 },
-];
-
-export type CustomConfig = Record<ResourceId, number> & { modules: ModuleId[] };
-
-export function customLines(c: CustomConfig): { label: string; amount: number }[] {
-  const r = CUSTOM_RATES;
-  const n = (v: number) => v.toLocaleString("fa-IR");
-  const lines = [{ label: "سامانه پایه (۱ انبار، ۱ کاربر، پشتیبانی تیکتی)", amount: r.base }];
-  if (c.warehouses > 1) lines.push({ label: `${n(c.warehouses - 1)} انبار اضافه`, amount: (c.warehouses - 1) * r.perExtraWarehouse });
-  lines.push({ label: `${n(c.drivers)} راننده`, amount: c.drivers * r.perDriver });
-  lines.push({ label: `${n(c.orders)} سفارش در ماه`, amount: (c.orders / 100) * r.per100Orders });
-  if (c.users > 1) lines.push({ label: `${n(c.users - 1)} کاربر اضافه`, amount: (c.users - 1) * r.perExtraUser });
-  for (const m of MODULES) if (c.modules.includes(m.id)) lines.push({ label: m.label, amount: m.monthly });
-  return lines;
-}
-
-export const customMonthly = (c: CustomConfig) => customLines(c).reduce((sum, l) => sum + l.amount, 0);
-
-/** سقف عددی پلن‌های ثابت برای پیشنهاد پلن ارزان‌تر */
-const PLAN_CAPS: Partial<Record<PlanId, Record<ResourceId, number> & { modules: ModuleId[] }>> = {
-  basic: { warehouses: 1, drivers: 5, orders: 500, users: 3, modules: [] },
-  pro: { warehouses: 3, drivers: 25, orders: 3000, users: 10, modules: ["reorder", "stocktake", "branding", "phone"] },
-};
-
-/** ارزان‌ترین پلن ثابتی که همه نیازهای انتخاب‌شده را پوشش می‌دهد و از پلن سفارشی ارزان‌تر است */
-export function cheaperPlan(c: CustomConfig): Plan | undefined {
-  const total = customMonthly(c);
-  return PLANS.find(p => {
-    const cap = PLAN_CAPS[p.id];
-    if (!cap || p.monthly === null || p.monthly >= total) return false;
-    return RESOURCES.every(r => c[r.id] <= cap[r.id]) && c.modules.every(m => cap.modules.includes(m));
-  });
-}
-
-/** پیکربندی سفارشی از آدرس فرم درخواست (?plan=custom&w=2&d=10&o=1000&u=5&m=reorder,phone) */
 const QUERY_KEYS: Record<ResourceId, string> = { warehouses: "w", drivers: "d", orders: "o", users: "u" };
 export function customToQuery(c: CustomConfig) {
   const q = new URLSearchParams({ plan: "custom" });
@@ -200,13 +220,10 @@ export function customFromQuery(search: string): CustomConfig | null {
   return config;
 }
 export function customSummary(c: CustomConfig) {
-  const n = (v: number) => v.toLocaleString("fa-IR");
   const mods = MODULES.filter(m => c.modules.includes(m.id)).map(m => m.label);
-  return `${n(c.warehouses)} انبار، ${n(c.drivers)} راننده، ${n(c.orders)} سفارش در ماه، ${n(c.users)} کاربر`
-    + (mods.length ? ` + ${mods.join("، ")}` : "") + ` — ${n(customMonthly(c))} تومان در ماه`;
+  return `${fa(c.warehouses)} انبار، ${fa(c.drivers)} راننده، ${fa(c.orders)} سفارش در ماه، ${fa(c.users)} کاربر`
+    + (mods.length ? ` + ${mods.join("، ")}` : "") + ` — ${fa(customMonthly(c))} تومان در ماه`;
 }
 
 /** پیشنهاد مشتریان اولیه (برای حذف: null) */
 export const EARLY_OFFER: string | null = "ویژه ۲۰ سازمان اول: ۵۰ درصد تخفیف در سال اول و راه‌اندازی رایگان";
-
-export const planById = (id: string | null | undefined) => PLANS.find(p => p.id === id);

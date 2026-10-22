@@ -7,7 +7,7 @@ import { BRAND } from "@/brand";
 import { buttonClass, cn } from "@/ui/primitives";
 import { InfoLayout } from "./InfoLayout";
 import { PricingCalculator } from "./PricingCalculator";
-import { ANNUAL_MONTHS, EARLY_OFFER, FEATURE_GROUPS, PLANS, PRICING_FAQ, TRIAL_DAYS, type Plan } from "./content/pricing";
+import { ANNUAL_MONTHS, EARLY_OFFER, FEATURE_GROUPS, PLANS, PRICING_FAQ, TRIAL_DAYS, type CustomConfig, type Plan } from "./content/pricing";
 
 type Billing = "monthly" | "annual";
 const fa = (n: number) => n.toLocaleString("fa-IR");
@@ -35,9 +35,8 @@ function BillingToggle({ value, onChange }: { value: Billing; onChange: (b: Bill
  * سالانه: معادل ماهانه درشت، قیمت ماهانه خط‌خورده و مبلغ کل سال زیرش.
  */
 function Price({ plan, billing }: { plan: Plan; billing: Billing }) {
-  let main: string, unit: string, prefix: string | undefined, was: string | undefined, note: string | undefined;
+  let main: string, unit: string, was: string | undefined, note: string | undefined;
   if (plan.monthly === 0) { main = "رایگان"; unit = `به مدت ${fa(TRIAL_DAYS)} روز`; }
-  else if (plan.monthly === null) { prefix = "از"; main = fa(plan.fromMonthly ?? 0); unit = "تومان در ماه"; note = "قیمت نهایی متناسب با نیاز شما"; }
   else if (billing === "monthly") { main = fa(plan.monthly); unit = "تومان در ماه"; }
   else {
     const yearly = plan.monthly * ANNUAL_MONTHS;
@@ -45,12 +44,9 @@ function Price({ plan, billing }: { plan: Plan; billing: Billing }) {
     note = `پرداخت یک‌جا: ${fa(yearly)} تومان در سال`;
   }
   return (
-    <div data-testid="plan-price" className="sm:min-h-[104px]">
+    <div data-testid="plan-price" data-monthly={plan.monthly} className="sm:min-h-[104px]">
       <div className={cn("h-5 items-center text-sm text-muted", was ? "flex" : "hidden sm:flex")}>{was && <span className="line-through decoration-danger/60">{was}</span>}</div>
-      <div className="flex items-baseline gap-1.5">
-        {prefix && <span className="text-base font-semibold text-muted">{prefix}</span>}
-        <span className="text-[2rem] font-black leading-tight">{main}</span>
-      </div>
+      <div className="text-[2rem] font-black leading-tight">{main}</div>
       <div className="text-sm text-text-2">{unit}</div>
       {note && <div className={cn("mt-1.5 text-sm", was ? "font-medium text-success" : "text-muted")}>{note}</div>}
     </div>
@@ -61,7 +57,7 @@ const LIMIT_ITEMS: [keyof Plan["limits"], string, LucideIcon][] = [
   ["warehouses", "انبار", Warehouse], ["drivers", "راننده", Truck], ["orders", "سفارش در ماه", ClipboardList], ["users", "کاربر پنل", UserRound],
 ];
 
-function PlanCard({ plan, billing }: { plan: Plan; billing: Billing }) {
+function PlanCard({ plan, billing, onCustomize }: { plan: Plan; billing: Billing; onCustomize: () => void }) {
   const to = `/request?plan=${plan.id}`;
   return (
     <div data-testid="plan-card" data-plan={plan.id}
@@ -82,13 +78,19 @@ function PlanCard({ plan, billing }: { plan: Plan; billing: Billing }) {
         ) : (
           <Link to={to} className={buttonClass(plan.highlight ? "primary" : "secondary", "lg", "w-full")} data-testid="plan-cta">{plan.cta}<ArrowLeft className="size-4" /></Link>
         )}
+        {plan.monthly > 0 && (
+          <button type="button" onClick={onCustomize} data-testid="plan-customize"
+            className="mx-auto mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-brand transition hover:bg-brand-soft">
+            <SlidersHorizontal className="size-4" />شخصی‌سازی این پلن
+          </button>
+        )}
       </div>
 
       <dl className="mt-6 grid grid-cols-2 gap-2">
         {LIMIT_ITEMS.map(([key, label, Icon]) => (
           <div key={key} className="rounded-xl bg-surface-2 px-3 py-2.5">
             <dt className="flex items-center gap-1.5 text-xs text-muted"><Icon className="size-3.5" />{label}</dt>
-            <dd className="mt-0.5 font-bold">{plan.limits[key]}</dd>
+            <dd className="mt-0.5 font-bold">{fa(plan.limits[key])}</dd>
           </div>
         ))}
       </dl>
@@ -158,6 +160,12 @@ function CompareTable() {
 
 export default function PricingPage() {
   const [billing, setBilling] = useState<Billing>("monthly");
+  // «شخصی‌سازی این پلن»: مشخصات همان پلن در ماشین‌حساب بارگذاری می‌شود (n = کلید بازسازی)
+  const [preset, setPreset] = useState<{ config: CustomConfig; n: number } | null>(null);
+  const customize = (p: Plan) => {
+    setPreset(prev => ({ config: { ...p.limits, modules: [...p.modules] }, n: (prev?.n ?? 0) + 1 }));
+    requestAnimationFrame(() => document.getElementById("custom-plan")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   return (
     <InfoLayout title="تعرفه‌ها" testId="pricing-page" eyebrow="تعرفه‌ها" cta={false}
       heading="یک قیمت ثابت برای کل سازمان"
@@ -179,7 +187,7 @@ export default function PricingPage() {
       }>
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid gap-6 pt-2 sm:grid-cols-2 xl:grid-cols-4">
-          {PLANS.map(p => <PlanCard key={p.id} plan={p} billing={billing} />)}
+          {PLANS.map(p => <PlanCard key={p.id} plan={p} billing={billing} onCustomize={() => customize(p)} />)}
         </div>
         <p className="mt-6 text-center text-sm text-muted">همه مبالغ به تومان و بدون احتساب مالیات بر ارزش افزوده است.</p>
 
@@ -195,7 +203,7 @@ export default function PricingPage() {
         <section id="custom-plan" className="mt-20 scroll-mt-24">
           <h2 className="text-2xl font-black tracking-tight sm:text-3xl">پلن خودتان را بسازید</h2>
           <p className="mt-2 text-text-2">فقط برای همان چیزی که لازم دارید هزینه کنید؛ قیمت همزمان با تغییرات محاسبه می‌شود.</p>
-          <div className="mt-6"><PricingCalculator billing={billing} /></div>
+          <div className="mt-6"><PricingCalculator key={preset?.n ?? 0} billing={billing} initial={preset?.config} /></div>
         </section>
 
         <div className="mt-20">

@@ -1,10 +1,10 @@
-/** ماشین‌حساب پلن سفارشی: اسلایدر منابع، انتخاب ماژول‌ها، جزئیات قیمت لحظه‌ای و پیشنهاد پلن ارزان‌تر */
+/** ماشین‌حساب پلن سفارشی: اسلایدر منابع، انتخاب ماژول‌ها، جزئیات قیمت لحظه‌ای و پیشنهاد پلن ثابت (همان فرمول قیمت پلن‌ها) */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ClipboardList, Lightbulb, Minus, Plus, Truck, UserRound, Warehouse, type LucideIcon } from "lucide-react";
 import { buttonClass, cn } from "@/ui/primitives";
 import {
-  ANNUAL_MONTHS, MODULES, RESOURCES, cheaperPlan, customLines, customMonthly, customToQuery,
+  ANNUAL_MONTHS, MODULES, RESOURCES, TRIAL_DAYS, customLines, customMonthly, customToQuery, matchPlan,
   type CustomConfig, type ModuleId, type ResourceId,
 } from "./content/pricing";
 
@@ -70,8 +70,8 @@ function ModuleSwitch({ id, on, onToggle }: { id: ModuleId; on: boolean; onToggl
   );
 }
 
-export function PricingCalculator({ billing }: { billing: Billing }) {
-  const [config, setConfig] = useState<CustomConfig>(DEFAULT);
+export function PricingCalculator({ billing, initial }: { billing: Billing; initial?: CustomConfig }) {
+  const [config, setConfig] = useState<CustomConfig>(initial ?? DEFAULT);
   // موبایل: وقتی اسلایدرها در دید است ولی کارت جمع کل نه، نوار پایین صفحه جمع لحظه‌ای را نشان می‌دهد
   const controls = useRef<HTMLDivElement>(null);
   const summary = useRef<HTMLElement>(null);
@@ -88,7 +88,7 @@ export function PricingCalculator({ billing }: { billing: Billing }) {
   }, []);
   const lines = useMemo(() => customLines(config), [config]);
   const monthly = customMonthly(config);
-  const better = cheaperPlan(config);
+  const match = matchPlan(config);
   const annual = billing === "annual";
   const shown = annual ? roundK((monthly * ANNUAL_MONTHS) / 12) : monthly;
 
@@ -128,11 +128,20 @@ export function PricingCalculator({ billing }: { billing: Billing }) {
           ))}
         </ul>
 
-        {better && (
-          <div className="mt-5 rounded-2xl bg-success-soft p-4 text-sm leading-6 text-success" data-testid="calc-better-plan">
-            <div className="flex items-center gap-2 font-bold"><Lightbulb className="size-4" />پیشنهاد ما: پلن {better.name}</div>
-            <p className="mt-1">همه این نیازها را پوشش می‌دهد و {fa(monthly - (better.monthly ?? 0))} تومان در ماه ارزان‌تر است.</p>
-            <Link to={`/request?plan=${better.id}`} className="mt-2 inline-flex items-center gap-1 font-bold underline-offset-4 hover:underline">انتخاب پلن {better.name}<ArrowLeft className="size-4" /></Link>
+        {match && (
+          <div className="mt-5 rounded-2xl bg-success-soft p-4 text-sm leading-6 text-success" data-testid="calc-better-plan" data-kind={match.kind}>
+            <div className="flex items-center gap-2 font-bold"><Lightbulb className="size-4" />
+              {match.kind === "same" ? `این دقیقاً پلن ${match.plan.name} است` : match.kind === "trial" ? `در دوره آزمایشی، رایگان` : `پیشنهاد ما: پلن ${match.plan.name}`}
+            </div>
+            <p className="mt-1">
+              {match.kind === "same" ? "همین قیمت را در کارت این پلن هم می‌بینید."
+                : match.kind === "trial" ? `این نیازها در سقف دوره آزمایشی است؛ ${fa(TRIAL_DAYS)} روز رایگان امتحان کنید.`
+                : match.saving > 0 ? `همه این نیازها را پوشش می‌دهد و ${fa(match.saving)} تومان در ماه ارزان‌تر است.`
+                : "با همین هزینه، همه این نیازها و ظرفیت بیشتری دارد."}
+            </p>
+            <Link to={`/request?plan=${match.plan.id}`} className="mt-2 inline-flex items-center gap-1 font-bold underline-offset-4 hover:underline">
+              {match.kind === "trial" ? "شروع دوره آزمایشی" : `انتخاب پلن ${match.plan.name}`}<ArrowLeft className="size-4" />
+            </Link>
           </div>
         )}
 

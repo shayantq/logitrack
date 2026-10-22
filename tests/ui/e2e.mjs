@@ -1377,15 +1377,23 @@ await session("brand-pages", null, null, async page => {
   await page.click("[data-testid=calc-module-phone]");
   await page.waitForFunction(t => Number(document.querySelector("[data-testid=calc-total]").dataset.monthly) === t + 100000, t1);
   check("brand", "module toggle adds its price", (await page.locator("[data-testid=calc-lines] li").count()) >= 6);
-  // نیازهای کوچک ← پیشنهاد پلن پایه
-  await slide("warehouses", "Home"); await slide("orders", "Home"); await slide("users", "Home");
-  await slide("drivers", "Home"); await slide("drivers", "ArrowRight", 4);
-  await page.click("[data-testid=calc-module-phone]"); await page.click("[data-testid=calc-module-reorder]");
-  await page.waitForSelector("[data-testid=calc-better-plan] >> text=پایه");
-  check("brand", "calculator suggests the cheaper fixed plan", true);
+  // «شخصی‌سازی این پلن»: مشخصات هر پلن در ماشین‌حساب دقیقاً همان قیمت کارت پلن را می‌دهد
+  const samePrice = [];
+  for (const id of ["basic", "pro", "enterprise"]) {
+    const planPrice = Number(await page.getAttribute(`[data-plan=${id}] [data-testid=plan-price]`, "data-monthly"));
+    await page.click(`[data-plan=${id}] [data-testid=plan-customize]`);
+    await page.waitForFunction(p => Number(document.querySelector("[data-testid=calc-total]")?.dataset.monthly) === p, planPrice, { timeout: 5000 }).catch(() => {});
+    const kind = await page.getAttribute("[data-testid=calc-better-plan]", "data-kind").catch(() => null);
+    samePrice.push(`${id}:${planPrice}/${await calcTotal()}/${kind}`);
+  }
+  check("brand", "plan specs in the calculator give the plan's own price", samePrice.every(s => { const [, v, k] = s.split(":"); const [a, b, kind] = v.split("/"); return a === b && kind === "same"; }), samePrice.join(" "));
+  // یک راننده کمتر از پلن حرفه‌ای ← پلن سفارشی ارزان‌تر و قابل ثبت
+  await page.click("[data-plan=pro] [data-testid=plan-customize]");
+  await page.click("[data-testid=calc-drivers-minus]");
+  check("brand", "fewer resources than a plan cost less", (await calcTotal()) === 3_900_000 - 30_000, String(await calcTotal()));
   await page.click("[data-testid=calc-cta]");
   await page.waitForSelector("[data-testid=request-plan] >> text=سفارشی");
-  check("brand", "custom plan carried into the request form", page.url().includes("plan=custom") && page.url().includes("d=5"));
+  check("brand", "custom plan carried into the request form", page.url().includes("plan=custom") && page.url().includes("d=24"));
   await page.goto(`${BASE}/pricing`);
   await page.waitForSelector("[data-testid=plan-card]");
 
