@@ -1242,7 +1242,8 @@ await session("wms", "qazvin_admin", "admin123", async page => {
   await page.click("[data-testid=document-reverse]");
   await page.fill("[data-testid=prompt-input]", "آزمون سند برگشت");
   await page.click("[data-testid=prompt-dialog] [data-testid=dialog-ok]");
-  const reversed = await toast(page);
+  // پیام قبلی («وضعیت کیفی تغییر کرد») ممکن است هنوز روی صفحه باشد؛ منتظر پیام همین سند می‌مانیم
+  const reversed = await page.locator("[data-testid=toast]", { hasText: "سند برگشت" }).first().textContent({ timeout: 10000 });
   check("wms", "reversal document posted", /RV-/.test(reversed), reversed);
   await page.keyboard.press("Escape");
   await page.waitForSelector(`[data-testid=document-row][data-code="${docCode}"][data-status=reversed]`);
