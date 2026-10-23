@@ -8,7 +8,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models import Inventory, Product, RoleEnum, StockMovement, User, Vehicle, Warehouse
+from app.models import Inventory, Product, RoleEnum, StockMovement, StockReservation, User, Vehicle, Warehouse
 from app.schemas.order import OrderStatusRequest
 from app.schemas.product import ProductCreate, StockMovementCreate, StockTransferCreate, StockUpdate
 from app.services import inventory_service, order_service, stock_ledger
@@ -81,26 +81,47 @@ def test_create_product_records_initial_movement(world):
 
 
 def test_full_order_lifecycle_is_recorded(world):
+    """ثبت = رزرو (بدون گردش)، بارگیری = حواله خروج، عدم تحویل بعد از بارگیری = سند برگشت از سفارش."""
     db, wh1, wh2, admin, manager, driver, vehicle, product = world
 
     order = order_service.create_order(db, admin, _order(product.id, vehicle.id, 5))
+    assert len(_movements(db, product.id)) == 1
+    order_service.update_order_status(db, driver, order.id, OrderStatusRequest(order_status="picked_up"))
     order_service.update_order_status(db, driver, order.id, OrderStatusRequest(order_status="failed"))
 
     out, back = _movements(db, product.id)[1:]
     assert (out.movement_type, out.quantity_change, out.balance_after) == ("order_out", -5, 15)
     assert (out.reference_type, out.reference_id) == ("order", order.id)
+    assert out.document.doc_type == "order_issue"
     assert (back.movement_type, back.quantity_change, back.balance_after) == ("order_return", 5, 20)
+    assert back.document.doc_type == "order_return"
     assert back.created_by_id == driver.id
+    [reservation] = db.query(StockReservation).filter(StockReservation.reference_id == order.id).all()
+    assert (reservation.status, reservation.movement_id) == ("consumed", out.id)
+    db.refresh(order)
+    assert order.stock_state == "returned"
     _assert_ledger_consistent(db)
 
 
-def test_deleting_active_order_records_return(world):
+def test_canceling_before_pickup_only_releases_reservation(world):
+    db, wh1, wh2, admin, manager, driver, vehicle, product = world
+    order = order_service.create_order(db, admin, _order(product.id, vehicle.id, 5))
+    order_service.update_order_status(db, admin, order.id, OrderStatusRequest(order_status="canceled"))
+
+    assert len(_movements(db, product.id)) == 1          # هیچ گردشی؛ کالا هرگز از انبار خارج نشد
+    [reservation] = db.query(StockReservation).filter(StockReservation.reference_id == order.id).all()
+    assert reservation.status == "released"
+    assert _qty(db, product.id, wh1.id) == 20
+    _assert_ledger_consistent(db)
+
+
+def test_deleting_active_order_releases_reservation(world):
     db, wh1, wh2, admin, manager, driver, vehicle, product = world
     order = order_service.create_order(db, admin, _order(product.id, vehicle.id, 3))
     order_service.delete_order(db, admin, order.id)
 
-    last = _movements(db, product.id)[-1]
-    assert (last.movement_type, last.quantity_change, last.reference_id) == ("order_return", 3, order.id)
+    assert [m.movement_type for m in _movements(db, product.id)] == ["initial"]
+    assert db.query(StockReservation).filter(StockReservation.reference_id == order.id).one().status == "released"
     assert _qty(db, product.id, wh1.id) == 20
     _assert_ledger_consistent(db)
 

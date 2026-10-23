@@ -9,7 +9,7 @@ import pytest
 from app.core.security import create_access_token
 from app.core.tenancy import set_tenant
 from app.models import User, RoleEnum, Vehicle, Product, Inventory, Organization
-from tests.factories import order_payload
+from tests.factories import default_warehouse, order_payload
 
 
 @pytest.fixture()
@@ -54,7 +54,7 @@ def world(api):
     product = Product(name="کالا", sku="API-SKU", price=10, weight_kg=1)
     db.add_all([vehicle, product])
     db.commit()
-    db.add(Inventory(product_id=product.id, quantity=10))
+    db.add(Inventory(product_id=product.id, warehouse_id=default_warehouse(db).id, quantity=10))
     db.commit()
     return client, db, admin, driver, vehicle, product
 

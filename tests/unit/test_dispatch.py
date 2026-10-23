@@ -13,7 +13,7 @@ from app.schemas.order import OrderAssignRequest
 from app.services import dispatch_service, order_service
 from app.services.dispatch_service import local_to_utc
 from app.services.exceptions import ConflictError
-from tests.factories import order_request
+from tests.factories import default_warehouse, order_request
 
 WEDNESDAY = 2   # weekday پایتون
 
@@ -161,7 +161,7 @@ def _stock(db, weight=150, qty=50):
     p = Product(name="بار ۱۵۰ کیلویی", sku=f"SKU-{weight}", price=1, weight_kg=weight)
     db.add(p)
     db.commit()
-    db.add(Inventory(product_id=p.id, quantity=qty))
+    db.add(Inventory(product_id=p.id, warehouse_id=default_warehouse(db).id, quantity=qty))
     db.commit()
     return p
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock3, Plus, Sparkles, Trash2 } from "lucide-react";
-import { api, errorMessage, unwrap, type Schemas } from "@/api/client";
+import { api, errorMessage, isServerError, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { CitySelect } from "@/components/CitySelect";
 import { SuggestionList } from "@/components/dispatch/SuggestionList";
@@ -36,14 +36,17 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data: products = [] } = useProducts();
-  const { data: warehouses = [] } = useWarehouses();
+  const { data: allWarehouses = [] } = useWarehouses();
+  // سفارش فقط از انبارهای فعالی ارسال می‌شود که نوعشان ارسال سفارش دارد (عمومی، محصول نهایی، توزیع)
+  const warehouses = useMemo(() => allWarehouses.filter(w => w.ships_orders && w.is_active), [allWarehouses]);
   const { data: provinces = [] } = useProvinces();
   const [form, setForm] = useState(EMPTY);
+  const [requestKey, setRequestKey] = useState(newIdempotencyKey);
   const [items, setItems] = useState<Item[]>([{ product_id: "", quantity: 1 }]);
   const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) => setForm(f => ({ ...f, [key]: value }));
 
   useEffect(() => {
-    if (open) { setForm({ ...EMPTY, date: tomorrowIsoDate() }); setItems([{ product_id: "", quantity: 1 }]); }
+    if (open) { setForm({ ...EMPTY, date: tomorrowIsoDate() }); setItems([{ product_id: "", quantity: 1 }]); setRequestKey(newIdempotencyKey()); }
   }, [open]);
 
   const totals = useMemo(() => items.reduce((acc, item) => {
@@ -54,7 +57,7 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
   const chosen = items.filter(i => i.product_id !== "" && i.quantity > 0);
   const fulfilling = useMemo(() => warehouses.map(w => w.id).filter(wid => chosen.every(i => {
     const p = products.find(x => x.id === i.product_id);
-    return (p?.stock_by_warehouse.find(s => s.warehouse_id === wid)?.quantity ?? 0) >= i.quantity;
+    return (p?.stock_by_warehouse.find(s => s.warehouse_id === wid)?.free ?? 0) >= i.quantity;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   })), [items, products, warehouses]);
 
@@ -84,13 +87,13 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
   }, [suggestions.data, form.vehicle]);
 
   const create = useMutation({
-    mutationFn: (body: Schemas["OrderRequest"]) => unwrap(api.POST("/orders/", { body })),
+    mutationFn: (body: Schemas["OrderRequest"]) => unwrap(api.POST("/orders/", { body, params: { header: { "Idempotency-Key": requestKey } } })),
     onSuccess: order => {
       toast.success(`سفارش ${order.tracking_code} ثبت شد.`);
       for (const key of ["orders", "products", "vehicles", "stats"]) queryClient.invalidateQueries({ queryKey: [key] });
       onClose();
     },
-    onError: e => toast.error(errorMessage(e)),
+    onError: e => { toast.error(errorMessage(e)); if (isServerError(e)) setRequestKey(newIdempotencyKey()); },
   });
 
   function onSubmit(e: FormEvent) {
@@ -128,7 +131,7 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
                 <Select required value={item.product_id} data-testid="order-item-product" aria-label="کالا"
                   onChange={e => setItems(list => list.map((x, i) => i === index ? { ...x, product_id: e.target.value ? Number(e.target.value) : "" } : x))}>
                   <option value="">انتخاب کالا...</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku}) — موجودی کل: {faNumber(p.stock)}</option>)}
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku}) — موجودی آزاد: {faNumber(p.free_stock)}</option>)}
                 </Select>
                 <Input type="number" min={1} required value={item.quantity} aria-label="تعداد" data-testid="order-item-qty"
                   onChange={e => setItems(list => list.map((x, i) => i === index ? { ...x, quantity: Number(e.target.value) } : x))} />
@@ -244,7 +247,8 @@ function WarehouseStockLine({ product, quantity, selected, warehouses, ownOnly =
   ownOnly?: boolean;
 }) {
   if (!product) return null;
-  const rows = warehouses.filter(w => !ownOnly || product.stock_by_warehouse.some(s => s.warehouse_id === w.id)).map(w => ({ id: w.id, name: w.name, city: w.city, quantity: product.stock_by_warehouse.find(s => s.warehouse_id === w.id)?.quantity ?? 0 }));
+  // موجودی آزاد = موجودی سالم − رزرو سفارش‌های باز
+  const rows = warehouses.filter(w => !ownOnly || product.stock_by_warehouse.some(s => s.warehouse_id === w.id)).map(w => ({ id: w.id, name: w.name, city: w.city, quantity: product.stock_by_warehouse.find(s => s.warehouse_id === w.id)?.free ?? 0 }));
   return (
     <div className="col-span-3 -mt-0.5 flex flex-wrap gap-1.5 pb-1 text-[11px]" data-testid="warehouse-stock">
       {rows.map(r => (

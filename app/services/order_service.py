@@ -3,11 +3,14 @@
 
 تمام منطق تجاری سفارش‌ها اینجاست:
   • ثبت سفارش چندقلمی: قفل ردیف‌های موجودی (جلوگیری از فروش بیش از موجودی)،
-    انتخاب انبار مبدأ، کسر موجودی از دفتر گردش کالا، ذخیره قیمت/وزن لحظه ثبت
+    انتخاب انبار مبدأ، «رزرو» موجودی آزاد، ذخیره قیمت/وزن لحظه ثبت
   • مشتری (بر اساس شماره همراه) و آدرس مقصد با استان/شهر
   • تخصیص خودرو: هنگام ثبت، یا بعداً برای سفارش «در انتظار تخصیص»
   • ماشین وضعیت و تاریخچه کامل تغییرات وضعیت
-  • برگشت موجودی و آزادسازی خودرو در لغو/عدم تحویل/انقضا
+  • وضعیت کالای سفارش (stock_state) جدا از وضعیت حمل:
+        ثبت ← رزرو | بارگیری ← حواله خروج (مصرف رزرو) | لغو/انقضا قبل از بارگیری ← آزادسازی رزرو
+        عدم تحویل بعد از بارگیری ← سند برگشت از سفارش
+  • کلید یکتایی (Idempotency-Key): تکرار درخواست ثبت، سفارش دوم نمی‌سازد
 
 روتر (app/routers/orders.py) فقط این توابع را صدا می‌زند.
 """
@@ -20,11 +23,14 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import (
     ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderItem, OrderStatusHistory, Organization, Product, User, Vehicle,
+    Warehouse,
 )
 from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
+from app.core.wms import AVAILABLE
 from app.services import (
-    catalog_service, commission_service, dispatch_service, messaging, notification_service, stock_ledger,
+    allocation_service, audit_service, catalog_service, commission_service, dispatch_service, messaging,
+    notification_service, stock_document_service, stock_ledger, warehouse_service,
 )
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
@@ -42,8 +48,10 @@ DRIVER_ALLOWED_STATUSES = {'picking_up', 'picked_up', 'in_transit', 'delivered',
 MANAGER_ALLOWED_STATUSES = {'picked_up', 'canceled'}
 # وضعیت‌هایی که «انجام کار» هستند و پیش از روز تحویل سفارش مجاز نیستند
 WORK_STATUSES = {'picking_up', 'picked_up', 'in_transit', 'delivered', 'failed'}
-# کالا تحویل نشده → به انبار برمی‌گردد
+# کالا تحویل نشده → به انبار برمی‌گردد (رزرو آزاد می‌شود یا کالای خارج‌شده با سند برگشت)
 RESTOCK_STATUSES = {'failed', 'canceled', 'expired'}
+# بارگیری = خروج فیزیکی کالا از انبار (حواله خروج و مصرف رزرو)
+ISSUE_STATUSES = {'picked_up'}
 # پایان کار خودرو برای این سفارش
 RELEASE_VEHICLE_STATUSES = {'delivered', 'failed', 'canceled', 'expired'}
 STATUS_LABELS = {
@@ -89,10 +97,19 @@ def _upsert_customer(db: Session, organization_id: int, data: CustomerIn) -> Cus
 def _lock_inventories(db: Session, products: dict[int, Product], quantities: dict[int, int],
                       warehouse_id: int | None) -> tuple[int | None, dict[int, Inventory]]:
     """
-    ردیف‌های موجودی همه اقلام را قفل می‌کند (به ترتیب id — بدون deadlock بین درخواست‌های هم‌زمان)
-    و انباری را برمی‌گرداند که برای «همه» اقلام موجودی کافی دارد.
+    ردیف‌های موجودی «سالم و آزاد» همه اقلام را قفل می‌کند (به ترتیب id — بدون deadlock بین درخواست‌های
+    هم‌زمان) و انباری را برمی‌گرداند که برای «همه» اقلام موجودی آزاد (موجود − رزرو) کافی دارد.
+    فقط انبارهایی که سفارش ارسال می‌کنند (عمومی/محصول نهایی/توزیع و فعال) نامزدند.
     """
-    query = db.query(Inventory).filter(Inventory.product_id.in_(list(quantities)))
+    shipping = warehouse_service.shipping_ids(db)
+    if warehouse_id is not None and warehouse_id not in shipping:
+        warehouse = db.get(Warehouse, warehouse_id)
+        if warehouse is None:
+            raise NotFoundError('انبار انتخاب‌شده یافت نشد.')
+        raise ConflictError(f"از «{warehouse.name}» ({warehouse_service.type_of(warehouse).label}"
+                            f"{'، غیرفعال' if warehouse.is_active is False else ''}) سفارش مشتری ارسال نمی‌شود.")
+    query = db.query(Inventory).filter(Inventory.product_id.in_(list(quantities)), Inventory.stock_status == AVAILABLE,
+                                       Inventory.warehouse_id.in_(shipping or {-1}))
     if warehouse_id is not None:
         query = query.filter(Inventory.warehouse_id == warehouse_id)
     rows = query.order_by(Inventory.id).with_for_update().all()
@@ -104,15 +121,15 @@ def _lock_inventories(db: Session, products: dict[int, Product], quantities: dic
     candidates = [warehouse_id] if warehouse_id is not None else sorted(by_warehouse, key=lambda w: (w is None, w or 0))
     for candidate in candidates:
         stock = by_warehouse.get(candidate, {})
-        if all((stock[pid].quantity if pid in stock else 0) >= qty for pid, qty in quantities.items()):
+        if all((stock[pid].free_quantity if pid in stock else 0) >= qty for pid, qty in quantities.items()):
             return candidate, stock
 
-    # پیام دقیق: کدام کالا کم است (بر اساس بیشترین موجودی یک انبار)
+    # پیام دقیق: کدام کالا کم است (بر اساس بیشترین موجودی آزاد یک انبار)
     shortages = []
     for pid, qty in quantities.items():
-        best = max((inv.quantity for inv in rows if inv.product_id == pid), default=0)
+        best = max((inv.free_quantity for inv in rows if inv.product_id == pid), default=0)
         if best < qty:
-            shortages.append(f"«{products[pid].name}» (موجودی: {best}، درخواستی: {qty})")
+            shortages.append(f"«{products[pid].name}» (موجودی آزاد: {best}، درخواستی: {qty})")
     if shortages:
         raise ConflictError("موجودی کافی نیست: " + "، ".join(shortages))
     raise ConflictError("هیچ انباری به‌تنهایی موجودی کافی برای همه اقلام این سفارش ندارد؛ سفارش را تفکیک کنید.")
@@ -153,10 +170,17 @@ def _validate_manual_vehicle(db: Session, vehicle_id: int, **dispatch) -> Vehicl
     return vehicle
 
 
-def create_order(db: Session, user: User, order_request: OrderRequest) -> Order:
+def create_order(db: Session, user: User, order_request: OrderRequest, idempotency_key: str | None = None) -> Order:
     if user.role not in ['org_admin', 'warehouse_manager']:
         raise ForbiddenError()
+    order, _ = stock_document_service.idempotent(
+        db, Order, idempotency_key, "order", order_request.model_dump(mode="json"),
+        lambda key, digest: _create_order(db, user, order_request, key, digest))
+    return get_order(db, user, order.id)
 
+
+def _create_order(db: Session, user: User, order_request: OrderRequest, idempotency_key: str | None,
+                  request_hash: str | None) -> Order:
     source_warehouse_id = order_request.warehouse_id
     if user.role == 'warehouse_manager':
         if not user.warehouse_id:
@@ -211,6 +235,7 @@ def create_order(db: Session, user: User, order_request: OrderRequest) -> Order:
             total_quantity=sum(quantities.values()),
             total_weight_kg=total_weight,
             total_price=sum(unit_prices[pid] * qty for pid, qty in quantities.items()),
+            stock_state="reserved", idempotency_key=idempotency_key, request_hash=request_hash,
         )
         db.add(order)
         for item in order_request.items:
@@ -220,20 +245,18 @@ def create_order(db: Session, user: User, order_request: OrderRequest) -> Order:
                 product_sku=product.sku, quantity=item.quantity,
                 unit_price=unit_prices[product.id], unit_weight_kg=product.weight_kg or 0,
             ))
-        db.flush()  # گرفتن شناسه سفارش برای مرجع گردش کالا
+        db.flush()  # گرفتن شناسه سفارش برای مرجع رزرو
 
+        # رزرو (نه خروج): کالا تا بارگیری در انبار می‌ماند ولی برای سفارش دیگری آزاد نیست
         for item in order_request.items:
-            stock_ledger.record(
-                db, inventories[item.product_id], -item.quantity, "order_out",
-                user=user, reason=f"خروج بابت سفارش {order.tracking_code}",
-                reference_type="order", reference_id=order.id,
-            )
+            allocation_service.reserve(db, inventories[item.product_id], item.quantity,
+                                       reference_type="order", reference_id=order.id, user=user)
         _add_history(db, order, None, status, user,
                      "ثبت سفارش" + (f" و تخصیص خودرو {vehicle.license_plate or vehicle.id}" if vehicle else ""))
         notification_service.order_assigned(db, order)
         db.commit()
         messaging.order_created(order, _organization_name(db, order))
-        return get_order(db, user, order.id)
+        return order
     except Exception:
         db.rollback()
         raise
@@ -391,22 +414,47 @@ def assign_vehicle(db: Session, user: User, order_id: int, request: OrderAssignR
         raise
 
 
+def _issue_stock(db: Session, order: Order, user: User | None) -> None:
+    """بارگیری: رزروهای سفارش مصرف و کالا با یک «حواله خروج سفارش» از موجودی کم می‌شود."""
+    if order.stock_state != "reserved":
+        return          # سفارش‌های قدیمی که موجودی‌شان هنگام ثبت کم شده بود
+    reservations = allocation_service.active_for(db, "order", order.id)
+    if reservations:
+        document = stock_ledger.new_document(
+            db, "order_issue", organization_id=order.organization_id, user=user, warehouse_id=order.warehouse_id,
+            reference_type="order", reference_id=order.id, note=f"حواله خروج سفارش {order.tracking_code}",
+        )
+        for reservation in reservations:
+            allocation_service.consume(db, reservation, document, user=user, reason=f"خروج بابت سفارش {order.tracking_code}")
+    order.stock_state = "issued"
+
+
 def _restore_stock(db: Session, order: Order, user: User | None, reason: str) -> None:
-    """موجودی همه اقلام را به همان انبار مبدأ برمی‌گرداند (گردش «برگشت از سفارش»)."""
-    items = [item for item in order.items if item.product_id]
-    if not items:
+    """
+    کالای سفارشی که تحویل نشد: اگر هنوز بارگیری نشده، رزروش آزاد می‌شود؛ اگر از انبار خارج شده بود،
+    با «سند برگشت از سفارش» به ردیف سالم همان انبار مبدأ برمی‌گردد.
+    """
+    if order.stock_state == "reserved":
+        for reservation in allocation_service.active_for(db, "order", order.id):
+            allocation_service.release(db, reservation, user=user, reason=reason)
+        order.stock_state = "released"
         return
-    query = db.query(Inventory).filter(Inventory.product_id.in_([i.product_id for i in items]))
-    if order.warehouse_id is not None:
-        query = query.filter(Inventory.warehouse_id == order.warehouse_id)
-    inventories = {}
-    for inv in query.order_by(Inventory.id).with_for_update().all():
-        inventories.setdefault(inv.product_id, inv)
-    for item in items:
-        inventory = inventories.get(item.product_id)
-        if inventory is not None:
-            stock_ledger.record(db, inventory, item.quantity, "order_return", user=user, reason=reason,
-                                reference_type="order", reference_id=order.id)
+    if order.stock_state != "issued":
+        return
+    items = [item for item in order.items if item.product_id]
+    document = None
+    for item in sorted(items, key=lambda i: i.product_id):
+        if order.warehouse_id is None:
+            break
+        inventory = stock_ledger.lock_bucket(db, item.product_id, order.warehouse_id, organization_id=order.organization_id)
+        if document is None:
+            document = stock_ledger.new_document(
+                db, "order_return", organization_id=order.organization_id, user=user, warehouse_id=order.warehouse_id,
+                reference_type="order", reference_id=order.id, note=reason,
+            )
+        stock_ledger.record(db, inventory, item.quantity, "order_return", document=document, user=user, reason=reason,
+                            reference_type="order", reference_id=order.id)
+    order.stock_state = "returned"
 
 
 def _release_vehicle(db: Session, order: Order) -> None:
@@ -429,6 +477,8 @@ def _release_vehicle(db: Session, order: Order) -> None:
 def _apply_status(db: Session, order: Order, new_status: str, user: User | None, note: str | None) -> None:
     old_status = order.status
     order.status = new_status
+    if new_status in ISSUE_STATUSES:
+        _issue_stock(db, order, user)
     if new_status in RESTOCK_STATUSES:
         _restore_stock(db, order, user, f"برگشت به انبار: سفارش {order.tracking_code} {STATUS_LABELS[new_status]}")
     if new_status in RELEASE_VEHICLE_STATUSES:
@@ -501,12 +551,15 @@ def delete_order(db: Session, user: User, order_id: int) -> None:
         if target_order is None:
             raise NotFoundError('سفارش یافت نشد.')
 
-        # فقط سفارش فعال موجودی رزرو‌شده و خودروی درگیر دارد. سفارش تحویل‌شده
-        # موجودی‌اش واقعاً خارج شده و در بقیه وضعیت‌های نهایی موجودی قبلاً برگشته است.
+        # سفارشی که کالایش از انبار خارج شده (یا برگشته) سند انبار دارد و برای حفظ سوابق حذف نمی‌شود؛ لغو کنید.
+        if target_order.stock_state in ("issued", "returned"):
+            raise ConflictError("کالای این سفارش از انبار خارج شده و سند انبار دارد؛ به‌جای حذف، سفارش را لغو کنید.")
         if target_order.status in ACTIVE_ORDER_STATUSES:
-            _restore_stock(db, target_order, user, f"برگشت به انبار: سفارش فعال {target_order.tracking_code} حذف شد")
+            _restore_stock(db, target_order, user, f"آزادسازی رزرو: سفارش {target_order.tracking_code} حذف شد")
             _release_vehicle(db, target_order)
 
+        audit_service.log(db, user, "order.delete", f"سفارش {target_order.tracking_code} حذف شد", target_type="order",
+                          target_id=target_order.id, target_label=target_order.tracking_code)
         db.delete(target_order)
         db.commit()
     except Exception:

@@ -18,7 +18,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from sqlalchemy.orm import Session
 
 from app.core.iran import gregorian_to_jalali, jalali_to_gregorian, normalize_persian_text
-from app.models import Inventory, Product, User, Warehouse
+from app.models import Product, ProductUom, User, Warehouse
 from app.services import catalog_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError
 
@@ -371,6 +371,30 @@ def import_catalog(db: Session, user: User, content: bytes, *, stock_mode: str =
             elif (parent in file_skus and file_skus[parent].data.get("parent_sku")) or (parent in existing and existing[parent].parent_id):
                 row.errors.append(f"«{parent}» خودش تنوع است؛ کالای اصلی را انتخاب کنید.")
 
+    # SKU: بدون فاصله و یکتا بدون حساسیت به حروف؛ بارکد: یکتا در کل سازمان (کالاها و واحدهای فرعی) و در همین فایل
+    existing_lower = {s.lower(): s for s in existing}
+    taken = {p.barcode: p.sku for p in existing.values() if p.barcode}
+    for u in db.query(ProductUom).all():
+        owner = next((p.sku for p in existing.values() if p.id == u.product_id), None)
+        if u.barcode and owner:
+            taken[u.barcode] = owner
+    file_barcodes: dict[str, str] = {}
+    for row in rows:
+        sku, barcode = row.data.get("sku"), row.data.get("barcode")
+        if row.action == "create" and sku:
+            if re.search(r"\s", sku):
+                row.errors.append("«کد کالا» نباید فاصله داشته باشد.")
+            if sku.lower() in existing_lower:
+                row.errors.append(f"کد «{sku}» با کد موجود «{existing_lower[sku.lower()]}» یکی است (حروف بزرگ و کوچک فرقی ندارند).")
+        if not barcode or row.action not in ("create", "update"):
+            continue
+        if not re.fullmatch(r"[0-9A-Za-z-]{4,64}", barcode):
+            row.errors.append("«بارکد» فقط عدد/حروف لاتین و ۴ تا ۶۴ نویسه است.")
+        elif taken.get(barcode, sku) != sku:
+            row.errors.append(f"بارکد «{barcode}» قبلاً برای کالای «{taken[barcode]}» ثبت شده است.")
+        elif file_barcodes.setdefault(barcode, sku) != sku:
+            row.errors.append(f"بارکد «{barcode}» در همین فایل برای کالای «{file_barcodes[barcode]}» هم آمده است.")
+
     errors = [{"line": r.line, "sku": r.data.get("sku"), "messages": r.errors} for r in rows if r.errors]
     report = {
         "rows": len(rows), "create": sum(1 for r in rows if r.action == "create" and not r.errors),
@@ -417,17 +441,15 @@ def import_catalog(db: Session, user: User, content: bytes, *, stock_mode: str =
             if d.get("warehouse") is None:
                 continue
             product = by_sku[d["sku"]]
-            inv = db.query(Inventory).filter(Inventory.product_id == product.id, Inventory.warehouse_id == d["warehouse"].id) \
-                .with_for_update().first()
-            if inv is None:
-                inv = Inventory(organization_id=product.organization_id, product_id=product.id, warehouse_id=d["warehouse"].id,
-                                quantity=0, reorder_point=d["reorder_point"] if d["reorder_point"] is not None else 10)
-                db.add(inv)
-                db.flush()
-            elif d["reorder_point"] is not None:
+            inv = stock_ledger.lock_bucket(db, product.id, d["warehouse"].id, organization_id=product.organization_id,
+                                           reorder_point=d["reorder_point"])
+            if d["reorder_point"] is not None:
                 inv.reorder_point = d["reorder_point"]
             if stock_mode != "ignore" and d["quantity"] is not None:
                 if stock_mode == "set":
+                    if d["quantity"] < (inv.reserved_quantity or 0):
+                        raise ConflictError(f"ردیف {row.line}: موجودی «{d['sku']}» نمی‌تواند کمتر از رزرو سفارش‌های باز "
+                                            f"({inv.reserved_quantity}) شود.")
                     stock_ledger.set_balance(db, inv, d["quantity"], "adjustment", user=user, reason="تنظیم موجودی از فایل اکسل")
                 elif d["quantity"] > 0:
                     stock_ledger.record(db, inv, d["quantity"], "receipt", user=user, reason="ورود کالا از فایل اکسل")

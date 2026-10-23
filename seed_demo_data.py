@@ -21,7 +21,7 @@ from app.services import route_service
 from app.models import ProductPrice, Stocktake, StocktakeLine, Ticket, TicketMessage, OrderCheckpoint, Customer, DriverInvite, DriverProfile, DriverShift, DriverTimeOff, OrderItem, OrderStatusHistory, Organization, OrganizationRequest, User, RoleEnum, Warehouse, Vehicle, Product, Inventory, Order
 from app.core.security import bcrypt_context
 from app.core.tenancy import SKIP_TENANT_FILTER, set_tenant
-from app.services import order_service, stock_ledger
+from app.services import allocation_service, order_service, stock_ledger, warehouse_service
 
 db = SessionLocal()
 
@@ -46,7 +46,8 @@ def get_or_create_warehouse(name, location):
             wh.province, wh.city = city.province, city.name
             db.commit()
         return wh
-    wh = Warehouse(name=name, location=location, province=city.province if city else None, city=city.name if city else None)
+    wh = Warehouse(name=name, location=location, province=city.province if city else None, city=city.name if city else None,
+                   code=warehouse_service.next_code(db))
     db.add(wh)
     db.commit()
     db.refresh(wh)
@@ -158,19 +159,34 @@ def create_demo_order(org_id, items, status, city, vehicle, warehouse_id, days_a
                                      product_sku=product.sku, quantity=qty, unit_price=product.price or 0,
                                      unit_weight_kg=product.weight_kg or 0))
     db.flush()
-    for _, inv, qty in items:
-        stock_ledger.record(db, inv, -qty, "order_out", reason=f"خروج بابت سفارش نمونه {order.tracking_code}",
-                            reference_type="order", reference_id=order.id)
+    # همان چرخه order_service: ثبت = رزرو، بارگیری = حواله خروج، لغو/انقضا قبل از بارگیری = آزادسازی،
+    # عدم تحویل بعد از بارگیری = سند برگشت
+    reservations = [allocation_service.reserve(db, inv, qty, reference_type="order", reference_id=order.id)
+                    for _, inv, qty in items]
+    order.stock_state = "reserved"
+    if status in ("canceled", "expired"):
+        for r in reservations:
+            allocation_service.release(db, r, reason=f"سفارش نمونه {order.tracking_code}")
+        order.stock_state = "released"
+    elif status not in ("pending", "assigned"):
+        issue = stock_ledger.new_document(db, "order_issue", organization_id=org_id, warehouse_id=warehouse_id,
+                                          reference_type="order", reference_id=order.id)
+        for r in reservations:
+            allocation_service.consume(db, r, issue, reason=f"خروج بابت سفارش نمونه {order.tracking_code}")
+        order.stock_state = "issued"
     db.add(OrderStatusHistory(organization_id=org_id, order=order, from_status=None,
                               to_status="pending" if status == "pending" else "assigned", note="ثبت سفارش نمونه",
                               changed_at=start - timedelta(hours=2)))
     if status not in ("pending", "assigned"):
         db.add(OrderStatusHistory(organization_id=org_id, order=order, from_status="assigned", to_status=status,
                                   note="وضعیت نمونه", changed_at=start))
-    if status in ("failed", "canceled", "expired"):
+    if status == "failed":
+        back = stock_ledger.new_document(db, "order_return", organization_id=org_id, warehouse_id=warehouse_id,
+                                         reference_type="order", reference_id=order.id)
         for _, inv, qty in items:
-            stock_ledger.record(db, inv, qty, "order_return", reason=f"برگشت سفارش نمونه {order.tracking_code}",
+            stock_ledger.record(db, inv, qty, "order_return", document=back, reason=f"برگشت سفارش نمونه {order.tracking_code}",
                                 reference_type="order", reference_id=order.id)
+        order.stock_state = "returned"
     return order
 
 
@@ -298,7 +314,7 @@ if db.query(Order).count() == 0:
         product = healthy_products[i % len(healthy_products)]
         vehicle = vehicles[i % len(vehicles)]
         inv = db.query(Inventory).filter(Inventory.product_id == product.id).first()
-        qty = min(3 + (i % 5), max(inv.quantity - 5, 1))
+        qty = min(3 + (i % 5), max(inv.free_quantity - 5, 1))
         # سفارش‌های فعال جدیدتر، سفارش‌های تمام‌شده قدیمی‌تر
         status = statuses[i % len(statuses)]
         create_demo_order(default_org.id, [(product, inv, qty)], status, destinations[i % len(destinations)],

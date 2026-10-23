@@ -10,6 +10,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.iran import fa_digits, gregorian_to_jalali, jalali_to_gregorian
+from app.core.wms import AVAILABLE, STOCK_STATUS_LABELS
 from app.models import Inventory, Order, Organization, StockMovement, User, Warehouse
 from app.services import catalog_service, dispatch_service
 from app.services.exceptions import ConflictError, ForbiddenError
@@ -87,16 +88,21 @@ def inventory(db: Session, user: User, warehouse_id: int | None = None, **_) -> 
     rows, low, value_total = [], 0, 0.0
     for inv in sorted(query.all(), key=lambda i: ((i.product.category or "") if i.product else "", i.product.name if i.product else "")):
         p = inv.product
-        if p is None:
+        held = inv.stock_status != AVAILABLE
+        if p is None or (held and not inv.quantity):
             continue
         qty = inv.quantity or 0
-        status = "ناموجود" if qty == 0 else ("زیر نقطه سفارش" if qty <= (inv.reorder_point or 0) else "عادی")
-        low += status != "عادی"
+        if held:
+            # موجودی قرنطینه/توقیف/معیوب: جدا نشان داده می‌شود و قابل فروش نیست
+            status = STOCK_STATUS_LABELS.get(inv.stock_status, inv.stock_status)
+        else:
+            status = "ناموجود" if qty == 0 else ("زیر نقطه سفارش" if qty <= (inv.reorder_point or 0) else "عادی")
+            low += status != "عادی"
         value = qty * (p.price or 0)
         value_total += value
         rows.append({"sku": p.sku, "name": p.name + (f" ({p.variant_label})" if p.variant_label else ""), "category": p.category or "—",
                      "origin": "وارداتی" if p.origin == "imported" else "داخلی", "warehouse": warehouses.get(inv.warehouse_id, "—"),
-                     "qty": qty, "unit": p.unit or "عدد", "reorder": inv.reorder_point, "status": status,
+                     "qty": qty, "unit": p.unit or "عدد", "reorder": None if held else inv.reorder_point, "status": status,
                      "price": p.price or 0, "value": value})
     cols = [Col("sku", "کد کالا", width=12), Col("name", "نام کالا", width=28), Col("category", "گروه", width=14),
             Col("origin", "مبدأ", width=9), Col("warehouse", "انبار", width=16), Col("qty", "موجودی", "number", 10, True),

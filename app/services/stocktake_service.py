@@ -8,6 +8,10 @@
 - عملیات انبار متوقف نمی‌شود: موجودی سیستم «در لحظه شمارش هر قلم» ذخیره می‌شود و اصلاح نهایی برابر
   (شمرده‌شده − همان عدد) است؛ گردش‌های بعد از شمارش دست نمی‌خورند.
 - در هر انبار فقط یک انبارگردانی فعال.
+- شمارش روی موجودی «سالم و آزاد» است (کالای قرنطینه/توقیف/معیوب جدا نگهداری و جدا اصلاح می‌شود)؛
+  کالای رزروشده هنوز در انبار است و شمرده می‌شود.
+- تأیید یک «اصلاحیه انبارگردانی» (یک سند برای همه اقلام) ثبت می‌کند و موجودی را هرگز کمتر از رزرو
+  سفارش‌های باز نمی‌کند (اختلاف باقی‌مانده در ستون «اصلاح‌شده» دیده می‌شود).
 """
 from __future__ import annotations
 
@@ -18,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.iran import fa_digits
+from app.core.wms import AVAILABLE
 from app.models import Inventory, Product, Stocktake, StocktakeLine, User, Warehouse
 from app.services import notification_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -69,7 +74,8 @@ def _load(db: Session, user: User, stocktake_id: int) -> Stocktake:
 
 
 def _inventory(db: Session, product_id: int, warehouse_id: int, lock: bool = False) -> Inventory | None:
-    query = db.query(Inventory).filter(Inventory.product_id == product_id, Inventory.warehouse_id == warehouse_id)
+    query = db.query(Inventory).filter(Inventory.product_id == product_id, Inventory.warehouse_id == warehouse_id,
+                                       Inventory.stock_status == AVAILABLE)
     if lock:
         query = query.with_for_update()
     return query.order_by(Inventory.id).first()
@@ -175,7 +181,7 @@ def overview(db: Session, user: User) -> list[dict]:
             "last_approved_at": last.approved_at if last else None, "last_code": last.code if last else None,
             "next_due_at": due, "overdue": bool(due and due <= today and not active),
             "active": _summary(active, {w.id: w.name}) if active else None,
-            "items": db.query(Inventory).filter(Inventory.warehouse_id == w.id).count(),
+            "items": db.query(Inventory).filter(Inventory.warehouse_id == w.id, Inventory.stock_status == AVAILABLE).count(),
         })
     return result
 
@@ -203,7 +209,8 @@ def create(db: Session, user: User, *, warehouse_id: int, scope: str, product_id
     if db.query(Stocktake).filter(Stocktake.warehouse_id == warehouse_id, Stocktake.status.in_(ACTIVE)).first():
         raise ConflictError(f"برای «{warehouse.name}» یک انبارگردانی فعال وجود دارد؛ ابتدا آن را تمام یا لغو کنید.")
     if scope == "full":
-        products = [inv.product for inv in db.query(Inventory).filter(Inventory.warehouse_id == warehouse_id)
+        products = [inv.product for inv in db.query(Inventory).filter(Inventory.warehouse_id == warehouse_id,
+                                                                       Inventory.stock_status == AVAILABLE)
                     .order_by(Inventory.id).all() if inv.product is not None]
     else:
         if not product_ids:
@@ -314,21 +321,23 @@ def recount(db: Session, user: User, stocktake_id: int, line_ids: list[int], not
 
 def approve(db: Session, user: User, stocktake_id: int, reasons: dict[int, str]) -> dict:
     st = _review(db, user, stocktake_id)
-    for l in st.lines:
+    document = None
+    for l in sorted(st.lines, key=lambda l: l.product_id):
         variance = (l.counted_qty or 0) - (l.expected_qty or 0)
         if variance == 0:
             l.adjustment = 0
             continue
         l.variance_reason = reasons.get(l.id) or "unknown"
-        inv = _inventory(db, l.product_id, st.warehouse_id, lock=True)
-        if inv is None:
-            inv = Inventory(organization_id=st.organization_id, product_id=l.product_id, warehouse_id=st.warehouse_id, quantity=0)
-            db.add(inv)
-            db.flush()
-        # اگر بعد از شمارش کالا خارج شده و اصلاح منفی به زیر صفر می‌رسد، فقط تا صفر اصلاح می‌شود
-        change = max(variance, -(inv.quantity or 0))
+        inv = stock_ledger.lock_bucket(db, l.product_id, st.warehouse_id, organization_id=st.organization_id)
+        # اگر بعد از شمارش کالا خارج یا رزرو شده، اصلاح منفی فقط تا مقدار رزرو سفارش‌های باز انجام می‌شود
+        change = max(variance, (inv.reserved_quantity or 0) - (inv.quantity or 0))
         if change:
-            stock_ledger.record(db, inv, change, "stocktake", user=user,
+            if document is None:
+                document = stock_ledger.new_document(
+                    db, "stocktake", organization_id=st.organization_id, user=user, warehouse_id=st.warehouse_id,
+                    reference_type="stocktake", reference_id=st.id, note=f"اصلاحیه انبارگردانی {st.code}",
+                )
+            stock_ledger.record(db, inv, change, "stocktake", document=document, user=user,
                                 reason=f"انبارگردانی {st.code}: {REASON_LABELS.get(l.variance_reason, l.variance_reason)}",
                                 reference_type="stocktake", reference_id=st.id)
         l.adjustment, l.inventory_id = change, inv.id

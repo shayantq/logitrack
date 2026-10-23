@@ -26,6 +26,8 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const OrdersPage = lazy(() => import("./pages/orders/OrdersPage"));
 const InventoryPage = lazy(() => import("./pages/inventory/InventoryPage"));
 const LedgerPage = lazy(() => import("./pages/inventory/LedgerPage"));
+const DocumentsPage = lazy(() => import("./pages/inventory/DocumentsPage"));
+const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
 const UserDetailPage = lazy(() => import("./pages/users/UserDetailPage"));
 const ActivityPage = lazy(() => import("./pages/users/ActivityPage"));
@@ -149,6 +151,8 @@ export function App() {
             <Route path="stocktakes/:id" element={guard(ORG_STAFF, <StocktakeDetailPage />)} />
             <Route path="inventory" element={guard(ORG_STAFF, <InventoryPage />)} />
             <Route path="ledger" element={guard(ORG_STAFF, <LedgerPage />)} />
+            <Route path="documents" element={guard(ORG_STAFF, <DocumentsPage />)} />
+            <Route path="partners" element={guard(ORG_STAFF, <PartnersPage />)} />
             <Route path="reports" element={guard(ORG_STAFF, <ReportsPage />)} />
             <Route path="finance" element={guard(["org_admin"], <FinancePage />)} />
             <Route path="capital" element={guard(["org_admin"], <CapitalPlanPage />)} />

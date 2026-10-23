@@ -5,6 +5,7 @@ from app.models import User, RoleEnum, Warehouse, Inventory
 from app.schemas.product import ProductCreate, StockUpdate
 from app.services import inventory_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
+from tests.factories import default_warehouse
 
 
 def _make_user(db, role, warehouse_id=None, tag=""):
@@ -18,6 +19,7 @@ def _make_user(db, role, warehouse_id=None, tag=""):
 
 def test_create_product_sets_initial_stock(db_session):
     admin = _make_user(db_session, RoleEnum.ORG_ADMIN, tag="1")
+    default_warehouse(db_session)
     product = inventory_service.create_product(
         db_session, admin, ProductCreate(name="کالای تستی", sku="T-001", price=1000, initial_quantity=25)
     )
@@ -28,6 +30,7 @@ def test_create_product_sets_initial_stock(db_session):
 
 def test_create_product_low_initial_stock_never_marked_high(db_session):
     admin = _make_user(db_session, RoleEnum.ORG_ADMIN, tag="2")
+    default_warehouse(db_session)
     product = inventory_service.create_product(
         db_session, admin, ProductCreate(name="کالای کم‌موجودی", sku="T-002", price=500, initial_quantity=3)
     )
@@ -37,6 +40,7 @@ def test_create_product_low_initial_stock_never_marked_high(db_session):
 
 def test_create_product_duplicate_sku_rejected(db_session):
     admin = _make_user(db_session, RoleEnum.ORG_ADMIN, tag="3")
+    default_warehouse(db_session)
     inventory_service.create_product(db_session, admin, ProductCreate(name="کالا۱", sku="DUP-1", price=100, initial_quantity=5))
     with pytest.raises(ConflictError):
         inventory_service.create_product(db_session, admin, ProductCreate(name="کالا۲", sku="DUP-1", price=200, initial_quantity=5))
@@ -87,6 +91,7 @@ def test_delete_product_not_found(db_session):
 
 def test_update_stock_reports_low_stock_status(db_session):
     admin = _make_user(db_session, RoleEnum.ORG_ADMIN, tag="8")
+    default_warehouse(db_session)
     product = inventory_service.create_product(db_session, admin, ProductCreate(name="کالا", sku="T-005", price=100, initial_quantity=50))
     result = inventory_service.update_stock(db_session, admin, product.id, StockUpdate(quantity=5, reorder_point=10))
     assert "بحرانی" in result["status"]

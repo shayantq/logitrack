@@ -1,12 +1,28 @@
 """سازنده‌های مشترک داده تست (ساختار جدید سفارش چندقلمی)."""
 from datetime import datetime, timedelta, timezone
 
+from app.models import Warehouse
 from app.schemas.order import OrderRequest
 
 CITY_PROVINCE = {
     "تهران": "تهران", "تبریز": "آذربایجان شرقی", "اصفهان": "اصفهان", "قم": "قم",
     "قزوین": "قزوین", "کرج": "البرز",
 }
+
+
+def default_warehouse(db, organization_id: int | None = None) -> Warehouse:
+    """انبار عمومی پیش‌فرض سازمان جاری (هر ردیف موجودی باید انبار داشته باشد)."""
+    query = db.query(Warehouse).filter(Warehouse.code == "WH-TEST")
+    if organization_id is not None:
+        query = query.filter(Warehouse.organization_id == organization_id)
+    warehouse = query.first()
+    if warehouse is None:
+        warehouse = Warehouse(name="انبار مرکزی", location="تهران", province="تهران", city="تهران", code="WH-TEST")
+        if organization_id is not None:
+            warehouse.organization_id = organization_id
+        db.add(warehouse)
+        db.flush()
+    return warehouse
 
 
 def order_request(product_id: int | None = None, vehicle_id: int | None = None, city: str = "تهران",

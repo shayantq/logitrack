@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   BarChart3, BookOpen, Building2, ChevronsLeft, ChevronsRight, Inbox, LogOut, Menu as MenuIcon,
-  Package, Route, Truck, Users, Warehouse, type LucideIcon, Building, Factory, Map as MapIcon, LifeBuoy, ClipboardCheck, UserRound, ShieldCheck, IdCard, CalendarClock, CalendarDays, Send, Mail, Trophy, Percent, FileBarChart, Wallet, History, KeyRound, ShoppingCart, PiggyBank, Compass, MapPinned,
+  Package, Route, Truck, Users, Warehouse, type LucideIcon, Building, Factory, Map as MapIcon, LifeBuoy, ClipboardCheck, UserRound, ShieldCheck, IdCard, CalendarClock, CalendarDays, Send, Mail, Trophy, Percent, FileBarChart, Wallet, History, KeyRound, ShoppingCart, PiggyBank, Compass, MapPinned, FileStack, Handshake,
 } from "lucide-react";
 import { api, authFetch, unwrap } from "@/api/client";
 import { isApprovedDriver, useAuth, useMe } from "@/auth/AuthContext";
@@ -33,6 +33,8 @@ const NAV: NavItem[] = [
   { to: "/app/inventory", label: "انبار و کالاها", icon: Warehouse, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/stocktakes", label: "انبارگردانی", icon: ClipboardCheck, roles: ["org_admin", "warehouse_manager"], group: "انبار", badge: "stocktakes" },
   { to: "/app/ledger", label: "دفتر گردش کالا", icon: BookOpen, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/documents", label: "اسناد انبار", icon: FileStack, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/partners", label: "طرف‌های تجاری", icon: Handshake, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/reorder", label: "نقطه سفارش هوشمند", icon: ShoppingCart, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/reports", label: "گزارش‌های اکسل و PDF", icon: FileBarChart, roles: ["org_admin", "warehouse_manager"], group: "گزارش‌ها" },
   { to: "/app/finance", label: "مالی حمل‌ونقل", icon: Wallet, roles: ["org_admin"], group: "گزارش‌ها" },

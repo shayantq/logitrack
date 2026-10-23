@@ -10,7 +10,7 @@ from app.models import DriverProfile, User, RoleEnum, Vehicle, Product, Inventor
 from app.schemas.order import OrderStatusRequest
 from app.services import order_service
 from app.services.exceptions import ConflictError, ForbiddenError
-from tests.factories import order_request
+from tests.factories import default_warehouse, order_request
 
 
 def _make_user(db, role, city=None, tag=""):
@@ -36,7 +36,7 @@ def _make_product_with_stock(db, quantity, weight_kg=1.0, tag=""):
     db.add(product)
     db.commit()
     db.refresh(product)
-    db.add(Inventory(product_id=product.id, quantity=quantity, reorder_point=10))
+    db.add(Inventory(product_id=product.id, warehouse_id=default_warehouse(db).id, quantity=quantity, reorder_point=10))
     db.commit()
     return product
 
@@ -45,7 +45,7 @@ def _order_request(product_id, vehicle_id=None, destination="تهران", quanti
     return order_request(product_id, vehicle_id, city=destination, quantity=quantity)
 
 
-def test_create_order_decrements_stock(db_session):
+def test_create_order_reserves_stock(db_session):
     admin = _make_user(db_session, RoleEnum.ORG_ADMIN)
     driver = _make_user(db_session, RoleEnum.DRIVER, city="تهران", tag="a")
     vehicle = _make_vehicle(db_session, driver, city="تهران")
@@ -54,7 +54,8 @@ def test_create_order_decrements_stock(db_session):
     order = order_service.create_order(db_session, admin, _order_request(product.id, vehicle.id, quantity=3))
 
     inv = db_session.query(Inventory).filter(Inventory.product_id == product.id).first()
-    assert inv.quantity == 7
+    # رزرو: موجودی فیزیکی دست‌نخورده، ۳ عدد برای این سفارش کنار گذاشته شده
+    assert (inv.quantity, inv.reserved_quantity, inv.free_quantity) == (10, 3, 7)
     assert order.total_quantity == 3
 
 
@@ -164,12 +165,13 @@ def test_delete_order_restores_stock_and_frees_vehicle(db_session):
     order = order_service.create_order(db_session, admin, _order_request(product.id, vehicle.id, quantity=4))
 
     inv_before = db_session.query(Inventory).filter(Inventory.product_id == product.id).first()
-    assert inv_before.quantity == 6
+    assert inv_before.free_quantity == 6
 
     order_service.delete_order(db_session, admin, order.id)
 
     inv_after = db_session.query(Inventory).filter(Inventory.product_id == product.id).first()
-    assert inv_after.quantity == 10
+    db_session.refresh(inv_after)
+    assert (inv_after.quantity, inv_after.reserved_quantity) == (10, 0)
 
     db_session.refresh(vehicle)
     assert vehicle.status == "available"

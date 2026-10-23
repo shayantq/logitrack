@@ -94,7 +94,7 @@ await session("org_admin", "qazvin_admin", "admin123", async page => {
   const productSelects = page.locator("[data-testid=order-item-product]");
   // دو کالا که موجودی کافی دارند (عدد موجودی در متن گزینه با ارقام فارسی است)
   const stocked = await page.locator("[data-native-for=order-item-product]").first().evaluate(sel => [...sel.options]
-    .map(o => ({ value: o.value, stock: Number((/موجودی(?: کل)?: ([۰-۹٬,]+)/.exec(o.text)?.[1] ?? "0").replace(/[٬,]/g, "").replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))) }))
+    .map(o => ({ value: o.value, stock: Number((/موجودی(?: کل| آزاد)?: ([۰-۹٬,]+)/.exec(o.text)?.[1] ?? "0").replace(/[٬,]/g, "").replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))) }))
     .filter(o => o.value && o.stock >= 5).map(o => o.value));
   await choose(page, productSelects.first(), stocked[0]);
   await page.waitForSelector("[data-testid=warehouse-stock] [data-warehouse]");
@@ -144,7 +144,13 @@ await session("org_admin", "qazvin_admin", "admin123", async page => {
   check("org_admin", "stock receipt recorded", true);
   await page.click("[data-testid=app-nav] >> text=دفتر گردش کالا");
   await page.waitForSelector("[data-testid=ledger-table] tbody tr");
-  check("org_admin", "ledger shows return of canceled order", (await page.locator("[data-testid=ledger-table] >> text=برگشت از سفارش").count()) > 0);
+  check("org_admin", "ledger shows the receipt with its document code",
+    (await page.locator("[data-testid=ledger-table] tbody tr").first().textContent()).includes("ورود کالا")
+    && /^RC-/.test(await page.locator("[data-testid=ledger-document]").first().textContent()));
+  // سفارش قبل از بارگیری فقط رزرو داشت؛ لغو آن رزرو را آزاد می‌کند (گردش برگشت لازم نیست)
+  const released = await (await fetch(`${BASE}/inventory/reservations?status=released`,
+    { headers: { Authorization: `Bearer ${await apiToken("qazvin_admin", "admin123")}` } })).json();
+  check("org_admin", "canceled order released its stock reservation", released.some(r => r.reference_label === code), JSON.stringify(released.slice(0, 2)));
 
   for (const [link, testId] of [["ناوگان", "vehicles-table"], ["کاربران و رانندگان", "users-table"]]) {
     await page.click(`[data-testid=app-nav] >> text=${link}`);
@@ -387,7 +393,8 @@ const iranDate = (days = 0) => new Date(Date.now() + 3.5 * 3600_000 + days * 864
 const adminToken = await apiToken("qazvin_admin", "admin123");
 const driverToken = await apiToken(kycUser, "driver123");
 const myVehicle = (await apiCall(driverToken, "GET", "/vehicles/"))[0];
-const stockProduct = (await apiCall(adminToken, "GET", "/inventory/products")).find(p => p.stock >= 3);
+// موجودی آزاد (موجود − رزرو سفارش‌های باز) — همان چیزی که سفارش تازه می‌تواند بردارد
+const stockProduct = (await apiCall(adminToken, "GET", "/inventory/products")).find(p => p.free_stock >= 3);
 const orderFor = (day, extra = {}) => apiCall(adminToken, "POST", "/orders/", {
   items: [{ product_id: stockProduct.id, quantity: 1 }], customer: { name: "مشتری امتیاز", mobile: "09121234321" },
   destination_province: "قزوین", destination_city: "قزوین", destination_address: "خیابان نظرسنجی، پلاک ۸", size: "m", priority: false,
@@ -683,7 +690,7 @@ await session("dispatch", "qazvin_admin", "admin123", async page => {
   const select = page.locator("[data-testid=order-item-product]").first();
   await page.waitForSelector("[data-native-for=order-item-product] option:nth-child(3)", { state: "attached" });
   const stocked = await page.locator("[data-native-for=order-item-product]").first().evaluate(sel => [...sel.options]
-    .map(o => ({ value: o.value, stock: Number((/موجودی(?: کل)?: ([۰-۹٬,]+)/.exec(o.text)?.[1] ?? "0").replace(/[٬,]/g, "").replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))) }))
+    .map(o => ({ value: o.value, stock: Number((/موجودی(?: کل| آزاد)?: ([۰-۹٬,]+)/.exec(o.text)?.[1] ?? "0").replace(/[٬,]/g, "").replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))) }))
     .filter(o => o.value && o.stock >= 5).map(o => o.value));
   await choose(page, select, stocked[0]);
   await page.fill("[data-testid=customer-name]", "مشتری زمان‌بندی");
@@ -766,6 +773,16 @@ for (const theme of ["light", "dark"]) {
 // راننده نمونه قزوین (راننده احراز هویت‌شده آزمون، امروز مرخصی تأییدشده دارد)
 const routeDriverToken = await apiToken("qazvin_driver1", "driver123");
 const routeVehicle = (await apiCall(routeDriverToken, "GET", "/vehicles/")).find(v => v.status !== "inactive");
+// رانندگان نمونه جمعه شیفت ندارند؛ برای آزمون مسیرِ «امروز»، امروز (هر روز هفته که باشد) به شیفت راننده اضافه می‌شود
+const routeSchedule = (await apiCall(adminToken, "GET", "/dispatch/schedules")).find(s => s.vehicle?.id === routeVehicle.id);
+const todayWeekday = (new Date(`${iranDate(0)}T12:00:00Z`).getUTCDay() + 6) % 7;   // مثل پایتون: دوشنبه = ۰
+if (routeSchedule && routeSchedule.shifts.length && !routeSchedule.shifts.some(s => s.weekday === todayWeekday)) {
+  await apiCall(adminToken, "PUT", `/dispatch/schedules/${routeSchedule.driver_id}`, {
+    employment_type: routeSchedule.employment_type, max_daily_orders: routeSchedule.max_daily_orders, intercity: routeSchedule.intercity,
+    shifts: [...routeSchedule.shifts.map(({ weekday, start_time, end_time }) => ({ weekday, start_time, end_time })),
+      { weekday: todayWeekday, start_time: "00:00", end_time: "23:59" }],
+  });
+}
 const routeOrder = await orderFor(iranDate(0), { destination_city: "تاکستان", destination_province: "قزوین",
   customer: { name: "مشتری نقشه", mobile: "09121239876" }, vehicle_id: routeVehicle.id });
 const planned = await apiCall(adminToken, "GET", `/orders/${routeOrder.id}/route`);
@@ -1176,6 +1193,62 @@ await session("catalog", "qazvin_admin", "admin123", async page => {
   await page.click("[data-testid=import-apply]");
   await page.waitForSelector("[data-testid=import-report][data-applied=true]");
   check("catalog", "import applied", true);
+});
+
+// ---------------- پایه انبارداری: طرف تجاری، رسید قرنطینه، تغییر وضعیت کیفی، اسناد و سند برگشت ----------------
+await session("wms", "qazvin_admin", "admin123", async page => {
+  await page.click("[data-testid=app-nav] >> text=طرف‌های تجاری");
+  await page.click("[data-testid=partner-new]");
+  await page.fill("[data-testid=partner-name]", `تأمین آزمون ${runId}`);
+  await page.click("[data-testid=partner-save]");
+  const created = await toast(page);
+  check("wms", "supplier created with an automatic code", /SUP-\d{3}/.test(created), created);
+  await page.waitForSelector(`[data-testid=partner-row]:has-text("تأمین آزمون ${runId}")`);
+
+  // رسید کالا از همین تأمین‌کننده با وضعیت «قرنطینه»
+  await page.click("[data-testid=app-nav] >> text=انبار و کالاها");
+  await page.waitForSelector("[data-testid=products-table] tbody tr");
+  const sku = await page.locator("[data-testid=product-row]").first().getAttribute("data-sku");
+  await page.click("[data-testid=new-movement]");
+  await choose(page, "[data-testid=movement-product]", { index: 1 });
+  await choose(page, "[data-testid=movement-warehouse]", { index: 1 });
+  await choose(page, "[data-testid=movement-status]", "quarantine");
+  await choose(page, "[data-testid=movement-supplier]", { index: 1 });
+  await page.fill("[data-testid=movement-qty]", "4");
+  await page.click("button[form=movement-form]");
+  await page.waitForSelector("[data-testid=toast]:has-text('گردش کالا ثبت شد')", { timeout: 10000 });
+  await page.waitForSelector(`[data-testid=product-row][data-sku="${sku}"] [data-testid=product-stock] >> text=قرنطینه`);
+  check("wms", "quarantined stock is shown apart from sellable stock", true);
+
+  // آزادسازی از قرنطینه پس از بازرسی (سند تغییر وضعیت کیفی با دو گردش)
+  await page.click("[data-testid=new-movement]");
+  await page.click("[data-testid=movement-kind] [data-kind=status]");
+  await choose(page, "[data-testid=movement-product]", { index: 1 });
+  await choose(page, "[data-testid=movement-warehouse]", { index: 1 });
+  await page.fill("[data-testid=movement-qty]", "4");
+  await page.fill("[data-testid=movement-modal] input[maxlength='500']", "بازرسی کیفی تأیید شد");
+  await page.click("button[form=movement-form]");
+  await page.waitForSelector("[data-testid=toast]:has-text('وضعیت کیفی تغییر کرد')", { timeout: 10000 });
+  check("wms", "quality status change recorded", true);
+
+  // اسناد انبار: سند تغییر وضعیت ← سند برگشت (سند اصلی حذف نمی‌شود، «برگشت‌خورده» می‌شود)
+  await page.click("[data-testid=app-nav] >> text=اسناد انبار");
+  await choose(page, "[data-testid=docs-type]", "status_change");
+  await page.waitForSelector("[data-testid=document-row][data-type=status_change]");
+  const docCode = await page.locator("[data-testid=document-row]").first().getAttribute("data-code");
+  await page.locator("[data-testid=document-row]").first().click();
+  await page.waitForSelector("[data-testid=document-movements] tbody tr");
+  check("wms", "status change document has two movements", (await page.locator("[data-testid=document-movements] tbody tr").count()) === 2);
+  await page.click("[data-testid=document-reverse]");
+  await page.fill("[data-testid=prompt-input]", "آزمون سند برگشت");
+  await page.click("[data-testid=prompt-dialog] [data-testid=dialog-ok]");
+  const reversed = await toast(page);
+  check("wms", "reversal document posted", /RV-/.test(reversed), reversed);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(`[data-testid=document-row][data-code="${docCode}"][data-status=reversed]`);
+  check("wms", "original document stays in history as reversed", true);
+  const ledger = await (await fetch(`${BASE}/inventory/ledger-check`, { headers: { Authorization: `Bearer ${await apiToken("qazvin_admin", "admin123")}` } })).json();
+  check("wms", "ledger stays consistent after reversal", ledger.ok === true, JSON.stringify(ledger.mismatches?.slice(0, 2)));
 });
 
 // ---------------- کنترل‌های سفارشی به‌جای ظاهر پیش‌فرض کروم ----------------

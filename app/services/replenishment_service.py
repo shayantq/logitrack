@@ -28,6 +28,7 @@ from statistics import NormalDist
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.iran import fa_digits, gregorian_to_jalali, jalali_to_gregorian
+from app.core.wms import AVAILABLE
 from app.models import Inventory, Organization, Product, ProductPrice, StockMovement, User
 from app.services import audit_service, dispatch_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -266,7 +267,9 @@ def cost_book(db: Session, product_ids: list[int], growth: float) -> CostBook:
 # فهرست اقلام و تنظیمات
 # ---------------------------------------------------------------------------
 def _inventories(db: Session, user: User, warehouse_id: int | None) -> list[Inventory]:
-    query = db.query(Inventory).options(joinedload(Inventory.product), joinedload(Inventory.warehouse))
+    # نقطه سفارش و برنامه خرید فقط روی موجودی «سالم و آزاد» معنا دارد
+    query = db.query(Inventory).options(joinedload(Inventory.product), joinedload(Inventory.warehouse)) \
+        .filter(Inventory.stock_status == AVAILABLE)
     if warehouse_id:
         query = query.filter(Inventory.warehouse_id == warehouse_id)
     return [inv for inv in query.all() if inv.product is not None and inv.product.is_active is not False]
@@ -425,7 +428,8 @@ def apply_auto(db: Session, user: User, inventory_ids: list[int] | None, warehou
 def recalculate(db: Session, organization_id: int) -> int:
     """محاسبه دوباره همه ردیف‌های یک سازمان (تسک شبانه Celery و بعد از تغییر سیاست). commit با فراخواننده."""
     org = db.get(Organization, organization_id)
-    invs = [i for i in db.query(Inventory).options(joinedload(Inventory.product)).filter(Inventory.organization_id == organization_id).all()
+    invs = [i for i in db.query(Inventory).options(joinedload(Inventory.product))
+            .filter(Inventory.organization_id == organization_id, Inventory.stock_status == AVAILABLE).all()
             if i.product is not None]
     results = _evaluate(db, invs, policy_of(org))
     for inv in invs:

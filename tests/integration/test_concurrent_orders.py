@@ -14,14 +14,14 @@ overselling) یک قابلیت قفل سطح ردیف واقعی در PostgreSQL
 import threading
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.tenancy import set_tenant
 from app.models import User, RoleEnum, Vehicle, Product, Inventory, Organization
 from app.services import order_service
 from app.services.exceptions import ConflictError
-from tests.factories import order_request
+from tests.factories import default_warehouse, order_request
 from tests.integration.conftest import TEST_DATABASE_URL
 
 pytestmark = [
@@ -69,15 +69,17 @@ def race_condition_setup(pg_session_factory):
     db.commit()
     db.refresh(product)
 
-    db.add(Inventory(product_id=product.id, quantity=1, reorder_point=10))  # ⚠️ فقط ۱ عدد موجودی!
+    db.add(Inventory(product_id=product.id, warehouse_id=default_warehouse(db).id, quantity=1, reorder_point=10))  # ⚠️ فقط ۱ عدد موجودی!
     db.commit()
 
     try:
         yield {"product_id": product.id, "vehicle_id": vehicle.id, "admin_id": admin.id}
     finally:
-        # پاکسازی کامل: حذف سازمان همه داده‌هایش را هم (با ON DELETE CASCADE) پاک می‌کند
+        # پاکسازی کامل: حذف سازمان همه داده‌هایش را هم (با ON DELETE CASCADE) پاک می‌کند؛
+        # دفتر گردش کالا تغییرناپذیر است، پس فقط در حالت نگهداری دفتر
         db.rollback()
         set_tenant(db, None)
+        db.execute(text("SELECT set_config('pasineh.ledger_maintenance', 'on', true)"))
         db.query(Organization).filter(Organization.id == org.id).delete()
         db.commit()
         db.close()
@@ -131,6 +133,8 @@ def test_two_simultaneous_orders_for_last_unit_only_one_succeeds(pg_session_fact
     verify_db = pg_session_factory()
     try:
         inv = verify_db.query(Inventory).filter(Inventory.product_id == product_id).first()
-        assert inv.quantity == 0, f"موجودی باید دقیقاً ۰ باشد، ولی {inv.quantity} است — یعنی overselling رخ داده!"
+        # سفارش فقط رزرو می‌کند: تنها واحد موجود دقیقاً یک‌بار رزرو شده و موجودی آزاد صفر است
+        assert (inv.quantity, inv.reserved_quantity) == (1, 1), \
+            f"رزرو باید دقیقاً ۱ باشد، ولی {inv.reserved_quantity} است — یعنی رزرو دوباره (overselling) رخ داده!"
     finally:
         verify_db.close()

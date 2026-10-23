@@ -397,6 +397,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/inventory/status-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🧪 تغییر وضعیت کیفی (قرنطینه، توقیف، معیوب ↔ سالم و آزاد) */
+        post: operations["change_status_inventory_status_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🧾 اسناد انبار (رسید، حواله، اصلاحیه، انتقال، ...) */
+        get: operations["list_documents_inventory_documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🧾 جزئیات سند انبار و گردش‌هایش */
+        get: operations["get_document_inventory_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/documents/{document_id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ↩️ سند برگشت: خنثی کردن یک سند قطعی (بدون حذف یا ویرایش) */
+        post: operations["reverse_document_inventory_documents__document_id__reverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📊 موجودی به تفکیک انبار و وضعیت کیفی (با رزرو و موجودی آزاد) */
+        get: operations["stock_buckets_inventory_stock_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inventory/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔒 رزروهای موجودی (تخصیص به سفارش‌ها) */
+        get: operations["list_reservations_inventory_reservations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/inventory/ledger-check": {
         parameters: {
             query?: never;
@@ -752,7 +854,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 📋 دریافت لیست انبارها */
+        /** 📋 دریافت لیست انبارها (به ترتیب درختی) */
         get: operations["list_warehouses_warehouses__get"];
         put?: never;
         /** ➕ ساخت انبار */
@@ -2541,6 +2643,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/catalog/products/{product_id}/uoms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 📏 واحدهای فرعی کالا (جایگزینی کامل فهرست) */
+        put: operations["set_uoms_catalog_products__product_id__uoms_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/catalog/products/{product_id}/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 🤝 تأمین‌کننده‌های کالا (جایگزینی کامل فهرست) */
+        put: operations["set_suppliers_catalog_products__product_id__suppliers_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/catalog/products/{product_id}/prices": {
         parameters: {
             query?: never;
@@ -2670,6 +2806,111 @@ export interface paths {
         };
         /** 💰 سرمایه لازم برای خرید ماه‌های آینده (فقط ادمین) */
         get: operations["capital_plan_replenishment_capital_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/partners/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 فهرست طرف‌های تجاری */
+        get: operations["list_partners_partners__get"];
+        put?: never;
+        /** ➕ تعریف طرف تجاری */
+        post: operations["create_partner_partners__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/partners/{partner_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📄 مشخصات طرف تجاری */
+        get: operations["get_partner_partners__partner_id__get"];
+        /** ✏️ ویرایش طرف تجاری */
+        put: operations["update_partner_partners__partner_id__put"];
+        post?: never;
+        /** 🗑️ حذف طرف تجاریِ بی‌سابقه */
+        delete: operations["delete_partner_partners__partner_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/partners/{partner_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🗄️ بایگانی (غیرفعال‌سازی) */
+        post: operations["archive_partner_partners__partner_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/partners/{partner_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ♻️ فعال‌سازی دوباره */
+        post: operations["activate_partner_partners__partner_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wms/vocabulary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📚 واژه‌نامه، وضعیت‌ها، انواع سند و انبار با برچسب فارسی */
+        get: operations["get_vocabulary_wms_vocabulary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/wms/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📡 رویدادهای دامنه به ترتیب (برای دنبال کردن با after_id) */
+        get: operations["list_events_wms_events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3158,6 +3399,28 @@ export interface components {
             shifts: string[];
             /** Off */
             off: boolean;
+        };
+        /** DomainEventOut */
+        DomainEventOut: {
+            /** Id */
+            id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Event Type */
+            event_type: string;
+            /** Aggregate Type */
+            aggregate_type: string;
+            /** Aggregate Id */
+            aggregate_id: number;
+            /** Actor Name */
+            actor_name?: string | null;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
         };
         /** DriverApplicationResponse */
         DriverApplicationResponse: {
@@ -4816,6 +5079,154 @@ export interface components {
              */
             service_level: "item" | "policy";
         };
+        /** PartnerIn */
+        PartnerIn: {
+            /** Code */
+            code?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @default legal
+             * @enum {string}
+             */
+            kind: "legal" | "individual";
+            /**
+             * Is Supplier
+             * @default false
+             */
+            is_supplier: boolean;
+            /**
+             * Is Customer
+             * @default false
+             */
+            is_customer: boolean;
+            /**
+             * Is Carrier
+             * @default false
+             */
+            is_carrier: boolean;
+            /** Legal Name */
+            legal_name?: string | null;
+            /** National Id */
+            national_id?: string | null;
+            /** Economic Code */
+            economic_code?: string | null;
+            /** Registration Number */
+            registration_number?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Mobile */
+            mobile?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Province */
+            province?: string | null;
+            /** City */
+            city?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Contact Mobile */
+            contact_mobile?: string | null;
+            /** Iban */
+            iban?: string | null;
+            /** Payment Terms Days */
+            payment_terms_days?: number | null;
+            /** Lead Time Days */
+            lead_time_days?: number | null;
+            /** Carrier Service */
+            carrier_service?: ("road" | "rail" | "air" | "sea" | "courier" | "post") | null;
+            /** Tracking Url */
+            tracking_url?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** PartnerOut */
+        PartnerOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Is Supplier */
+            is_supplier: boolean;
+            /** Is Customer */
+            is_customer: boolean;
+            /** Is Carrier */
+            is_carrier: boolean;
+            /** Roles */
+            roles: string[];
+            /** Legal Name */
+            legal_name?: string | null;
+            /** National Id */
+            national_id?: string | null;
+            /** Economic Code */
+            economic_code?: string | null;
+            /** Registration Number */
+            registration_number?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Mobile */
+            mobile?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Province */
+            province?: string | null;
+            /** City */
+            city?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Postal Code */
+            postal_code?: string | null;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Contact Mobile */
+            contact_mobile?: string | null;
+            /** Iban */
+            iban?: string | null;
+            /** Payment Terms Days */
+            payment_terms_days?: number | null;
+            /** Lead Time Days */
+            lead_time_days?: number | null;
+            /** Carrier Service */
+            carrier_service?: string | null;
+            /** Tracking Url */
+            tracking_url?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Masked
+             * @default false
+             */
+            masked: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Products Count
+             * @default 0
+             */
+            products_count: number;
+            /**
+             * Documents Count
+             * @default 0
+             */
+            documents_count: number;
+        };
         /** PasswordResetChannels */
         PasswordResetChannels: {
             /** Sms */
@@ -5057,6 +5468,41 @@ export interface components {
         };
         /** ProductCreate */
         ProductCreate: {
+            /** Short Name */
+            short_name?: string | null;
+            /** Barcode */
+            barcode?: string | null;
+            /** Net Weight Kg */
+            net_weight_kg?: number | null;
+            /** Length Cm */
+            length_cm?: number | null;
+            /** Width Cm */
+            width_cm?: number | null;
+            /** Height Cm */
+            height_cm?: number | null;
+            /**
+             * Lot Tracked
+             * @default false
+             */
+            lot_tracked: boolean;
+            /**
+             * Serial Tracked
+             * @default false
+             */
+            serial_tracked: boolean;
+            /**
+             * Expiry Tracked
+             * @default false
+             */
+            expiry_tracked: boolean;
+            /** Shelf Life Days */
+            shelf_life_days?: number | null;
+            /** Min Stock */
+            min_stock?: number | null;
+            /** Max Stock */
+            max_stock?: number | null;
+            /** Reorder Point */
+            reorder_point?: number | null;
             /** Name */
             name: string;
             /** Sku */
@@ -5068,6 +5514,7 @@ export interface components {
             price: number;
             /**
              * Weight Kg
+             * @description وزن ناخالص هر واحد پایه
              * @default 1
              */
             weight_kg: number;
@@ -5107,10 +5554,45 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+            /** Short Name */
+            short_name?: string | null;
             /** Sku */
             sku: string;
             /** Weight Kg */
             weight_kg?: number | null;
+            /** Net Weight Kg */
+            net_weight_kg?: number | null;
+            /** Length Cm */
+            length_cm?: number | null;
+            /** Width Cm */
+            width_cm?: number | null;
+            /** Height Cm */
+            height_cm?: number | null;
+            /** Volume M3 */
+            volume_m3?: number | null;
+            /**
+             * Lot Tracked
+             * @default false
+             */
+            lot_tracked: boolean;
+            /**
+             * Serial Tracked
+             * @default false
+             */
+            serial_tracked: boolean;
+            /**
+             * Expiry Tracked
+             * @default false
+             */
+            expiry_tracked: boolean;
+            /** Shelf Life Days */
+            shelf_life_days?: number | null;
+            /** Min Stock */
+            min_stock?: number | null;
+            /** Max Stock */
+            max_stock?: number | null;
+            /** Reorder Point */
+            reorder_point?: number | null;
             /** Price */
             price: number;
             /** Category */
@@ -5159,6 +5641,16 @@ export interface components {
             variants: components["schemas"]["VariantOut"][];
             /** Stock */
             stock: components["schemas"]["StockRow"][];
+            /**
+             * Uoms
+             * @default []
+             */
+            uoms: components["schemas"]["UomOut"][];
+            /**
+             * Suppliers
+             * @default []
+             */
+            suppliers: components["schemas"]["SupplierLinkOut"][];
         };
         /** ProductRef */
         ProductRef: {
@@ -5186,6 +5678,23 @@ export interface components {
              * @default 0
              */
             stock: number;
+            /**
+             * Reserved
+             * @default 0
+             */
+            reserved: number;
+            /**
+             * Free Stock
+             * @default 0
+             */
+            free_stock: number;
+            /**
+             * Held Stock
+             * @default {}
+             */
+            held_stock: {
+                [key: string]: number;
+            };
             /**
              * Ever High Stock
              * @default false
@@ -5224,15 +5733,44 @@ export interface components {
              * @default true
              */
             is_active: boolean;
+            /** Barcode */
+            barcode?: string | null;
         };
-        /** ProductUpdate */
+        /**
+         * ProductUpdate
+         * @description ویرایش جزئی. SKU تغییرناپذیر است (اگر فرستاده شود باید همان کد فعلی باشد).
+         */
         ProductUpdate: {
             /** Name */
             name?: string | null;
             /** Sku */
             sku?: string | null;
+            /** Short Name */
+            short_name?: string | null;
             /** Weight Kg */
             weight_kg?: number | null;
+            /** Net Weight Kg */
+            net_weight_kg?: number | null;
+            /** Length Cm */
+            length_cm?: number | null;
+            /** Width Cm */
+            width_cm?: number | null;
+            /** Height Cm */
+            height_cm?: number | null;
+            /** Lot Tracked */
+            lot_tracked?: boolean | null;
+            /** Serial Tracked */
+            serial_tracked?: boolean | null;
+            /** Expiry Tracked */
+            expiry_tracked?: boolean | null;
+            /** Shelf Life Days */
+            shelf_life_days?: number | null;
+            /** Min Stock */
+            min_stock?: number | null;
+            /** Max Stock */
+            max_stock?: number | null;
+            /** Reorder Point */
+            reorder_point?: number | null;
             /** Category */
             category?: string | null;
             /** Brand */
@@ -5478,6 +6016,42 @@ export interface components {
             /** Destination City */
             destination_city: string;
         };
+        /** ReservationOut */
+        ReservationOut: {
+            /** Id */
+            id: number;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name?: string | null;
+            /** Product Sku */
+            product_sku?: string | null;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Warehouse Name */
+            warehouse_name?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Status */
+            status: string;
+            /** Reference Type */
+            reference_type: string;
+            /** Reference Id */
+            reference_id: number;
+            /** Reference Label */
+            reference_label?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Reason */
+            close_reason?: string | null;
+        };
+        /** ReverseRequest */
+        ReverseRequest: {
+            /** Reason */
+            reason: string;
+        };
         /** ReviewDecision */
         ReviewDecision: {
             /** Note */
@@ -5720,11 +6294,129 @@ export interface components {
             id: number;
         };
         /**
+         * StatusChangeCreate
+         * @description تغییر وضعیت کیفی (مثلاً قرنطینه ← سالم و آزاد پس از بازرسی) — یک سند با دو گردش.
+         */
+        StatusChangeCreate: {
+            /** Product Id */
+            product_id: number;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /**
+             * From Status
+             * @enum {string}
+             */
+            from_status: "available" | "quarantine" | "blocked" | "damaged";
+            /**
+             * To Status
+             * @enum {string}
+             */
+            to_status: "available" | "quarantine" | "blocked" | "damaged";
+            /** Quantity */
+            quantity: number;
+            /** Uom */
+            uom?: string | null;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * StockBucketOut
+         * @description یک ردیف موجودی: کالا × انبار × وضعیت کیفی.
+         */
+        StockBucketOut: {
+            /** Inventory Id */
+            inventory_id: number;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Unit */
+            unit: string;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Warehouse Name */
+            warehouse_name: string;
+            /** Stock Status */
+            stock_status: string;
+            /** Stock Status Label */
+            stock_status_label: string;
+            /** Quantity */
+            quantity: number;
+            /** Reserved */
+            reserved: number;
+            /** Free */
+            free: number;
+        };
+        /** StockDocumentOut */
+        StockDocumentOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Doc Type */
+            doc_type: string;
+            /** Doc Type Label */
+            doc_type_label: string;
+            /** Status */
+            status: string;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Warehouse Name */
+            warehouse_name?: string | null;
+            /** Partner Id */
+            partner_id?: number | null;
+            /** Partner Name */
+            partner_name?: string | null;
+            /** Reference Type */
+            reference_type?: string | null;
+            /** Reference Id */
+            reference_id?: number | null;
+            /** External Ref */
+            external_ref?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Created By Name */
+            created_by_name?: string | null;
+            /** Reversal Of Id */
+            reversal_of_id?: number | null;
+            /** Reversal Of Code */
+            reversal_of_code?: string | null;
+            /** Reversed By Id */
+            reversed_by_id?: number | null;
+            /** Reversed By Code */
+            reversed_by_code?: string | null;
+            /**
+             * Can Reverse
+             * @default false
+             */
+            can_reverse: boolean;
+            /**
+             * Total In
+             * @default 0
+             */
+            total_in: number;
+            /**
+             * Total Out
+             * @default 0
+             */
+            total_out: number;
+            /**
+             * Movements
+             * @default []
+             */
+            movements: components["schemas"]["StockMovementResponse"][];
+        };
+        /**
          * StockMovementCreate
-         * @description ثبت دستی گردش:
-         *       receipt   = ورود کالا (quantity مثبت)
+         * @description ثبت دستی گردش (هر درخواست یک سند انبار):
+         *       receipt   = رسید ورود کالا (quantity مثبت) — وضعیت کیفی پیش‌فرض از نوع انبار (مثلاً قرنطینه)
          *       damage    = ضایعات/کسری (quantity مثبت، از موجودی کم می‌شود) — دلیل الزامی
          *       adjustment = اصلاح (quantity مثبت یا منفی) — دلیل الزامی
+         *     quantity به واحد uom است (خالی = واحد پایه) و به واحد پایه تبدیل می‌شود.
          */
         StockMovementCreate: {
             /** Product Id */
@@ -5740,6 +6432,17 @@ export interface components {
             quantity: number;
             /** Reason */
             reason?: string | null;
+            /** Stock Status */
+            stock_status?: ("available" | "quarantine" | "blocked" | "damaged") | null;
+            /** Uom */
+            uom?: string | null;
+            /**
+             * Partner Id
+             * @description تأمین‌کننده (فقط رسید)
+             */
+            partner_id?: number | null;
+            /** External Ref */
+            external_ref?: string | null;
         };
         /** StockMovementResponse */
         StockMovementResponse: {
@@ -5747,6 +6450,14 @@ export interface components {
             id: number;
             /** Created At */
             created_at?: string | null;
+            /** Document Id */
+            document_id?: number | null;
+            /** Document Code */
+            document_code?: string | null;
+            /** Document Type */
+            document_type?: string | null;
+            /** Document Status */
+            document_status?: string | null;
             /** Product Id */
             product_id: number;
             /** Product Name */
@@ -5757,6 +6468,13 @@ export interface components {
             warehouse_id?: number | null;
             /** Warehouse Name */
             warehouse_name?: string | null;
+            /**
+             * Stock Status
+             * @default available
+             */
+            stock_status: string;
+            /** Reversal Of Id */
+            reversal_of_id?: number | null;
             /** Movement Type */
             movement_type: string;
             /** Quantity Change */
@@ -5784,6 +6502,21 @@ export interface components {
             quantity: number;
             /** Reorder Point */
             reorder_point?: number | null;
+            /**
+             * Stock Status
+             * @default available
+             */
+            stock_status: string;
+            /**
+             * Reserved
+             * @default 0
+             */
+            reserved: number;
+            /**
+             * Free
+             * @default 0
+             */
+            free: number;
         };
         /** StockTransferCreate */
         StockTransferCreate: {
@@ -5797,6 +6530,14 @@ export interface components {
             quantity: number;
             /** Reason */
             reason?: string | null;
+            /**
+             * Stock Status
+             * @default available
+             * @enum {string}
+             */
+            stock_status: "available" | "quarantine" | "blocked" | "damaged";
+            /** Uom */
+            uom?: string | null;
         };
         /** StockUpdate */
         StockUpdate: {
@@ -5980,6 +6721,48 @@ export interface components {
             candidates: components["schemas"]["Candidate"][];
             /** Excluded */
             excluded: components["schemas"]["Candidate"][];
+        };
+        /** SupplierLinkIn */
+        SupplierLinkIn: {
+            /** Partner Id */
+            partner_id: number;
+            /** Supplier Sku */
+            supplier_sku?: string | null;
+            /** Lead Time Days */
+            lead_time_days?: number | null;
+            /** Min Order Qty */
+            min_order_qty?: number | null;
+            /** Last Price */
+            last_price?: number | null;
+            /**
+             * Is Preferred
+             * @default false
+             */
+            is_preferred: boolean;
+        };
+        /** SupplierLinkOut */
+        SupplierLinkOut: {
+            /** Id */
+            id: number;
+            /** Partner Id */
+            partner_id: number;
+            /** Partner Code */
+            partner_code: string;
+            /** Partner Name */
+            partner_name: string;
+            /** Supplier Sku */
+            supplier_sku?: string | null;
+            /** Lead Time Days */
+            lead_time_days?: number | null;
+            /** Min Order Qty */
+            min_order_qty?: number | null;
+            /** Last Price */
+            last_price?: number | null;
+            /**
+             * Is Preferred
+             * @default false
+             */
+            is_preferred: boolean;
         };
         /** TicketDetail */
         TicketDetail: {
@@ -6278,6 +7061,49 @@ export interface components {
             /** At */
             at?: string | null;
         };
+        /** UomIn */
+        UomIn: {
+            /** Name */
+            name: string;
+            /**
+             * Factor
+             * @description چند واحد پایه
+             */
+            factor: number;
+            /** Barcode */
+            barcode?: string | null;
+            /**
+             * Is Purchase Default
+             * @default false
+             */
+            is_purchase_default: boolean;
+            /**
+             * Is Sales Default
+             * @default false
+             */
+            is_sales_default: boolean;
+        };
+        /** UomOut */
+        UomOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Factor */
+            factor: number;
+            /** Barcode */
+            barcode?: string | null;
+            /**
+             * Is Purchase Default
+             * @default false
+             */
+            is_purchase_default: boolean;
+            /**
+             * Is Sales Default
+             * @default false
+             */
+            is_sales_default: boolean;
+        };
         /** UpdateUserRequest */
         UpdateUserRequest: {
             /** Old Password */
@@ -6506,6 +7332,21 @@ export interface components {
             city: string;
             /** Location */
             location?: string | null;
+            /** Code */
+            code?: string | null;
+            /**
+             * Type
+             * @default general
+             * @enum {string}
+             */
+            type: "general" | "finished_goods" | "distribution" | "raw_materials" | "quarantine" | "returns" | "transit" | "site";
+            /** Parent Id */
+            parent_id?: number | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
         };
         /** WarehouseOut */
         WarehouseOut: {
@@ -6536,6 +7377,50 @@ export interface components {
              * @default 0
              */
             managers_count: number;
+            /**
+             * Code
+             * @default
+             */
+            code: string;
+            /**
+             * Type
+             * @default general
+             */
+            type: string;
+            /**
+             * Type Label
+             * @default
+             */
+            type_label: string;
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Parent Name */
+            parent_name?: string | null;
+            /**
+             * Depth
+             * @default 0
+             */
+            depth: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Holds Stock
+             * @default true
+             */
+            holds_stock: boolean;
+            /**
+             * Ships Orders
+             * @default true
+             */
+            ships_orders: boolean;
+            /**
+             * On Hand
+             * @default 0
+             */
+            on_hand: number;
         };
         /** WarehouseStock */
         WarehouseStock: {
@@ -6547,6 +7432,21 @@ export interface components {
             city?: string | null;
             /** Quantity */
             quantity: number;
+            /**
+             * Reserved
+             * @default 0
+             */
+            reserved: number;
+            /**
+             * Free
+             * @default 0
+             */
+            free: number;
+            /**
+             * Ships Orders
+             * @default true
+             */
+            ships_orders: boolean;
         };
         /** WarehouseStocktakeStatus */
         WarehouseStocktakeStatus: {
@@ -7277,11 +8177,15 @@ export interface operations {
                 /** @description فقط این انبار (مدیر انبار همیشه انبار خودش) */
                 warehouse_id?: number | null;
                 /** @description نوع گردش */
-                movement_type?: ("initial" | "receipt" | "order_out" | "order_return" | "adjustment" | "damage" | "transfer_out" | "transfer_in" | "stocktake") | null;
+                movement_type?: ("initial" | "receipt" | "order_out" | "order_return" | "adjustment" | "damage" | "transfer_out" | "transfer_in" | "stocktake" | "status_out" | "status_in") | null;
                 /** @description از تاریخ (شامل) */
                 date_from?: string | null;
                 /** @description تا تاریخ (بدون شامل) */
                 date_to?: string | null;
+                /** @description فقط گردش‌های این سند */
+                document_id?: number | null;
+                /** @description وضعیت کیفی */
+                stock_status?: ("available" | "quarantine" | "blocked" | "damaged") | null;
                 skip?: number;
                 limit?: number;
             };
@@ -7314,7 +8218,10 @@ export interface operations {
     record_movement_inventory_movements_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7347,7 +8254,10 @@ export interface operations {
     transfer_stock_inventory_transfers_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7364,6 +8274,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StockMovementResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_status_inventory_status_changes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusChangeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockDocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_documents_inventory_documents_get: {
+        parameters: {
+            query?: {
+                doc_type?: ("opening" | "receipt" | "order_issue" | "order_return" | "adjustment" | "write_off" | "transfer" | "status_change" | "stocktake" | "reversal") | null;
+                status?: ("draft" | "posted" | "reversed" | "canceled") | null;
+                warehouse_id?: number | null;
+                product_id?: number | null;
+                /** @description کد سند یا شماره فاکتور/بارنامه */
+                q?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockDocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_inventory_documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockDocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reverse_document_inventory_documents__document_id__reverse_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockDocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stock_buckets_inventory_stock_get: {
+        parameters: {
+            query?: {
+                product_id?: number | null;
+                warehouse_id?: number | null;
+                stock_status?: ("available" | "quarantine" | "blocked" | "damaged") | null;
+                include_empty?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockBucketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reservations_inventory_reservations_get: {
+        parameters: {
+            query?: {
+                status?: ("active" | "consumed" | "released") | null;
+                product_id?: number | null;
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservationOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7484,7 +8606,10 @@ export interface operations {
     add_order_orders__post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -11824,6 +12949,76 @@ export interface operations {
             };
         };
     };
+    set_uoms_catalog_products__product_id__uoms_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UomIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_suppliers_catalog_products__product_id__suppliers_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierLinkIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_price_catalog_products__product_id__prices_post: {
         parameters: {
             query?: never;
@@ -12103,6 +13298,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CapitalPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_partners_partners__get: {
+        parameters: {
+            query?: {
+                /** @description فقط این نقش */
+                role?: ("supplier" | "customer" | "carrier") | null;
+                q?: string | null;
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_partner_partners__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_partner_partners__partner_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partner_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_partner_partners__partner_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partner_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_partner_partners__partner_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partner_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_partner_partners__partner_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partner_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_partner_partners__partner_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                partner_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_vocabulary_wms_vocabulary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_events_wms_events_get: {
+        parameters: {
+            query?: {
+                /** @description فقط رویدادهای بعد از این شناسه */
+                after_id?: number;
+                event_type?: string | null;
+                aggregate_type?: string | null;
+                aggregate_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DomainEventOut"][];
                 };
             };
             /** @description Validation Error */

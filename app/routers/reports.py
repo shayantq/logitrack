@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from celery.result import AsyncResult
 
 from app.database import db_dependency
+from app.core.wms import AVAILABLE
 from app.models import Product, Order, Vehicle, Inventory, RoleEnum
 from app.dependencies import require_role
 from app.celery_app import celery_app
@@ -36,7 +37,8 @@ def get_dashboard_stats(
     }
 
     # کمبود موجودی به تفکیک هر انبار سنجیده می‌شود (هر ردیف موجودی، حد آستانه خودش را دارد)
-    inventory_query = db.query(Inventory).options(joinedload(Inventory.product), joinedload(Inventory.warehouse))
+    inventory_query = db.query(Inventory).options(joinedload(Inventory.product), joinedload(Inventory.warehouse)) \
+        .filter(Inventory.stock_status == AVAILABLE)
     products_query = db.query(Product)
     if current_user.role == RoleEnum.WAREHOUSE_MANAGER:
         inventory_query = inventory_query.filter(Inventory.warehouse_id == current_user.warehouse_id)

@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Optional
 from pydantic import model_validator, BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
 from app.core.iran import normalize_persian_text
+from app.core.wms import WAREHOUSE_TYPES
 from app.schemas.geo_fields import city_in_province
 from app.schemas.organization import Province
 
@@ -104,6 +105,12 @@ class WarehouseIn(BaseModel):
     province: Province
     city: City
     location: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]] = None
+    # کد یکتا در سازمان (خالی = ساخت خودکار WH-01، WH-02، ...)؛ نوع و انبار مادر (app/core/wms.WAREHOUSE_TYPES)
+    code: Optional[Annotated[str, BeforeValidator(lambda v: v.strip().upper() if isinstance(v, str) else v),
+                             StringConstraints(min_length=2, max_length=16, pattern=r"^[A-Z0-9][A-Z0-9-]*$")]] = None
+    type: Literal[tuple(WAREHOUSE_TYPES)] = "general"
+    parent_id: Optional[int] = Field(None, gt=0)
+    is_active: bool = True
 
     @model_validator(mode="after")
     def _known_city(self):
@@ -123,6 +130,16 @@ class WarehouseOut(BaseModel):
     map_city: Optional[str] = None  # نقطه‌ای که روی نقشه برای آن استفاده می‌شود
     products_count: int = 0
     managers_count: int = 0
+    code: str = ""
+    type: str = "general"
+    type_label: str = ""
+    parent_id: Optional[int] = None
+    parent_name: Optional[str] = None
+    depth: int = 0
+    is_active: bool = True
+    holds_stock: bool = True
+    ships_orders: bool = True
+    on_hand: int = 0
 
 
 class GeoCity(BaseModel):

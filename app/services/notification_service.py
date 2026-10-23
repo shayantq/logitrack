@@ -14,6 +14,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.iran import fa_date, fa_digits
+from app.core.wms import AVAILABLE
 from app.models import Inventory, Order, Stocktake, Ticket, User
 from app.models_notification import Notification, NotificationReceipt, _now
 from app.services.exceptions import ForbiddenError, NotFoundError
@@ -207,6 +208,8 @@ def low_stock(db: Session, inv: Inventory) -> bool:
     ردیفی که قبلاً بالای نقطه سفارش بوده و حالا به آن رسیده، یک‌بار هشدار می‌گیرد؛
     هشدار بعدی فقط بعد از پر شدن دوباره (low_alerted در دفتر گردش صفر می‌شود).
     """
+    if (inv.stock_status or AVAILABLE) != AVAILABLE:
+        return False            # هشدار نقطه سفارش فقط برای موجودی سالم و آزاد
     stock = inv.quantity or 0
     rop = reorder_point_of(inv)
     if stock > rop or not inv.ever_exceeded_reorder or inv.low_alerted:

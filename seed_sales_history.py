@@ -18,6 +18,7 @@ from datetime import datetime, time, timedelta
 from sqlalchemy.orm import joinedload
 
 from app.core.tenancy import set_tenant
+from app.core.wms import AVAILABLE
 from app.models import Inventory, Organization, ProductPrice, StockMovement
 from app.models_notification import Notification
 from app.services import dispatch_service, notification_service, replenishment_service, stock_ledger
@@ -55,65 +56,69 @@ def seed(db) -> None:
             print(f"↩️  سابقه فروش نمونه «{org.name}» قبلاً ثبت شده است.")
             set_tenant(db, None)
             continue
-        invs = db.query(Inventory).options(joinedload(Inventory.product)).order_by(Inventory.id).all()
-        rows, seeded = 0, []
-        for index, inv in enumerate(invs):
-            p = inv.product
-            if p is None or p.is_active is False:
-                continue
-            rng = random.Random(inv.id * 7919)
-            if rng.random() < 0.15:                 # چند کالا بی‌فروش
-                continue
-            base = rng.choice([0.6, 1.2, 2.5, 4, 6, 9, 14]) * rng.uniform(0.8, 1.25)
-            growth = rng.uniform(-0.0012, 0.0035)     # روند روزانه
-            imported = p.origin == "imported"
-            lead = rng.choice([25, 30, 40]) if imported else rng.choice([3, 5, 7, 7, 10, 14])
-            # سیاست ساده خرید در گذشته (فقط برای ساختن سابقه)
-            reorder_at = base * (lead + 6)
-            batch = max(5, round(base * rng.choice([20, 30, 45])))
-            stock, pending = 0, []                    # [(روز رسیدن، مقدار)]
-            start = today - timedelta(days=DAYS)
-            # موجودی آغاز دوره
-            first = max(5, round(base * (lead + 25)))
-            stock_ledger.record(db, inv, first, "receipt", reason=f"{MARKER} — موجودی آغاز دوره")
+        # ساخت سابقه گذشته (تاریخ و مانده گردش‌ها بعد از ثبت تنظیم می‌شود) فقط در حالت نگهداری دفتر مجاز است
+        with stock_ledger.maintenance(db):
+            invs = db.query(Inventory).options(joinedload(Inventory.product)) \
+                .filter(Inventory.stock_status == AVAILABLE).order_by(Inventory.id).all()
+            rows, seeded = 0, []
+            for index, inv in enumerate(invs):
+                p = inv.product
+                if p is None or p.is_active is False:
+                    continue
+                rng = random.Random(inv.id * 7919)
+                if rng.random() < 0.15:                 # چند کالا بی‌فروش
+                    continue
+                base = rng.choice([0.6, 1.2, 2.5, 4, 6, 9, 14]) * rng.uniform(0.8, 1.25)
+                growth = rng.uniform(-0.0012, 0.0035)     # روند روزانه
+                imported = p.origin == "imported"
+                lead = rng.choice([25, 30, 40]) if imported else rng.choice([3, 5, 7, 7, 10, 14])
+                # سیاست ساده خرید در گذشته (فقط برای ساختن سابقه)
+                reorder_at = base * (lead + 6)
+                batch = max(5, round(base * rng.choice([20, 30, 45])))
+                stock, pending = 0, []                    # [(روز رسیدن، مقدار)]
+                start = today - timedelta(days=DAYS)
+                # موجودی آغاز دوره
+                first = max(5, round(base * (lead + 25)))
+                stock_ledger.record(db, inv, first, "receipt", reason=f"{MARKER} — موجودی آغاز دوره")
+                db.flush()
+                last = db.query(StockMovement).filter(StockMovement.inventory_id == inv.id).order_by(StockMovement.id.desc()).first()
+                last.created_at = _at(start, 8, 0)
+                stock = first
+                for d in range(DAYS):
+                    day = start + timedelta(days=d)
+                    for arrival in [x for x in pending if x[0] == d]:
+                        m = stock_ledger.record(db, inv, arrival[1], "receipt", reason=f"{MARKER} — رسید خرید")
+                        db.flush()
+                        m.created_at = _at(day, 9, rng.randint(0, 50))
+                        stock += arrival[1]
+                        pending.remove(arrival)
+                        rows += 1
+                    weekday = day.weekday()                # جمعه = ۴
+                    factor = 0.35 if weekday == 4 else 0.8 if weekday == 3 else 1.0
+                    qty = min(stock, _poisson(rng, base * (1 + growth * d) * factor))
+                    if qty > 0:
+                        m = stock_ledger.record(db, inv, -qty, "order_out", reason=MARKER)
+                        db.flush()
+                        m.created_at = _at(day, rng.randint(10, 19), rng.randint(0, 59))
+                        stock -= qty
+                        rows += 1
+                    # خرید جدید وقتی موجودی + در راه به حد برسد (۲۰٪ از کالاها در ماه آخر خرید نمی‌کنند ← کمبود نمونه)
+                    on_order = sum(x[1] for x in pending)
+                    skip_late = index % 5 == 0 and d > DAYS - 40
+                    if stock + on_order <= reorder_at and not skip_late:
+                        pending.append((d + lead + rng.randint(-1, 2), batch))
+                seeded.append(inv)
+                # زمان تأمین کالا برای فرمول (بخشی پیش‌فرض سازمان می‌مانند)
+                if rng.random() < 0.6:
+                    inv.lead_time_days = float(lead)
+                    inv.lead_time_std_days = round(lead * 0.25, 1)
+                db.flush()
+                # مانده بعد از هر گردش به ترتیب تاریخ
+                balance = 0
+                for m in db.query(StockMovement).filter(StockMovement.inventory_id == inv.id).order_by(StockMovement.created_at, StockMovement.id).all():
+                    balance += m.quantity_change
+                    m.balance_after = balance
             db.flush()
-            last = db.query(StockMovement).filter(StockMovement.inventory_id == inv.id).order_by(StockMovement.id.desc()).first()
-            last.created_at = _at(start, 8, 0)
-            stock = first
-            for d in range(DAYS):
-                day = start + timedelta(days=d)
-                for arrival in [x for x in pending if x[0] == d]:
-                    m = stock_ledger.record(db, inv, arrival[1], "receipt", reason=f"{MARKER} — رسید خرید")
-                    db.flush()
-                    m.created_at = _at(day, 9, rng.randint(0, 50))
-                    stock += arrival[1]
-                    pending.remove(arrival)
-                    rows += 1
-                weekday = day.weekday()                # جمعه = ۴
-                factor = 0.35 if weekday == 4 else 0.8 if weekday == 3 else 1.0
-                qty = min(stock, _poisson(rng, base * (1 + growth * d) * factor))
-                if qty > 0:
-                    m = stock_ledger.record(db, inv, -qty, "order_out", reason=MARKER)
-                    db.flush()
-                    m.created_at = _at(day, rng.randint(10, 19), rng.randint(0, 59))
-                    stock -= qty
-                    rows += 1
-                # خرید جدید وقتی موجودی + در راه به حد برسد (۲۰٪ از کالاها در ماه آخر خرید نمی‌کنند ← کمبود نمونه)
-                on_order = sum(x[1] for x in pending)
-                skip_late = index % 5 == 0 and d > DAYS - 40
-                if stock + on_order <= reorder_at and not skip_late:
-                    pending.append((d + lead + rng.randint(-1, 2), batch))
-            seeded.append(inv)
-            # زمان تأمین کالا برای فرمول (بخشی پیش‌فرض سازمان می‌مانند)
-            if rng.random() < 0.6:
-                inv.lead_time_days = float(lead)
-                inv.lead_time_std_days = round(lead * 0.25, 1)
-            db.flush()
-            # مانده بعد از هر گردش به ترتیب تاریخ
-            balance = 0
-            for m in db.query(StockMovement).filter(StockMovement.inventory_id == inv.id).order_by(StockMovement.created_at, StockMovement.id).all():
-                balance += m.quantity_change
-                m.balance_after = balance
         # بهای خرید (≈ ۷۸٪ قیمت فروش)؛ هر هفتمین کالا بدون بها
         priced = 0
         for row in db.query(ProductPrice).filter(ProductPrice.cost_price.is_(None)).order_by(ProductPrice.product_id).all():

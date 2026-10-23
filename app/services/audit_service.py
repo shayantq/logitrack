@@ -21,7 +21,7 @@ from app.services.exceptions import ForbiddenError, NotFoundError
 
 CATEGORIES = {
     "auth": "ورود و امنیت", "users": "کاربران", "settings": "تنظیمات سازمان", "catalog": "کاتالوگ و قیمت",
-    "reports": "گزارش‌گیری", "drivers": "رانندگان",
+    "reports": "گزارش‌گیری", "drivers": "رانندگان", "partners": "طرف‌های تجاری", "orders": "سفارش‌ها",
 }
 ACTION_CATEGORY = {
     "auth.login": "auth", "auth.login_failed": "auth", "auth.locked": "auth", "auth.password_changed": "auth",
@@ -34,6 +34,9 @@ ACTION_CATEGORY = {
     "report.generate": "reports",
     "inventory.policy": "settings", "inventory.rop": "catalog", "inventory.rop_auto": "catalog",
     "driver.invite": "drivers", "driver.approve": "drivers", "driver.reject": "drivers",
+    "catalog.delete": "catalog", "catalog.uoms": "catalog", "catalog.suppliers": "catalog", "order.delete": "orders",
+    "partner.create": "partners", "partner.update": "partners", "partner.archive": "partners",
+    "partner.activate": "partners", "partner.delete": "partners",
 }
 
 

@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app import tasks
 from app.models import (
-    Customer, Inventory, Order, OrderStatusHistory, Product, RoleEnum, StockMovement, User, Vehicle, Warehouse,
+    Customer, Inventory, Order, OrderStatusHistory, Product, RoleEnum, StockMovement, StockReservation, User, Vehicle, Warehouse,
 )
 from app.schemas.order import OrderAssignRequest, OrderStatusRequest
 from app.services import inventory_service, order_service, stock_ledger
@@ -29,9 +29,10 @@ def _user(db, role, tag, warehouse_id=None):
 
 
 def _qty(db, product_id, warehouse_id):
+    """موجودی آزاد (موجود − رزرو)."""
     inv = db.query(Inventory).filter(Inventory.product_id == product_id, Inventory.warehouse_id == warehouse_id).one()
     db.refresh(inv)
-    return inv.quantity
+    return inv.free_quantity
 
 
 def _status(db, user, order, new_status, note=None):
@@ -79,8 +80,11 @@ def test_multi_item_order_snapshots_prices_and_records_each_item(world):
     assert (_qty(db, rice.id, wh2.id), _qty(db, oil.id, wh2.id)) == (2, 26)
     assert _qty(db, rice.id, wh1.id) == 20  # انبار دیگر دست‌نخورده
 
-    moves = db.query(StockMovement).filter(StockMovement.reference_id == order.id, StockMovement.movement_type == "order_out").all()
-    assert sorted(m.quantity_change for m in moves) == [-4, -3]
+    # ثبت سفارش فقط رزرو می‌کند؛ کالا تا بارگیری در انبار است
+    reservations = db.query(StockReservation).filter(StockReservation.reference_id == order.id).all()
+    assert sorted(r.quantity for r in reservations) == [3, 4] and {r.status for r in reservations} == {"active"}
+    assert not db.query(StockMovement).filter(StockMovement.reference_id == order.id).all()
+    assert order.stock_state == "reserved"
 
     # تغییر بعدی قیمت کالا، سفارش ثبت‌شده را تغییر نمی‌دهد
     rice.price = 999

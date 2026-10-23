@@ -17,7 +17,7 @@ from app.schemas.user import CreateUserRequest
 from app.schemas.vehicle import VehicleStatusRequest
 from app.services import order_service, inventory_service, user_service, vehicle_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
-from tests.factories import order_request
+from tests.factories import default_warehouse, order_request
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def _product(db, tag, stocks):
     db.commit()
     db.refresh(product)
     for warehouse_id, quantity in stocks:
-        db.add(Inventory(product_id=product.id, warehouse_id=warehouse_id, quantity=quantity,
+        db.add(Inventory(product_id=product.id, warehouse_id=warehouse_id or default_warehouse(db).id, quantity=quantity,
                          reorder_point=10, ever_exceeded_reorder=quantity > 10))
     db.commit()
     return product
@@ -68,12 +68,13 @@ def _request(product_id, vehicle_id=None, quantity=1, warehouse_id=None):
 
 
 def _stock(db, product_id, warehouse_id=None):
+    """موجودی آزاد (موجود − رزرو سفارش‌های باز) — همان چیزی که سفارش بعدی می‌تواند بردارد."""
     query = db.query(Inventory).filter(Inventory.product_id == product_id)
     if warehouse_id is not None:
         query = query.filter(Inventory.warehouse_id == warehouse_id)
     inv = query.first()
     db.refresh(inv)
-    return inv.quantity
+    return inv.free_quantity
 
 
 @pytest.fixture()
@@ -160,7 +161,9 @@ def test_deleting_completed_order_does_not_restore_stock(setup):
     order_service.update_order_status(db, admin, order.id, OrderStatusRequest(order_status="in_transit"))
     order_service.update_order_status(db, admin, order.id, OrderStatusRequest(order_status="delivered"))
 
-    order_service.delete_order(db, admin, order.id)
+    # سفارشی که کالایش از انبار خارج شده سند انبار دارد و حذف نمی‌شود (فقط لغو)
+    with pytest.raises(ConflictError):
+        order_service.delete_order(db, admin, order.id)
     assert _stock(db, product.id) == 15
 
 
@@ -296,6 +299,7 @@ def test_manager_lists_only_own_warehouse_products(two_warehouses):
 
 def test_product_weight_is_saved(db_session):
     admin = _user(db_session, RoleEnum.ORG_ADMIN, "w")
+    default_warehouse(db_session)
     product = inventory_service.create_product(
         db_session, admin, ProductCreate(name="یخچال", sku="FRIDGE", price=1, weight_kg=80, initial_quantity=1)
     )

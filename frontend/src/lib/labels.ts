@@ -71,6 +71,60 @@ export const MOVEMENT_TYPES: Record<string, { label: string; tone: Tone }> = {
   transfer_out: { label: "انتقال (خروج)", tone: "violet" },
   transfer_in: { label: "انتقال (ورود)", tone: "brand" },
   stocktake: { label: "انبارگردانی", tone: "pink" },
+  status_out: { label: "تغییر وضعیت (خروج)", tone: "muted" },
+  status_in: { label: "تغییر وضعیت (ورود)", tone: "muted" },
+};
+
+/** وضعیت کیفی موجودی — هم‌خوان با app/core/wms.py */
+export type StockStatus = "available" | "quarantine" | "blocked" | "damaged";
+export const STOCK_STATUS: Record<StockStatus, { label: string; tone: Tone; hint: string }> = {
+  available: { label: "سالم و آزاد", tone: "success", hint: "قابل فروش و مصرف" },
+  quarantine: { label: "قرنطینه", tone: "warning", hint: "منتظر بازرسی کیفی" },
+  blocked: { label: "توقیف", tone: "danger", hint: "به دستور مدیریت قابل استفاده نیست" },
+  damaged: { label: "معیوب", tone: "orange", hint: "منتظر تصمیم: تعمیر، مرجوعی یا ضایعات" },
+};
+export const stockStatusLabel = (s: string) => STOCK_STATUS[s as StockStatus]?.label ?? s;
+
+/** اسناد انبار */
+export const DOCUMENT_TYPES: Record<string, { label: string; tone: Tone }> = {
+  opening: { label: "موجودی اول دوره", tone: "muted" },
+  receipt: { label: "رسید ورود کالا", tone: "success" },
+  order_issue: { label: "حواله خروج سفارش", tone: "info" },
+  order_return: { label: "برگشت از سفارش", tone: "orange" },
+  adjustment: { label: "اصلاحیه موجودی", tone: "warning" },
+  write_off: { label: "ضایعات و کسری", tone: "danger" },
+  transfer: { label: "انتقال بین انبارها", tone: "violet" },
+  status_change: { label: "تغییر وضعیت کیفی", tone: "brand" },
+  stocktake: { label: "اصلاحیه انبارگردانی", tone: "pink" },
+  reversal: { label: "سند برگشت", tone: "muted" },
+};
+export const DOCUMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  draft: { label: "پیش‌نویس", tone: "muted" },
+  posted: { label: "قطعی", tone: "success" },
+  reversed: { label: "برگشت‌خورده", tone: "danger" },
+  canceled: { label: "لغوشده", tone: "muted" },
+};
+
+/** انواع انبار */
+export const WAREHOUSE_TYPES: Record<string, { label: string; hint: string }> = {
+  general: { label: "انبار عمومی", hint: "نگهداری و ارسال سفارش" },
+  finished_goods: { label: "انبار محصول نهایی", hint: "کالای آماده فروش؛ ارسال سفارش" },
+  distribution: { label: "مرکز توزیع", hint: "ارسال سفارش به مشتریان" },
+  raw_materials: { label: "انبار مواد اولیه", hint: "مصرف داخلی؛ بدون ارسال سفارش" },
+  quarantine: { label: "انبار قرنطینه", hint: "کالای رسیده با وضعیت «قرنطینه» ثبت می‌شود" },
+  returns: { label: "انبار مرجوعی", hint: "کالای برگشتی؛ پیش‌فرض قرنطینه" },
+  transit: { label: "انبار در راه", hint: "فقط با سند انتقال پر و خالی می‌شود" },
+  site: { label: "سایت / مجتمع انبار", hint: "فقط گروه‌بندی انبارها؛ کالا نگه نمی‌دارد" },
+};
+
+/** طرف‌های تجاری */
+export const PARTNER_ROLES: Record<string, { label: string; tone: Tone }> = {
+  supplier: { label: "تأمین‌کننده", tone: "brand" },
+  customer: { label: "مشتری", tone: "success" },
+  carrier: { label: "شرکت حمل", tone: "violet" },
+};
+export const CARRIER_SERVICES: Record<string, string> = {
+  road: "جاده‌ای", rail: "ریلی", air: "هوایی", sea: "دریایی", courier: "پیک", post: "پست",
 };
 
 export const BUSINESS_TYPES: Record<string, string> = {

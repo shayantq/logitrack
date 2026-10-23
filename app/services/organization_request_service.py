@@ -124,7 +124,7 @@ def approve_request(db: Session, reviewer: User, request_id: int, data: Organiza
         db.flush()
 
         # انبار پیش‌فرض در شهر سازمان — مبدأ مسیر سفارش‌ها روی نقشه؛ بعداً قابل ویرایش است
-        db.add(Warehouse(organization_id=org.id, name=f"انبار مرکزی {request.city}", location=request.address,
+        db.add(Warehouse(organization_id=org.id, code="WH-01", name=f"انبار مرکزی {request.city}", location=request.address,
                          province=request.province, city=request.city))
 
         db.add(User(

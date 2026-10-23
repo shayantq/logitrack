@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from starlette import status
 
 from app.database import db_dependency
-from app.dependencies import require_role, user_dependency
+from app.dependencies import IdempotencyKey, require_role, user_dependency
 from app.models import ACTIVE_ORDER_STATUSES, Order, RoleEnum, Vehicle
 from app.schemas.order import (
     OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatus, OrderStatusRequest,
@@ -83,9 +83,9 @@ def get_order_by_id(db: db_dependency, user: user_dependency, order_id: int = Pa
 
 
 @router.post('/', status_code=status.HTTP_201_CREATED, response_model=OrderDetailResponse, summary="⚡ ثبت سفارش چندقلمی + تخصیص هوشمند ناوگان")
-def add_order(db: db_dependency, user: user_dependency, order_request: OrderRequest):
+def add_order(db: db_dependency, user: user_dependency, order_request: OrderRequest, idempotency_key: IdempotencyKey = None):
     try:
-        return OrderDetailResponse.from_order(order_service.create_order(db, user, order_request))
+        return OrderDetailResponse.from_order(order_service.create_order(db, user, order_request, idempotency_key))
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 

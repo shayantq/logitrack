@@ -6,7 +6,7 @@ from fastapi.responses import Response
 
 from app.database import db_dependency
 from app.dependencies import user_dependency
-from app.schemas.catalog import ImportReport, PriceIn, ProductDetail, ProductUpdate, VariantIn
+from app.schemas.catalog import ImportReport, PriceIn, ProductDetail, ProductUpdate, SupplierLinkIn, UomIn, VariantIn
 from app.services import catalog_io, catalog_service
 from app.services.exceptions import DomainError
 from app.services import audit_service
@@ -69,6 +69,22 @@ def update_product(data: ProductUpdate, db: db_dependency, user: user_dependency
     result = _call(catalog_service.update, db, user, product_id, data.model_dump(exclude_unset=True))
     audit_service.record(db, user, "catalog.update", f"مشخصات کالای «{result['name']}» ویرایش شد", target_type="product",
                          target_id=product_id, target_label=result["sku"])
+    return result
+
+
+@router.put("/products/{product_id}/uoms", response_model=ProductDetail, summary="📏 واحدهای فرعی کالا (جایگزینی کامل فهرست)")
+def set_uoms(data: list[UomIn], db: db_dependency, user: user_dependency, product_id: int = Path(gt=0)):
+    result = _call(catalog_service.set_uoms, db, user, product_id, [u.model_dump() for u in data])
+    audit_service.record(db, user, "catalog.uoms", f"واحدهای فرعی کالای «{result['name']}» به‌روز شد", target_type="product",
+                         target_id=product_id, target_label=result["sku"], details={"uoms": [f"{u.name}={u.factor}" for u in data]})
+    return result
+
+
+@router.put("/products/{product_id}/suppliers", response_model=ProductDetail, summary="🤝 تأمین‌کننده‌های کالا (جایگزینی کامل فهرست)")
+def set_suppliers(data: list[SupplierLinkIn], db: db_dependency, user: user_dependency, product_id: int = Path(gt=0)):
+    result = _call(catalog_service.set_suppliers, db, user, product_id, [s.model_dump() for s in data])
+    audit_service.record(db, user, "catalog.suppliers", f"تأمین‌کننده‌های کالای «{result['name']}» به‌روز شد",
+                         target_type="product", target_id=product_id, target_label=result["sku"])
     return result
 
 

@@ -7,7 +7,7 @@ from app.core.security import bcrypt_context, create_access_token
 from app.core.tenancy import set_tenant
 from app.models import DriverDocument, Inventory, Organization, Product, RoleEnum, User, Vehicle
 from app.services.commission_service import DEFAULT_LEVELS, DEFAULT_TIERS
-from tests.factories import order_payload
+from tests.factories import default_warehouse, order_payload
 
 PASSWORD = "secret123"
 
@@ -41,7 +41,7 @@ def env(api_env):
         product = Product(name="کالا", sku=f"S-{slug}", price=10, weight_kg=2)
         db.add_all([*vehicles, product])
         db.commit()
-        db.add(Inventory(product_id=product.id, quantity=500))
+        db.add(Inventory(product_id=product.id, warehouse_id=default_warehouse(db, org.id).id, quantity=500))
         db.commit()
         out[slug] = dict(org=org, admin=admin, manager=manager, drivers=drivers, vehicles=vehicles, product=product)
         set_tenant(db, None)

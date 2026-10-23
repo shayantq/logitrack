@@ -14,7 +14,7 @@ from app.models import CommissionPlan, DriverProfile, DriverRating, Inventory, O
 from app.schemas.order import OrderStatusRequest
 from app.services import commission_service, order_service
 from app.services.commission_service import DEFAULT_LEVELS, DEFAULT_TIERS, compute, level_for, tier_multiplier
-from tests.factories import order_request
+from tests.factories import default_warehouse, order_request
 
 PLAN = {"base_fare": 500_000, "fare_per_kg": 5_000, "levels": DEFAULT_LEVELS, "tiers": DEFAULT_TIERS}
 NOW = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -69,7 +69,7 @@ def world(db_session):
     product = Product(name="بار", sku="SKU-C", price=1, weight_kg=1)
     db.add_all([vehicle, product])
     db.commit()
-    db.add(Inventory(product_id=product.id, quantity=1000))
+    db.add(Inventory(product_id=product.id, warehouse_id=default_warehouse(db).id, quantity=1000))
     # ۴۸ تحویل موفق در روزهای قبل (برای «سابقه»)
     for i in range(48):
         db.add(Order(tracking_code=f"LT-OLD{i:05d}", status="delivered", size="m", priority=False,

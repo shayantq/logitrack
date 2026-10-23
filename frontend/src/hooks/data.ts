@@ -9,6 +9,14 @@ export const useProducts = () =>
 export const useWarehouses = () =>
   useQuery({ queryKey: ["warehouses"], queryFn: () => unwrap(api.GET("/warehouses/")), staleTime: 60_000 });
 
+/** طرف‌های تجاری فعال (مثلاً role="supplier" برای انتخاب تأمین‌کننده در رسید) */
+export const usePartners = (role?: "supplier" | "customer" | "carrier", enabled = true) =>
+  useQuery({
+    queryKey: ["partners", role ?? "all"],
+    queryFn: () => unwrap(api.GET("/partners/", { params: { query: { role: role ?? null } } })),
+    enabled, staleTime: 60_000,
+  });
+
 export const useVehicles = (enabled = true) =>
   useQuery({ queryKey: ["vehicles"], queryFn: () => unwrap(api.GET("/vehicles/")), enabled });
 

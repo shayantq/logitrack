@@ -87,3 +87,16 @@ export async function unwrap<T>(promise: Promise<{ data?: T; error?: unknown; re
   }
   return data as T;
 }
+
+/**
+ * کلید یکتایی درخواست (هدر Idempotency-Key): اگر ثبت یک سند یا سفارش به‌خاطر قطع شبکه دوباره فرستاده شود،
+ * سرور همان نتیجه قبلی را برمی‌گرداند و سند دوم نمی‌سازد. برای هر «تلاش ثبت» یک کلید تازه بسازید و بعد از
+ * پاسخ سرور (موفق یا خطا) عوضش کنید؛ فقط وقتی پاسخی نرسیده همان کلید را دوباره بفرستید.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** خطایی که از خود سرور آمده (نه قطع شبکه) — بعد از آن کلید یکتایی باید عوض شود. */
+export const isServerError = (error: unknown) => error instanceof ApiError && error.status !== undefined;

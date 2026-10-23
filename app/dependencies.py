@@ -1,11 +1,12 @@
-from typing import Annotated
-from fastapi import Depends, HTTPException, status
+from typing import Annotated, Optional
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.security import SECRET_KEY, ALGORITHM
 from app.core.tenancy import set_tenant
+from app.services.event_bus import set_actor
 from app.database import get_db
 from app.models import User, RoleEnum, PLATFORM_ROLES
 
@@ -58,6 +59,7 @@ def get_current_user(
         set_tenant(db, user.organization_id)
     else:
         set_tenant(db, None)
+    set_actor(db, user)
 
     return user
 
@@ -71,6 +73,12 @@ def get_tenant_user(current_user: User = Depends(get_current_user)) -> User:
         )
     return current_user
 
+
+# کلید یکتایی درخواست: تکرار همان درخواست ثبت (مثلاً بعد از قطع شبکه) سند یا سفارش دوم نمی‌سازد
+IdempotencyKey = Annotated[Optional[str], Header(
+    alias="Idempotency-Key", pattern=r"^[A-Za-z0-9._:-]{8,64}$",
+    description="کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند.",
+)]
 
 # هر کاربر لاگین‌کرده (برای /users/me)
 current_user_dependency = Annotated[User, Depends(get_current_user)]

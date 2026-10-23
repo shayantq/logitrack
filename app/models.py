@@ -1,9 +1,11 @@
 import enum
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, Boolean, Date, DateTime, Time, UniqueConstraint, CheckConstraint, Text, JSON
+import secrets
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, Boolean, Date, DateTime, Time, UniqueConstraint, CheckConstraint, Text, JSON, and_
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.core.tenancy import TenantScoped
+from app.core.wms import AVAILABLE, ORDER_STOCK_STATES, STOCK_STATUSES, WAREHOUSE_TYPES, sql_in
 
 
 class RoleEnum(str, enum.Enum):
@@ -221,10 +223,24 @@ class Vehicle(TenantScoped, Base):
     orders = relationship("Order", back_populates="vehicle")
 
 class Warehouse(TenantScoped, Base):
+    """
+    انبار یا سایت انبار. نوع (app/core/wms.WAREHOUSE_TYPES) رفتار را تعیین می‌کند: ارسال سفارش، رسید مستقیم،
+    وضعیت کیفی پیش‌فرض کالای رسیده. parent_id سلسله‌مراتب (مثلاً سایت ← انبارها) را می‌سازد.
+    """
     __tablename__ = "warehouses"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "code", name="uq_warehouses_org_code"),
+        CheckConstraint(f"type IN ({sql_in(WAREHOUSE_TYPES)})", name="ck_warehouses_type"),
+        CheckConstraint("parent_id IS NULL OR parent_id <> id", name="ck_warehouses_parent_self"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
+    # کد کوتاه یکتا در سازمان (برای برچسب، اسناد و یکپارچه‌سازی)؛ اگر داده نشود ساخته می‌شود
+    code = Column(String(16), nullable=False, default=lambda: "WH-" + secrets.token_hex(3).upper())
     name = Column(String)
+    type = Column(String(24), nullable=False, default="general", server_default="general")
+    parent_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True, index=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     location = Column(String)                       # نشانی
     # مبدأ مسیر سفارش‌ها روی نقشه (مرحله ۱۰)
     province = Column(String(64), nullable=True)
@@ -232,26 +248,52 @@ class Warehouse(TenantScoped, Base):
     # انبارگردانی دوره‌ای: هر چند روز یک‌بار (خالی = بدون برنامه)
     stocktake_interval_days = Column(Integer, nullable=True)
 
-    inventories = relationship("Inventory", back_populates="warehouse")
+    inventories = relationship("Inventory", viewonly=True)
+    parent = relationship("Warehouse", remote_side=[id])
 
 
 class Product(TenantScoped, Base):
     __tablename__ = "products"
-    # کد کالا فقط در هر سازمان یکتاست (دو سازمان می‌توانند SKU یکسان داشته باشند)
-    __table_args__ = (UniqueConstraint("organization_id", "sku", name="uq_products_org_sku"),)
+    # کد کالا و بارکد فقط در هر سازمان یکتاست (دو سازمان می‌توانند SKU یکسان داشته باشند).
+    # SKU پس از ثبت تغییرناپذیر است (محافظ در app/services/stock_ledger.py).
+    __table_args__ = (
+        UniqueConstraint("organization_id", "sku", name="uq_products_org_sku"),
+        UniqueConstraint("organization_id", "barcode", name="uq_products_org_barcode"),
+        CheckConstraint("net_weight_kg IS NULL OR weight_kg IS NULL OR net_weight_kg <= weight_kg", name="ck_products_net_weight"),
+        CheckConstraint("(length_cm IS NULL OR length_cm > 0) AND (width_cm IS NULL OR width_cm > 0) AND (height_cm IS NULL OR height_cm > 0)",
+                        name="ck_products_dimensions"),
+        CheckConstraint("NOT expiry_tracked OR lot_tracked", name="ck_products_expiry_needs_lot"),
+        CheckConstraint("shelf_life_days IS NULL OR shelf_life_days > 0", name="ck_products_shelf_life"),
+        CheckConstraint("(min_stock IS NULL OR min_stock >= 0) AND (reorder_point IS NULL OR reorder_point >= 0) "
+                        "AND (max_stock IS NULL OR min_stock IS NULL OR max_stock >= min_stock)", name="ck_products_thresholds"),
+    )
 
     id = Column(Integer, primary_key=True, index=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=False)                   # نام کامل
+    short_name = Column(String(60), nullable=True)          # نام کوتاه برای برچسب و اسناد
     sku = Column(String, index=True, nullable=False)
-    weight_kg = Column(Float, default=1.0)
+    weight_kg = Column(Float, default=1.0)                  # وزن ناخالص هر واحد پایه (مبنای ظرفیت خودرو)
+    net_weight_kg = Column(Float, nullable=True)
+    length_cm = Column(Float, nullable=True)
+    width_cm = Column(Float, nullable=True)
+    height_cm = Column(Float, nullable=True)
+    # ردیابی: بچ/سری ساخت، شماره سریال، تاریخ انقضا (انقضا بدون بچ معنا ندارد)
+    lot_tracked = Column(Boolean, nullable=False, default=False, server_default="false")
+    serial_tracked = Column(Boolean, nullable=False, default=False, server_default="false")
+    expiry_tracked = Column(Boolean, nullable=False, default=False, server_default="false")
+    shelf_life_days = Column(Integer, nullable=True)
+    # آستانه‌ها (پیش‌فرض ردیف‌های موجودی جدید؛ هر انبار می‌تواند نقطه سفارش خودش را داشته باشد)
+    min_stock = Column(Integer, nullable=True)
+    max_stock = Column(Integer, nullable=True)
+    reorder_point = Column(Integer, nullable=True)
     # قیمت نهایی «امروز» (کش) — منبع اصلی تاریخچه product_prices است (مرحله ۱۳)
     price = Column(Float, default=0.0, nullable=False)
     # مشخصات تکمیلی کاتالوگ (مرحله ۱۳)
     updated_at = Column(DateTime, nullable=True)
     category = Column(String(100), nullable=True, index=True)
     brand = Column(String(100), nullable=True)
-    unit = Column(String(32), nullable=False, default="عدد")
+    unit = Column(String(32), nullable=False, default="عدد")                 # واحد پایه — مقادیر موجودی عدد صحیحِ این واحدند
     barcode = Column(String(64), nullable=True)
     description = Column(Text, nullable=True)
     origin = Column(String(16), nullable=False, default="domestic")          # domestic | imported
@@ -264,19 +306,35 @@ class Product(TenantScoped, Base):
     variant_label = Column(String(100), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
 
-    inventories = relationship("Inventory", back_populates="product", cascade="all, delete")
+    # همه ردیف‌های موجودی (همه وضعیت‌های کیفی). بدون cascade: کالای دارای سابقه حذف نمی‌شود، بایگانی می‌شود.
+    stock_rows = relationship("Inventory", back_populates="product")
+    # فقط ردیف‌های «سالم و آزاد» — موجودی قابل فروش، نقطه سفارش و برنامه خرید
+    inventories = relationship(
+        "Inventory", viewonly=True,
+        primaryjoin=lambda: and_(Product.id == Inventory.product_id, Inventory.stock_status == AVAILABLE),
+    )
     order_items = relationship("OrderItem", back_populates="product")
     prices = relationship("ProductPrice", back_populates="product", cascade="all, delete-orphan",
                           order_by="ProductPrice.effective_from")
+    uoms = relationship("ProductUom", back_populates="product", cascade="all, delete-orphan", order_by="ProductUom.factor")
+    suppliers = relationship("ProductSupplier", back_populates="product", cascade="all, delete-orphan",
+                             order_by="ProductSupplier.id")
 
 
 class Inventory(TenantScoped, Base):
     """
-    موجودی یک کالا در یک انبار. ستون quantity فقط «مانده» است و تنها از طریق
-    app/services/stock_ledger.py (همراه با ثبت یک StockMovement) تغییر می‌کند.
+    موجودی یک کالا در یک انبار با یک وضعیت کیفی (هر ترکیب کالا × انبار × وضعیت یک ردیف).
+    quantity = موجودی فیزیکی و فقط از app/services/stock_ledger.py (همراه با سند و گردش) تغییر می‌کند.
+    reserved_quantity = جمع رزروهای فعال و فقط از app/services/allocation_service.py تغییر می‌کند.
+    موجودی آزاد = quantity − reserved_quantity. رزرو فقط روی ردیف «سالم و آزاد» ممکن است و
+    پارامترهای نقطه سفارش هم فقط روی همین ردیف معنا دارند.
     """
     __tablename__ = "inventories"
     __table_args__ = (
+        UniqueConstraint("organization_id", "product_id", "warehouse_id", "stock_status", name="uq_inventories_bucket"),
+        CheckConstraint(f"stock_status IN ({sql_in(STOCK_STATUSES)})", name="ck_inventories_stock_status"),
+        CheckConstraint("reserved_quantity >= 0 AND reserved_quantity <= quantity", name="ck_inventories_reserved"),
+        CheckConstraint(f"stock_status = '{AVAILABLE}' OR reserved_quantity = 0", name="ck_inventories_reserve_available_only"),
         CheckConstraint("quantity >= 0", name="ck_inventories_quantity_non_negative"),
         CheckConstraint("rop_mode IN ('manual', 'auto')", name="ck_inventories_rop_mode"),
         CheckConstraint("service_level IS NULL OR (service_level >= 0.5 AND service_level < 1)", name="ck_inventories_service_level"),
@@ -284,9 +342,11 @@ class Inventory(TenantScoped, Base):
     )
 
     id = Column(Integer, primary_key=True, index=True, nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True, nullable=False)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True)
+    product_id = Column(Integer, ForeignKey("products.id"), index=True, nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
+    stock_status = Column(String(16), nullable=False, default=AVAILABLE, server_default=AVAILABLE)
     quantity = Column(Integer, default=0, nullable=False)
+    reserved_quantity = Column(Integer, nullable=False, default=0, server_default="0")
     reorder_point = Column(Integer, default=10)
     ever_exceeded_reorder = Column(Boolean, default=False)
     # هشدار «رسیدن به نقطه سفارش» برای این دور داده شده؛ با پر شدن دوباره (بالای نقطه سفارش) صفر می‌شود
@@ -304,10 +364,14 @@ class Inventory(TenantScoped, Base):
     suggested_order_qty = Column(Integer, nullable=True)
     rop_calculated_at = Column(DateTime, nullable=True)
 
-    product = relationship("Product", back_populates="inventories")
-    warehouse = relationship("Warehouse", back_populates="inventories")
-    movements = relationship("StockMovement", back_populates="inventory", cascade="all, delete-orphan",
-                             order_by="StockMovement.id")
+    product = relationship("Product", back_populates="stock_rows")
+    warehouse = relationship("Warehouse")
+    movements = relationship("StockMovement", back_populates="inventory", order_by="StockMovement.id")
+
+    @property
+    def free_quantity(self) -> int:
+        """موجودی آزاد (قابل وعده به سفارش جدید)."""
+        return (self.quantity or 0) - (self.reserved_quantity or 0)
 
 
 # انواع گردش کالا — منبع واحد برای مدل، اسکیماها و فرانت
@@ -321,23 +385,32 @@ MOVEMENT_TYPES = (
     "transfer_out",   # انتقال به انبار دیگر (خروج)
     "transfer_in",    # انتقال از انبار دیگر (ورود)
     "stocktake",      # اصلاح ناشی از انبارگردانی (مرحله انبارگردانی)
+    "status_out",     # تغییر وضعیت کیفی: خروج از وضعیت قبلی (مثلاً قرنطینه)
+    "status_in",      # تغییر وضعیت کیفی: ورود به وضعیت جدید (مثلاً سالم و آزاد)
 )
 
 
 class StockMovement(TenantScoped, Base):
     """
-    دفتر گردش کالا: هر تغییر موجودی یک ردیف غیرقابل‌ویرایش. همیشه برقرار است:
+    دفتر گردش کالا: هر تغییر موجودی یک ردیف غیرقابل‌ویرایش و غیرقابل‌حذف که به یک سند انبار
+    (StockDocument) تعلق دارد. همیشه برقرار است:
     Inventory.quantity == مجموع quantity_change گردش‌های همان ردیف موجودی
+    اصلاح فقط با سند برگشت: گردش قرینه با reversal_of_id (هر گردش حداکثر یک‌بار برگشت می‌خورد).
     """
     __tablename__ = "stock_movements"
-    __table_args__ = (CheckConstraint("quantity_change <> 0", name="ck_stock_movements_nonzero"),)
+    __table_args__ = (
+        CheckConstraint("quantity_change <> 0", name="ck_stock_movements_nonzero"),
+        UniqueConstraint("reversal_of_id", name="uq_stock_movements_reversal"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    inventory_id = Column(Integer, ForeignKey("inventories.id", ondelete="CASCADE"), index=True, nullable=False)
+    document_id = Column(Integer, ForeignKey("stock_documents.id"), index=True, nullable=False)
+    inventory_id = Column(Integer, ForeignKey("inventories.id"), index=True, nullable=False)
     # برای فیلتر و گزارش سریع (تکرار از روی inventory)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True, nullable=False)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), index=True, nullable=True)
+    product_id = Column(Integer, ForeignKey("products.id"), index=True, nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), index=True, nullable=True)
+    stock_status = Column(String(16), nullable=False, default=AVAILABLE, server_default=AVAILABLE)
     movement_type = Column(String(32), nullable=False, index=True)
     quantity_change = Column(Integer, nullable=False)     # مثبت = ورود، منفی = خروج
     balance_after = Column(Integer, nullable=False)       # مانده همان انبار پس از این گردش
@@ -345,8 +418,10 @@ class StockMovement(TenantScoped, Base):
     # مرجع گردش: مثلاً ("order", شناسه سفارش) یا ("transfer", شناسه گردش خروجی)
     reference_type = Column(String(32), nullable=True)
     reference_id = Column(Integer, nullable=True)
+    reversal_of_id = Column(Integer, ForeignKey("stock_movements.id"), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
+    document = relationship("StockDocument", back_populates="movements")
     inventory = relationship("Inventory", back_populates="movements")
     product = relationship("Product")
     warehouse = relationship("Warehouse")
@@ -371,6 +446,8 @@ class Order(TenantScoped, Base):
     __tablename__ = "orders"
     __table_args__ = (
         CheckConstraint("status IN (" + ", ".join(f"'{s}'" for s in ORDER_STATUSES) + ")", name="ck_orders_status"),
+        CheckConstraint(f"stock_state IN ({sql_in(ORDER_STOCK_STATES)})", name="ck_orders_stock_state"),
+        UniqueConstraint("organization_id", "idempotency_key", name="uq_orders_idempotency"),
     )
 
     id = Column(Integer, primary_key=True, index=True, nullable=False)
@@ -394,8 +471,13 @@ class Order(TenantScoped, Base):
     destination_address = Column(String(500), nullable=True)
     destination_postal_code = Column(String(10), nullable=True)
 
-    # انبار مبدأ — موجودی همه اقلام از همین انبار کم و در صورت برگشت به همین انبار برمی‌گردد
+    # انبار مبدأ — موجودی همه اقلام از همین انبار رزرو/کم و در صورت برگشت به همین انبار برمی‌گردد
     warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    # وضعیت کالای سفارش در انبار، جدا از وضعیت حمل: رزرو ← خروج (بارگیری) ← برگشت؛ یا رزرو ← آزادسازی
+    stock_state = Column(String(16), nullable=False, default="reserved")
+    # تکرار همین درخواست با همین کلید، سفارش دوم نمی‌سازد
+    idempotency_key = Column(String(64), nullable=True)
+    request_hash = Column(String(64), nullable=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="SET NULL"), index=True, nullable=True)
 
     # جمع‌ها هنگام ثبت محاسبه و ذخیره می‌شوند (برای گزارش سریع)
@@ -867,5 +949,11 @@ class AuditLog(TenantScoped, Base):
     user_agent = Column(String(255), nullable=True)
 
 
+# مدل‌های پایه انبارداری (سند انبار، رزرو، رویداد، طرف تجاری، واحد فرعی، تأمین‌کننده کالا)
+from app.models_wms import (  # noqa: E402,F401
+    DomainEvent, Partner, ProductSupplier, ProductUom, StockDocument, StockReservation,
+)
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401
+# رویدادهای دامنه (after_flush)
+from app.services import event_bus  # noqa: E402,F401

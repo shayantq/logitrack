@@ -9,10 +9,13 @@ from sqlalchemy import text
 
 from app.database import db_dependency
 from app.core.request_context import RequestContextMiddleware
+from app.core.tenancy import TenantIsolationError
+from app.services.stock_ledger import LedgerViolationError
 
 from app.routers import (
     auth, inventory, orders, users, vehicles, reports, warehouses, notifications, platform,
     organization, organization_requests, drivers, dispatch, driver_portal, performance, tracking, routes, tickets, stocktakes, catalog, replenishment,
+    partners, wms,
 )
 
 # ------------------------------------------------------------------------------
@@ -160,3 +163,17 @@ app.include_router(tickets.public_router)
 app.include_router(stocktakes.router)
 app.include_router(catalog.router)
 app.include_router(replenishment.router)
+app.include_router(partners.router)
+app.include_router(wms.router)
+
+
+# محافظ‌های لایه داده آخرین سدند (سرویس‌ها پیش از آن خطای خوانا می‌دهند)؛ اگر کدی از آن‌ها رد شود،
+# درخواست با پیام روشن رد می‌شود و هیچ تغییری ذخیره نمی‌شود.
+@app.exception_handler(TenantIsolationError)
+async def tenant_isolation_handler(request: Request, exc: TenantIsolationError):
+    return JSONResponse(status_code=403, content={"detail": "دسترسی به داده سازمان دیگر مجاز نیست."})
+
+
+@app.exception_handler(LedgerViolationError)
+async def ledger_violation_handler(request: Request, exc: LedgerViolationError):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
