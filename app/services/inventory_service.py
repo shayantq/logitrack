@@ -19,8 +19,14 @@ from app.models import (
     ACTIVE_ORDER_STATUSES, Inventory, Order, OrderItem, Partner, Product, StockDocument, StockMovement, StockReservation,
     User, Warehouse,
 )
-from app.schemas.product import ProductCreate, StatusChangeCreate, StockMovementCreate, StockTransferCreate, StockUpdate
-from app.services import audit_service, catalog_service, stock_document_service, stock_ledger, warehouse_service
+from app.schemas.product import (
+    LocationMoveCreate, ProductCreate, StatusChangeCreate, StockMovementCreate, StockTransferCreate, StockUpdate,
+)
+from app.services import (
+    allocation_service, audit_service, catalog_service, location_service, quality_service, receiving_service,
+    stock_document_service, stock_ledger, warehouse_service,
+)
+from app.services.stock_ledger import StockKey
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
 
@@ -36,6 +42,11 @@ def list_products(db: Session, user: User) -> list[dict]:
 
     warehouses = {w.id: w for w in db.query(Warehouse).all()}
     current = catalog_service.prices_at(db, [p.id for p in products], catalog_service.today_local())
+    # موجودی تأییدشده‌ای که قابل تخصیص نیست (محل تخلیه/قرنطینه، منقضی، امانی) از «آزاد» کم می‌شود
+    unallocatable = allocation_service.unallocatable_map(db)
+
+    def free(inv: Inventory) -> int:
+        return max((inv.quantity or 0) - unallocatable.get(inv.id, 0) - (inv.reserved_quantity or 0), 0)
     result = []
     for p in products:
         rows = [inv for inv in p.stock_rows if not is_manager or inv.warehouse_id == user.warehouse_id]
@@ -49,10 +60,11 @@ def list_products(db: Session, user: User) -> list[dict]:
                 held[inv.stock_status] += inv.quantity
         stock = sum(inv.quantity or 0 for inv in available)
         reserved = sum(inv.reserved_quantity or 0 for inv in available)
+        free_total = sum(free(inv) for inv in available)
         result.append({
             "id": p.id, "name": p.name, "sku": p.sku,
             "weight_kg": p.weight_kg, "price": current[p.id].final_price if p.id in current else p.price, "stock": stock,
-            "reserved": reserved, "free_stock": stock - reserved, "held_stock": dict(held),
+            "reserved": reserved, "free_stock": free_total, "held_stock": dict(held),
             "ever_high_stock": any(inv.ever_exceeded_reorder for inv in available),
             "category": p.category, "unit": p.unit or "عدد", "origin": p.origin or "domestic", "origin_country": p.origin_country,
             "parent_id": p.parent_id, "variant_label": p.variant_label, "is_active": p.is_active is not False,
@@ -62,7 +74,7 @@ def list_products(db: Session, user: User) -> list[dict]:
                 {"warehouse_id": inv.warehouse_id,
                  "warehouse_name": warehouses[inv.warehouse_id].name if inv.warehouse_id in warehouses else "بدون انبار",
                  "city": warehouses[inv.warehouse_id].city if inv.warehouse_id in warehouses else None,
-                 "quantity": inv.quantity or 0, "reserved": inv.reserved_quantity or 0, "free": inv.free_quantity,
+                 "quantity": inv.quantity or 0, "reserved": inv.reserved_quantity or 0, "free": free(inv),
                  "ships_orders": inv.warehouse_id in warehouses and warehouse_service.type_of(warehouses[inv.warehouse_id]).ships_orders
                  and warehouses[inv.warehouse_id].is_active is not False}
                 for inv in sorted(available, key=lambda i: i.warehouse_id)
@@ -175,6 +187,8 @@ def delete_product(db: Session, user: User, product_id: int) -> None:
                             "به‌جای حذف، آن را در مشخصات کالا غیرفعال (بایگانی) کنید.")
 
     for inv in list(product.stock_rows):
+        for balance in list(inv.balances):
+            db.delete(balance)
         db.delete(inv)
     audit_service.log(db, user, "catalog.delete", f"کالای «{product.name}» حذف شد", target_type="product",
                       target_id=product.id, target_label=product.sku)
@@ -269,12 +283,20 @@ def record_movement(db: Session, user: User, data: StockMovementCreate, idempote
                 status = status or AVAILABLE
                 warehouse_id = _resolve_warehouse(db, user, product.id, data.warehouse_id, status)
                 warehouse_service.get(db, warehouse_id)
-            quantity = catalog_service.to_base(product, data.quantity, data.uom)
-            change = quantity * MOVEMENT_SIGN.get(data.movement_type, 1)
+            quantity = catalog_service.to_base(product, abs(data.quantity), data.uom)
+            change = quantity * MOVEMENT_SIGN.get(data.movement_type, 1) * (1 if data.quantity > 0 else -1)
+            location_service.resolve(db, warehouse_id, data.location_id)
             inventory = stock_ledger.lock_bucket(db, product.id, warehouse_id, status, create=change > 0,
                                                  reorder_point=product.reorder_point)
             if inventory is None:
                 raise ConflictError(f"این کالا در این انبار موجودی «{STOCK_STATUS_LABELS[status]}» ندارد.")
+            lines, match = None, {k: v for k, v in (("location_id", data.location_id), ("lot_number", data.lot_number)) if v}
+            if change > 0:
+                if data.movement_type == "receipt":
+                    receiving_service.check_tracking(product, quantity, data.lot_number, data.expiry_date,
+                                                     data.serial_numbers, damaged=status != AVAILABLE)
+                base = StockKey(location_id=data.location_id, lot_number=data.lot_number, expiry_date=data.expiry_date)
+                lines = [(base.with_(serial_number=s), 1) for s in data.serial_numbers] or [(base, quantity)]
             reason = data.reason or DEFAULT_REASONS.get(data.movement_type)
             document = stock_ledger.new_document(
                 db, {"receipt": "receipt", "damage": "write_off", "adjustment": "adjustment"}[data.movement_type],
@@ -282,7 +304,8 @@ def record_movement(db: Session, user: User, data: StockMovementCreate, idempote
                 partner_id=partner.id if partner else None, external_ref=data.external_ref, note=reason,
                 idempotency_key=key, request_hash=digest,
             )
-            movement = stock_ledger.record(db, inventory, change, data.movement_type, document=document, user=user, reason=reason)
+            movement = stock_ledger.record(db, inventory, change, data.movement_type, document=document, user=user,
+                                           reason=reason, lines=lines, match=match or None)
             db.commit()
             db.refresh(movement)
             return movement
@@ -303,7 +326,10 @@ def transfer_stock(db: Session, user: User, data: StockTransferCreate, idempoten
     product = _get_product(db, data.product_id)
     warehouse_service.get(db, data.from_warehouse_id)
     warehouse_service.for_stock_in(db, data.to_warehouse_id)
+    location_service.resolve(db, data.from_warehouse_id, data.from_location_id)
+    location_service.resolve(db, data.to_warehouse_id, data.to_location_id)
     quantity = catalog_service.to_base(product, data.quantity, data.uom)
+    match = {k: v for k, v in (("location_id", data.from_location_id), ("lot_number", data.lot_number)) if v}
 
     def create(key, digest):
         try:
@@ -329,12 +355,11 @@ def transfer_stock(db: Session, user: User, data: StockTransferCreate, idempoten
                 note=reason, idempotency_key=key, request_hash=digest,
             )
             db.flush()
-            moves = [
-                stock_ledger.record(db, source, -quantity, "transfer_out", document=document, user=user, reason=reason,
-                                    reference_type="transfer", reference_id=document.id),
-                stock_ledger.record(db, target, quantity, "transfer_in", document=document, user=user, reason=reason,
-                                    reference_type="transfer", reference_id=document.id),
-            ]
+            # همان بچ/سریال/انقضا/مالک به انبار مقصد می‌رود (محل مقصد انتخاب‌شده یا بدون محل)
+            moves = stock_ledger.move(db, source, quantity, document=document, target=target, out_type="transfer_out",
+                                      in_type="transfer_in", match=match or None,
+                                      overrides={"location_id": data.to_location_id}, user=user, reason=reason,
+                                      reference_type="transfer", reference_id=document.id)
             db.commit()
             for m in moves:
                 db.refresh(m)
@@ -351,11 +376,14 @@ def change_status(db: Session, user: User, data: StatusChangeCreate, idempotency
     """تغییر وضعیت کیفی بخشی از موجودی (مثلاً آزادسازی از قرنطینه پس از بازرسی): یک سند با دو گردش."""
     _require_stock_role(user)
     product = _get_product(db, data.product_id)
+    quality_service.ensure_transition(user, data.from_status, data.to_status)
 
     def create(key, digest):
         try:
             warehouse_id = _resolve_warehouse(db, user, product.id, data.warehouse_id, data.from_status)
             warehouse_service.for_stock_in(db, warehouse_id)
+            location_service.resolve(db, warehouse_id, data.location_id)
+            match = {k: v for k, v in (("location_id", data.location_id), ("lot_number", data.lot_number)) if v}
             quantity = catalog_service.to_base(product, data.quantity, data.uom)
             source = stock_ledger.lock_bucket(db, product.id, warehouse_id, data.from_status, create=False)
             if source is None or source.free_quantity < quantity:
@@ -368,8 +396,9 @@ def change_status(db: Session, user: User, data: StatusChangeCreate, idempotency
                 note=data.reason, idempotency_key=key, request_hash=digest,
             )
             label = f"{STOCK_STATUS_LABELS[data.from_status]} ← {STOCK_STATUS_LABELS[data.to_status]}: {data.reason}"
-            stock_ledger.record(db, source, -quantity, "status_out", document=document, user=user, reason=label)
-            stock_ledger.record(db, target, quantity, "status_in", document=document, user=user, reason=label)
+            # وضعیت کیفی مستقل از محل است: همان محل/بچ/سریال، فقط ردیف وضعیت عوض می‌شود
+            stock_ledger.move(db, source, quantity, document=document, target=target, out_type="status_out",
+                              in_type="status_in", match=match or None, user=user, reason=label)
             db.commit()
             return document
         except Exception:
@@ -377,6 +406,45 @@ def change_status(db: Session, user: User, data: StatusChangeCreate, idempotency
             raise
 
     document, _ = stock_document_service.idempotent(db, StockDocument, idempotency_key, "status", data.model_dump(), create)
+    return stock_document_service.get_document(db, user, document.id)
+
+
+def move_between_locations(db: Session, user: User, data: LocationMoveCreate, idempotency_key: str | None = None) -> dict:
+    """جابه‌جایی دستی داخل یک انبار (محل به محل، یا از «بدون محل» به یک محل) — سند MV با ظرفیت و قاعده اختلاط مقصد."""
+    _require_stock_role(user)
+    product = _get_product(db, data.product_id)
+    warehouse_id = location_service.scope_warehouse(user, data.warehouse_id)
+    if warehouse_id is None:
+        raise ConflictError("انبار را انتخاب کنید.")
+
+    def create(key, digest):
+        try:
+            location_service.resolve(db, warehouse_id, data.from_location_id)
+            destination = location_service.resolve(db, warehouse_id, data.to_location_id)
+            if data.from_location_id == data.to_location_id:
+                raise ConflictError("محل مبدأ و مقصد یکی است.")
+            quantity = catalog_service.to_base(product, data.quantity, data.uom)
+            inventory = stock_ledger.lock_bucket(db, product.id, warehouse_id, data.stock_status, create=False)
+            if inventory is None:
+                raise ConflictError(f"این کالا در این انبار موجودی «{STOCK_STATUS_LABELS[data.stock_status]}» ندارد.")
+            reason = data.reason or f"جابه‌جایی به محل {destination.code}"
+            document = stock_ledger.new_document(
+                db, "location_move", organization_id=product.organization_id, user=user, warehouse_id=warehouse_id,
+                note=reason, idempotency_key=key, request_hash=digest,
+            )
+            match = {"location_id": data.from_location_id}
+            if data.lot_number:
+                match["lot_number"] = data.lot_number
+            stock_ledger.move(db, inventory, quantity, document=document, match=match,
+                              overrides={"location_id": destination.id}, user=user, reason=reason)
+            db.commit()
+            return document
+        except Exception:
+            db.rollback()
+            raise
+
+    document, _ = stock_document_service.idempotent(db, StockDocument, idempotency_key, "location_move",
+                                                    data.model_dump(mode="json"), create)
     return stock_document_service.get_document(db, user, document.id)
 
 

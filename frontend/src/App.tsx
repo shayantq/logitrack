@@ -27,6 +27,11 @@ const OrdersPage = lazy(() => import("./pages/orders/OrdersPage"));
 const InventoryPage = lazy(() => import("./pages/inventory/InventoryPage"));
 const LedgerPage = lazy(() => import("./pages/inventory/LedgerPage"));
 const DocumentsPage = lazy(() => import("./pages/inventory/DocumentsPage"));
+const StockCardPage = lazy(() => import("./pages/inventory/StockCardPage"));
+const LocationsPage = lazy(() => import("./pages/warehouse/LocationsPage"));
+const ReceiptsPage = lazy(() => import("./pages/warehouse/ReceiptsPage"));
+const QualityPage = lazy(() => import("./pages/warehouse/QualityPage"));
+const PutawayPage = lazy(() => import("./pages/warehouse/PutawayPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
 const UserDetailPage = lazy(() => import("./pages/users/UserDetailPage"));
@@ -152,6 +157,11 @@ export function App() {
             <Route path="inventory" element={guard(ORG_STAFF, <InventoryPage />)} />
             <Route path="ledger" element={guard(ORG_STAFF, <LedgerPage />)} />
             <Route path="documents" element={guard(ORG_STAFF, <DocumentsPage />)} />
+            <Route path="stock-card" element={guard(ORG_STAFF, <StockCardPage />)} />
+            <Route path="locations" element={guard(ORG_STAFF, <LocationsPage />)} />
+            <Route path="receipts" element={guard(ORG_STAFF, <ReceiptsPage />)} />
+            <Route path="quality" element={guard(ORG_STAFF, <QualityPage />)} />
+            <Route path="putaway" element={guard(ORG_STAFF, <PutawayPage />)} />
             <Route path="partners" element={guard(ORG_STAFF, <PartnersPage />)} />
             <Route path="reports" element={guard(ORG_STAFF, <ReportsPage />)} />
             <Route path="finance" element={guard(["org_admin"], <FinancePage />)} />

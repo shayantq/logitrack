@@ -88,10 +88,11 @@ def test_cost_book_uses_scheduled_cost_and_inflation():
 # API
 # ---------------------------------------------------------------------------
 def _backdate(db, inv, day: date, change: int, kind: str = "order_out"):
-    """یک گردش با تاریخ روز محلی گذشته (ظهر به وقت ایران) — تاریخ پیش از ذخیره تعیین می‌شود (گردش ثبت‌شده تغییرناپذیر است)."""
-    movement = stock_ledger.record(db, inv, change, kind, reason="آزمون")
-    movement.created_at = dispatch_service.local_to_utc(datetime.combine(day, time(12)))
-    db.flush()
+    """یک گردش با تاریخ روز محلی گذشته (ظهر به وقت ایران) — مثل اسکریپت سابقه فروش، در حالت نگهداری (گردش ثبت‌شده تغییرناپذیر است)."""
+    with stock_ledger.maintenance(db):
+        movement = stock_ledger.record(db, inv, change, kind, reason="آزمون")
+        movement.created_at = dispatch_service.local_to_utc(datetime.combine(day, time(12)))
+        db.flush()
     return movement
 
 

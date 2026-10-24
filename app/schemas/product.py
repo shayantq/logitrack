@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, constr, model_validator
@@ -11,6 +11,16 @@ Sku = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_
 Barcode = Annotated[str, StringConstraints(strip_whitespace=True, min_length=4, max_length=64, pattern=r"^[0-9A-Za-z-]+$")]
 UomName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
 IdempotencyKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9._:-]{8,64}$")]
+# بچ و سریال: بدون فاصله، حروف بزرگ (اسکن و جست‌وجو بدون حساسیت به حروف)
+LotNumber = Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, min_length=1, max_length=64,
+                                             pattern=r"^[0-9A-Za-z._/-]+$")]
+SerialNumber = LotNumber
+
+
+def _unique_serials(values: list[str]) -> list[str]:
+    if len(set(values)) != len(values):
+        raise ValueError("شماره سریال تکراری وارد شده است.")
+    return values
 
 
 class ProductMasterFields(BaseModel):
@@ -28,6 +38,8 @@ class ProductMasterFields(BaseModel):
     min_stock: Optional[int] = Field(None, ge=0)
     max_stock: Optional[int] = Field(None, ge=0)
     reorder_point: Optional[int] = Field(None, ge=0)
+    inspection_required: bool = False
+    units_per_pallet: Optional[int] = Field(None, gt=0, le=1_000_000)
 
 
 class ProductCreate(ProductMasterFields):
@@ -112,9 +124,15 @@ class StockMovementCreate(BaseModel):
     uom: Optional[UomName] = None
     partner_id: Optional[int] = Field(None, gt=0, description="تأمین‌کننده (فقط رسید)")
     external_ref: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=64)]] = None
+    # محل و بچ: ورود به همین محل/بچ؛ خروج (ضایعات/اصلاح منفی) فقط از همین محل/بچ (خالی = برداشت خودکار FEFO)
+    location_id: Optional[int] = Field(None, gt=0)
+    lot_number: Optional[LotNumber] = None
+    expiry_date: Optional[date] = None
+    serial_numbers: list[SerialNumber] = Field(default_factory=list, max_length=1000)
 
     @model_validator(mode="after")
     def check_quantity_and_reason(self):
+        _unique_serials(self.serial_numbers)
         if self.quantity == 0:
             raise ValueError("مقدار گردش نمی‌تواند صفر باشد.")
         if self.movement_type in ("receipt", "damage") and self.quantity < 0:
@@ -132,6 +150,9 @@ class StockTransferCreate(BaseModel):
     reason: Optional[Reason] = None
     stock_status: StockStatus = "available"
     uom: Optional[UomName] = None
+    from_location_id: Optional[int] = Field(None, gt=0)
+    to_location_id: Optional[int] = Field(None, gt=0)
+    lot_number: Optional[LotNumber] = None
 
     @model_validator(mode="after")
     def check_different_warehouses(self):
@@ -149,12 +170,41 @@ class StatusChangeCreate(BaseModel):
     quantity: int = Field(gt=0)
     uom: Optional[UomName] = None
     reason: Reason
+    # محدود به یک محل/بچ (خالی = برداشت خودکار)؛ کالا در همان محل می‌ماند
+    location_id: Optional[int] = Field(None, gt=0)
+    lot_number: Optional[LotNumber] = None
 
     @model_validator(mode="after")
     def check_statuses(self):
         if self.from_status == self.to_status:
             raise ValueError("وضعیت مبدأ و مقصد نمی‌توانند یکی باشند.")
         return self
+
+
+class LocationMoveCreate(BaseModel):
+    """جابه‌جایی داخل انبار: از یک محل (یا «بدون محل» با from_location_id خالی) به محل دیگر."""
+    product_id: int = Field(gt=0)
+    warehouse_id: Optional[int] = Field(None, gt=0)
+    from_location_id: Optional[int] = Field(None, gt=0)
+    to_location_id: int = Field(gt=0)
+    quantity: int = Field(gt=0)
+    uom: Optional[UomName] = None
+    stock_status: StockStatus = "available"
+    lot_number: Optional[LotNumber] = None
+    reason: Optional[Reason] = None
+
+
+class MovementLineOut(BaseModel):
+    """بخشی از یک گردش: چه مقدار از کدام محل/بچ/سریال/مالک."""
+    location_id: Optional[int] = None
+    location_code: Optional[str] = None
+    lot_number: Optional[str] = None
+    serial_number: Optional[str] = None
+    expiry_date: Optional[date] = None
+    owner_id: Optional[int] = None
+    owner_name: Optional[str] = None
+    quantity_change: int
+    balance_after: int
 
 
 class StockMovementResponse(BaseModel):
@@ -181,6 +231,7 @@ class StockMovementResponse(BaseModel):
     reference_id: Optional[int] = None
     created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
+    lines: list[MovementLineOut] = []
 
     @classmethod
     def from_movement(cls, m) -> "StockMovementResponse":
@@ -196,4 +247,10 @@ class StockMovementResponse(BaseModel):
             reason=m.reason, reference_type=m.reference_type, reference_id=m.reference_id,
             created_by_id=m.created_by_id,
             created_by_name=(m.created_by.full_name or m.created_by.username) if m.created_by else None,
+            lines=[MovementLineOut(
+                location_id=line.location_id, location_code=line.location.code if line.location else None,
+                lot_number=line.lot_number, serial_number=line.serial_number, expiry_date=line.expiry_date,
+                owner_id=line.owner_id, owner_name=line.owner.name if line.owner else None,
+                quantity_change=line.quantity_change, balance_after=line.balance_after,
+            ) for line in m.lines],
         )

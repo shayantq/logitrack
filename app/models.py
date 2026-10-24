@@ -264,6 +264,7 @@ class Product(TenantScoped, Base):
                         name="ck_products_dimensions"),
         CheckConstraint("NOT expiry_tracked OR lot_tracked", name="ck_products_expiry_needs_lot"),
         CheckConstraint("shelf_life_days IS NULL OR shelf_life_days > 0", name="ck_products_shelf_life"),
+        CheckConstraint("units_per_pallet IS NULL OR units_per_pallet > 0", name="ck_products_units_per_pallet"),
         CheckConstraint("(min_stock IS NULL OR min_stock >= 0) AND (reorder_point IS NULL OR reorder_point >= 0) "
                         "AND (max_stock IS NULL OR min_stock IS NULL OR max_stock >= min_stock)", name="ck_products_thresholds"),
     )
@@ -283,6 +284,10 @@ class Product(TenantScoped, Base):
     serial_tracked = Column(Boolean, nullable=False, default=False, server_default="false")
     expiry_tracked = Column(Boolean, nullable=False, default=False, server_default="false")
     shelf_life_days = Column(Integer, nullable=True)
+    # کالای رسیده ابتدا «در انتظار بازرسی» است و تا بازرسی کیفی قابل تخصیص نیست
+    inspection_required = Column(Boolean, nullable=False, default=False, server_default="false")
+    # تعداد واحد پایه در یک پالت کامل (مبنای ظرفیت پالتی محل‌ها)
+    units_per_pallet = Column(Integer, nullable=True)
     # آستانه‌ها (پیش‌فرض ردیف‌های موجودی جدید؛ هر انبار می‌تواند نقطه سفارش خودش را داشته باشد)
     min_stock = Column(Integer, nullable=True)
     max_stock = Column(Integer, nullable=True)
@@ -367,10 +372,12 @@ class Inventory(TenantScoped, Base):
     product = relationship("Product", back_populates="stock_rows")
     warehouse = relationship("Warehouse")
     movements = relationship("StockMovement", back_populates="inventory", order_by="StockMovement.id")
+    # ردیف‌های ریز: محل × مالک × بچ × سریال × انقضا (مجموعشان همیشه = quantity)
+    balances = relationship("StockBalance", back_populates="inventory", order_by="StockBalance.id")
 
     @property
     def free_quantity(self) -> int:
-        """موجودی آزاد (قابل وعده به سفارش جدید)."""
+        """موجودی فیزیکی آزاد (منهای رزرو). قابل وعده به سفارش: allocation_service.allocatable_map."""
         return (self.quantity or 0) - (self.reserved_quantity or 0)
 
 
@@ -387,6 +394,8 @@ MOVEMENT_TYPES = (
     "stocktake",      # اصلاح ناشی از انبارگردانی (مرحله انبارگردانی)
     "status_out",     # تغییر وضعیت کیفی: خروج از وضعیت قبلی (مثلاً قرنطینه)
     "status_in",      # تغییر وضعیت کیفی: ورود به وضعیت جدید (مثلاً سالم و آزاد)
+    "move_out",       # جابه‌جایی/جانمایی داخل انبار: خروج از محل مبدأ
+    "move_in",        # جابه‌جایی/جانمایی داخل انبار: ورود به محل مقصد
 )
 
 
@@ -423,6 +432,8 @@ class StockMovement(TenantScoped, Base):
 
     document = relationship("StockDocument", back_populates="movements")
     inventory = relationship("Inventory", back_populates="movements")
+    # محل/بچ/سریال/مالک هر بخش از این گردش (app/models_operations.StockMovementLine)
+    lines = relationship("StockMovementLine", back_populates="movement", order_by="StockMovementLine.id")
     product = relationship("Product")
     warehouse = relationship("Warehouse")
     created_by = relationship("User")
@@ -952,6 +963,11 @@ class AuditLog(TenantScoped, Base):
 # مدل‌های پایه انبارداری (سند انبار، رزرو، رویداد، طرف تجاری، واحد فرعی، تأمین‌کننده کالا)
 from app.models_wms import (  # noqa: E402,F401
     DomainEvent, Partner, ProductSupplier, ProductUom, StockDocument, StockReservation,
+)
+# عملیات انبار: محل‌ها، موجودی چندبعدی، رسید دریافت، بازرسی کیفی، جانمایی
+from app.models_operations import (  # noqa: E402,F401
+    InboundReceipt, InboundReceiptLine, Location, PutawayTask, QualityInspection, QualityInspectionResult,
+    StockBalance, StockMovementLine,
 )
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401

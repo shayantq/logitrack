@@ -5,6 +5,8 @@
   • یکتایی درخواست (Idempotency) و رویدادهای دامنه در همان تراکنش
   • انواع و سلسله‌مراتب انبار، داده پایه کالا، جداسازی ارجاع بین سازمان‌ها
 """
+from datetime import timedelta
+
 import pytest
 
 from app.core.tenancy import TenantIsolationError, set_tenant
@@ -356,12 +358,17 @@ def test_master_data_rules_and_uom_conversion(world):
     assert detail["volume_m3"] == 0.006 and detail["shelf_life_days"] == 180
 
     catalog_service.set_uoms(db, admin, product.id, [{"name": "کارتن", "factor": 12, "barcode": "6260000000999"}])
+    # کالای بچ‌دار و تاریخ‌دار: رسید بدون بچ/انقضا پذیرفته نمی‌شود
+    expiry = catalog_service.today_local() + timedelta(days=180)
+    with pytest.raises(ConflictError, match="بچ"):
+        inventory_service.record_movement(db, manager, StockMovementCreate(
+            product_id=product.id, movement_type="receipt", quantity=3, uom="کارتن"))
     movement = inventory_service.record_movement(db, manager, StockMovementCreate(
-        product_id=product.id, movement_type="receipt", quantity=3, uom="کارتن"))
-    assert movement.quantity_change == 36
+        product_id=product.id, movement_type="receipt", quantity=3, uom="کارتن", lot_number="b-1", expiry_date=expiry))
+    assert movement.quantity_change == 36 and movement.lines[0].lot_number == "B-1"
     with pytest.raises(ConflictError, match="تعریف نشده"):
         inventory_service.record_movement(db, manager, StockMovementCreate(
-            product_id=product.id, movement_type="receipt", quantity=1, uom="پالت"))
+            product_id=product.id, movement_type="receipt", quantity=1, uom="پالت", lot_number="B-1", expiry_date=expiry))
 
 
 def test_product_with_history_is_archived_not_deleted(world):

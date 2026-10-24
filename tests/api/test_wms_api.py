@@ -72,8 +72,12 @@ SUPPLIER = {"name": "پخش البرز", "kind": "legal", "is_supplier": True, "
 def test_vocabulary_is_shared_terminology(env):
     client, t = env
     data = client.get("/wms/vocabulary", headers=t["a"]["manager"]).json()
-    assert [s["code"] for s in data["stock_statuses"]] == ["available", "quarantine", "blocked", "damaged"]
-    assert {d["code"] for d in data["document_types"]} >= {"receipt", "transfer", "reversal", "status_change"}
+    assert [s["code"] for s in data["stock_statuses"]] == [
+        "available", "pending", "quarantine", "blocked", "rejected", "defective", "damaged"]
+    assert {d["code"] for d in data["document_types"]} >= {
+        "receipt", "transfer", "reversal", "status_change", "inbound_receipt", "inspection", "putaway", "location_move"}
+    assert [lvl["code"] for lvl in data["location_levels"]] == ["zone", "aisle", "rack", "shelf", "bin"]
+    assert {t["code"] for t in data["location_types"] if t["allocatable"]} == {"storage", "picking"}
     assert any(g["term"] == "SKU" for g in data["glossary"])
 
 

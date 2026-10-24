@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.database import db_dependency
 from app.core.request_context import RequestContextMiddleware
@@ -15,7 +16,7 @@ from app.services.stock_ledger import LedgerViolationError
 from app.routers import (
     auth, inventory, orders, users, vehicles, reports, warehouses, notifications, platform,
     organization, organization_requests, drivers, dispatch, driver_portal, performance, tracking, routes, tickets, stocktakes, catalog, replenishment,
-    partners, wms,
+    partners, wms, locations, inbound,
 )
 
 # ------------------------------------------------------------------------------
@@ -165,6 +166,10 @@ app.include_router(catalog.router)
 app.include_router(replenishment.router)
 app.include_router(partners.router)
 app.include_router(wms.router)
+app.include_router(locations.router)
+app.include_router(inbound.router)
+app.include_router(inbound.quality_router)
+app.include_router(inbound.putaway_router)
 
 
 # محافظ‌های لایه داده آخرین سدند (سرویس‌ها پیش از آن خطای خوانا می‌دهند)؛ اگر کدی از آن‌ها رد شود،
@@ -177,3 +182,17 @@ async def tenant_isolation_handler(request: Request, exc: TenantIsolationError):
 @app.exception_handler(LedgerViolationError)
 async def ledger_violation_handler(request: Request, exc: LedgerViolationError):
     return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+# قیدهای یکتای دیتابیس آخرین سد درخواست‌های هم‌زمان‌اند (مثلاً یک سریال در دو انبار در یک لحظه)
+_CONSTRAINT_MESSAGES = {
+    "uq_stock_balances_serial": "این شماره سریال همین الان در موجودی ثبت شد؛ سریال تکراری پذیرفته نمی‌شود.",
+    "uq_inbound_receipts_partner_ref": "رسید دیگری با همین شماره بارنامه/حواله برای این طرف همین الان ثبت شد.",
+}
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    message = next((m for name, m in _CONSTRAINT_MESSAGES.items() if name in str(exc.orig)),
+                   "این تغییر با داده‌ای که هم‌زمان ثبت شد تداخل دارد؛ دوباره تلاش کنید.")
+    return JSONResponse(status_code=409, content={"detail": message})

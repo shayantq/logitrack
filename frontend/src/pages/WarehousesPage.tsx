@@ -4,7 +4,8 @@
  */
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CornerDownLeft, MapPin, MapPinOff, Pencil, Plus, Trash2, Truck, Warehouse } from "lucide-react";
+import { Link } from "react-router-dom";
+import { CornerDownLeft, MapPin, MapPinOff, MapPinned, Pencil, Plus, Trash2, Truck, Warehouse } from "lucide-react";
 import { api, errorMessage, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { CitySelect } from "@/components/CitySelect";
@@ -75,6 +76,11 @@ export default function WarehousesPage() {
                     {w.holds_stock && <Badge tone="muted">{faNumber(w.products_count)} کالا · {faNumber(w.on_hand)} واحد</Badge>}
                     {w.managers_count > 0 && <Badge tone="muted">{faNumber(w.managers_count)} مدیر</Badge>}
                   </div>
+                  {w.holds_stock && (
+                    <Link to={`/app/locations?warehouse=${w.id}`} className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline" data-testid="warehouse-locations">
+                      <MapPinned className="size-3.5" />محل‌ها، ظرفیت و قاعده اختلاط
+                    </Link>
+                  )}
                   {isAdmin && (
                     <div className="mt-auto flex gap-2 pt-4">
                       <Button size="sm" variant="secondary" icon={<Pencil className="size-3.5" />} onClick={() => setEditing(w)} data-testid="warehouse-edit">ویرایش</Button>

@@ -30,6 +30,7 @@ ACTION_CATEGORY = {
     "user.reset_password": "users", "user.unlock": "users", "user.delete": "users",
     "org.profile": "settings", "org.logo": "settings", "org.brand": "settings", "commission.plan": "settings",
     "warehouse.create": "settings", "warehouse.update": "settings", "warehouse.delete": "settings",
+    "location.create": "settings", "location.update": "settings", "location.delete": "settings",
     "catalog.import": "catalog", "catalog.price": "catalog", "catalog.price_delete": "catalog", "catalog.update": "catalog",
     "report.generate": "reports",
     "inventory.policy": "settings", "inventory.rop": "catalog", "inventory.rop_auto": "catalog",

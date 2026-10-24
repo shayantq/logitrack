@@ -1,10 +1,16 @@
 """
 تخصیص و رزرو موجودی (Allocation)
 
-رزرو، موجودی فیزیکی را تغییر نمی‌دهد؛ فقط بخشی از موجودی «سالم و آزاد» را برای یک سند (مثلاً سفارش)
+رزرو، موجودی فیزیکی را تغییر نمی‌دهد؛ فقط بخشی از موجودی «قابل تخصیص» را برای یک سند (مثلاً سفارش)
 کنار می‌گذارد تا سفارش دیگری آن را نفروشد. سه پایان ممکن:
   • consume  — کالا با حواله از انبار خارج شد (گردش order_out زیر یک سند انبار)
   • release  — سند لغو/منقضی شد و موجودی دوباره آزاد است
+
+قابل تخصیص (allocatable) = موجودی تأییدشده‌ای که
+  • در محل نگهداری/برداشت فعال و غیرمسدود است (یا انبار محل‌بندی ندارد)،
+  • منقضی نشده و
+  • مال خود سازمان است (کالای امانی مالک دیگر به سفارش‌های سازمان تخصیص نمی‌یابد).
+موجودی قابل وعده (ATP) = قابل تخصیص − رزرو. هر عملیاتی که قابل تخصیص را کمتر از رزرو کند رد می‌شود (ensure_covered).
 
 جلوگیری از رزرو دوباره (Race Condition): هر تابع روی ردیف موجودیِ قفل‌شده (SELECT ... FOR UPDATE،
 همیشه به ترتیب id تا deadlock رخ ندهد) کار می‌کند و دیتابیس با CHECK
@@ -14,16 +20,63 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
-from app.core.wms import AVAILABLE
-from app.models import Inventory, StockDocument, StockMovement, StockReservation, User
+from app.core.wms import ALLOCATABLE_LOCATION_TYPES, AVAILABLE
+from app.models import Inventory, Location, StockBalance, StockDocument, StockMovement, StockReservation, User
 from app.services import stock_ledger
 from app.services.exceptions import ConflictError
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def unallocatable_map(db: Session, inventory_ids=None) -> dict[int, int]:
+    """مقدار تأییدشده‌ای از هر ردیف موجودی که قابل تخصیص نیست (محل نامناسب، منقضی، کالای امانی)."""
+    from app.services import catalog_service
+    today = catalog_service.today_local()
+    query = db.query(StockBalance.inventory_id, func.sum(StockBalance.quantity)).outerjoin(
+        Location, StockBalance.location_id == Location.id,
+    ).filter(
+        StockBalance.stock_status == AVAILABLE, StockBalance.quantity > 0,
+        or_(
+            StockBalance.owner_id.is_not(None),
+            StockBalance.expiry_date < today,
+            and_(StockBalance.location_id.is_not(None), or_(
+                Location.location_type.not_in(ALLOCATABLE_LOCATION_TYPES), Location.is_active.is_(False),
+                Location.is_blocked.is_(True),
+            )),
+        ),
+    )
+    if inventory_ids is not None:
+        query = query.filter(StockBalance.inventory_id.in_(list(inventory_ids) or [-1]))
+    return {inventory_id: int(total or 0) for inventory_id, total in query.group_by(StockBalance.inventory_id).all()}
+
+
+def allocatable(db: Session, inventory: Inventory) -> int:
+    if (inventory.stock_status or AVAILABLE) != AVAILABLE:
+        return 0
+    db.flush()
+    return (inventory.quantity or 0) - unallocatable_map(db, [inventory.id]).get(inventory.id, 0)
+
+
+def available_to_promise(db: Session, inventory: Inventory) -> int:
+    return max(allocatable(db, inventory) - (inventory.reserved_quantity or 0), 0)
+
+
+def ensure_covered(db: Session, inventory: Inventory) -> None:
+    """رزرو سفارش‌های باز باید همیشه با موجودی قابل تخصیص پوشش داشته باشد."""
+    reserved = inventory.reserved_quantity or 0
+    if not reserved:
+        return
+    covered = allocatable(db, inventory)
+    if covered < reserved:
+        raise ConflictError(
+            f"{reserved} عدد از این کالا برای سفارش‌های باز رزرو است و بعد از این عملیات فقط {covered} عدد "
+            "قابل تخصیص (در محل نگهداری/برداشت و تأییدشده) می‌ماند. ابتدا سفارش‌ها را ارسال یا لغو کنید."
+        )
 
 
 def lock_inventories(db: Session, inventory_ids) -> dict[int, Inventory]:
@@ -40,10 +93,11 @@ def reserve(db: Session, inventory: Inventory, quantity: int, *, reference_type:
     if quantity <= 0:
         raise ValueError("مقدار رزرو باید مثبت باشد.")
     if (inventory.stock_status or AVAILABLE) != AVAILABLE:
-        raise ConflictError("فقط موجودی «سالم و آزاد» قابل رزرو است.")
-    if inventory.free_quantity < quantity:
+        raise ConflictError("فقط موجودی تأییدشده (سالم) قابل رزرو است.")
+    free = available_to_promise(db, inventory)
+    if free < quantity:
         raise ConflictError(
-            f"موجودی آزاد کافی نیست. موجودی آزاد: {inventory.free_quantity} عدد — درخواستی: {quantity} عدد."
+            f"موجودی آزاد کافی نیست. موجودی آزاد: {free} عدد — درخواستی: {quantity} عدد."
         )
     stock_ledger.set_reserved(inventory, (inventory.reserved_quantity or 0) + quantity)
     reservation = StockReservation(
@@ -84,11 +138,12 @@ def release(db: Session, reservation: StockReservation, *, user: User | None = N
 
 def consume(db: Session, reservation: StockReservation, document: StockDocument, *, user: User | None = None,
             reason: str | None = None, movement_type: str = "order_out") -> StockMovement:
-    """رزرو را مصرف و همان مقدار را با گردش خروج زیر سند document از موجودی کم می‌کند."""
+    """رزرو را مصرف و همان مقدار را با گردش خروج (برداشت FEFO از موجودی قابل تخصیص) زیر سند document کم می‌کند."""
     inventory = _close(reservation, "consumed", user, reason)
     movement = stock_ledger.record(
         db, inventory, -reservation.quantity, movement_type, document=document, user=user, reason=reason,
         reference_type=reservation.reference_type, reference_id=reservation.reference_id,
+        pick=stock_ledger.ALLOCATABLE_FIRST,
     )
     reservation.movement = movement
     return movement

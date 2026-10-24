@@ -97,6 +97,7 @@ function InfoTab({ p }: { p: Detail }) {
     name: p.name, short_name: p.short_name ?? "", category: p.category ?? "", brand: p.brand ?? "", unit: p.unit, barcode: p.barcode ?? "",
     weight: String(p.weight_kg ?? 1), net_weight: num(p.net_weight_kg), length: num(p.length_cm), width: num(p.width_cm), height: num(p.height_cm),
     lot: p.lot_tracked, serial: p.serial_tracked, expiry: p.expiry_tracked, shelf_life: num(p.shelf_life_days),
+    inspection: p.inspection_required, pallet: num(p.units_per_pallet),
     min_stock: num(p.min_stock), max_stock: num(p.max_stock), reorder_point: num(p.reorder_point), active: p.is_active,
     origin: p.origin as "domestic" | "imported", origin_country: p.origin_country ?? "",
     export_eligible: p.export_eligible, hs_code: p.hs_code ?? "", description: p.description ?? "", variant_label: p.variant_label ?? "",
@@ -109,6 +110,7 @@ function InfoTab({ p }: { p: Detail }) {
       barcode: f.barcode.trim() || null, weight_kg: toNumber(f.weight) || 1,
       net_weight_kg: optNumber(f.net_weight), length_cm: optNumber(f.length), width_cm: optNumber(f.width), height_cm: optNumber(f.height),
       lot_tracked: f.lot || f.expiry, serial_tracked: f.serial, expiry_tracked: f.expiry, shelf_life_days: f.expiry ? optNumber(f.shelf_life) : null,
+      inspection_required: f.inspection, units_per_pallet: optNumber(f.pallet),
       min_stock: optNumber(f.min_stock), max_stock: optNumber(f.max_stock), reorder_point: optNumber(f.reorder_point), is_active: f.active,
       origin: f.origin, origin_country: f.origin === "imported" ? f.origin_country || null : null,
       export_eligible: f.export_eligible, hs_code: f.hs_code || null, description: f.description || null,
@@ -148,6 +150,11 @@ function InfoTab({ p }: { p: Detail }) {
             value={f.shelf_life} onChange={e => set("shelf_life", e.target.value)} /><span className="text-sm text-muted">روز ماندگاری</span></div>}
         </div>
         <p className="mt-2 text-xs text-muted">ردیابی تاریخ انقضا بدون بچ ممکن نیست؛ با فعال کردن انقضا، بچ هم فعال می‌شود.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3">
+          <Checkbox label="بازرسی کیفی هنگام ورود" checked={f.inspection} onChange={e => set("inspection", e.target.checked)} data-testid="catalog-inspection" />
+          <div className="flex items-center gap-2"><Input inputMode="numeric" className="w-24 text-center" aria-label="تعداد در پالت" placeholder="—"
+            value={f.pallet} onChange={e => set("pallet", e.target.value)} data-testid="catalog-pallet" /><span className="text-sm text-muted">عدد در هر پالت (ظرفیت پالتی محل‌ها)</span></div>
+        </div>
       </div>
       <Field label="حداقل / حداکثر موجودی" hint="پیش‌فرض کالا؛ هر انبار نقطه سفارش خودش را هم دارد">
         <div className="grid grid-cols-2 gap-2">

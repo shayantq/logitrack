@@ -1252,6 +1252,102 @@ await session("wms", "qazvin_admin", "admin123", async page => {
   check("wms", "ledger stays consistent after reversal", ledger.ok === true, JSON.stringify(ledger.mismatches?.slice(0, 2)));
 });
 
+// ---------------- عملیات انبار: محل ← رسید ← جانمایی با اسکن ← بازرسی ← کاردکس ----------------
+const opsToken = await apiToken("qazvin_manager", "manager123");
+const opsWarehouse = (await apiCall(opsToken, "GET", "/users/me")).warehouse_id;
+const opsProduct = (await apiCall(opsToken, "GET", "/inventory/products")).find(p => p.is_active);
+const rcvCode = `RCV-${runId}`, binCode = `A-${runId}`;
+await session("wms-ops", "qazvin_manager", "manager123", async page => {
+  // ۱. محل تخلیه و یک خانه نگهداری با ظرفیت پالتی
+  await page.click("[data-testid=app-nav] >> text=محل‌های انبار");
+  for (const [code, type] of [[rcvCode, "receiving"], [binCode, "storage"]]) {
+    await page.click("[data-testid=location-new]");
+    await page.fill("[data-testid=loc-code]", code);
+    await choose(page, "[data-testid=loc-type]", type);
+    await page.click("[data-testid=location-save]");
+    await page.waitForSelector(`[data-testid=location-row][data-code="${code}"]`);
+  }
+  check("wms-ops", "receiving and storage locations created", true);
+  const locations = await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`);
+  const rcv = locations.find(l => l.code === rcvCode), bin = locations.find(l => l.code === binCode);
+  check("wms-ops", "location barcode defaults to warehouse-location code", bin.barcode.endsWith(`-${binCode}`), bin.barcode);
+
+  // ۲. رسید خرید با ۵ عدد مورد انتظار، دریافت ۴ عدد در محل تخلیه
+  await page.click("[data-testid=app-nav] >> text=رسید و دریافت");
+  await page.click("[data-testid=receipt-new]");
+  await choose(page, "[data-testid=receipt-partner]", { index: 1 });
+  await page.fill("[data-testid=receipt-ref]", `BL-${runId}`);
+  await choose(page, "[data-testid=receipt-line-product]", String(opsProduct.id));
+  await page.fill("[data-testid=receipt-line-qty]", "5");
+  await page.click("[data-testid=receipt-save]");
+  await page.waitForSelector("[data-testid=receipt-detail] [data-testid=receipt-receive]");
+  await page.click("[data-testid=receipt-receive]");
+  await choose(page, "[data-testid=receive-location]", String(rcv.id));
+  await page.fill("[data-testid=receive-qty]", "4");
+  await page.click("[data-testid=receive-save]");
+  await page.waitForSelector("[data-testid=receipt-line][data-received='4']", { timeout: 10000 });
+  check("wms-ops", "physical receipt recorded on the receipt line", true);
+  await page.click("[data-testid=receipt-close]");
+  await page.fill("[data-testid=close-reason]", "تأمین‌کننده کمتر فرستاد");
+  await page.click("[data-testid=receipt-close-save]");
+  await page.waitForSelector("[data-testid=receipt-line][data-discrepancy=shortage]", { timeout: 10000 });
+  check("wms-ops", "closing records the shortage discrepancy", true);
+  const duplicate = await apiCall(opsToken, "POST", "/inbound/receipts", {
+    receipt_type: "purchase", warehouse_id: opsWarehouse,
+    partner_id: (await apiCall(opsToken, "GET", "/inbound/receipts", null)).find(r => r.external_ref === `BL-${runId}`).partner_id,
+    external_ref: `BL-${runId}`, lines: [{ product_id: opsProduct.id, expected_quantity: 1 }] }, false);
+  check("wms-ops", "duplicate delivery note is rejected", duplicate.status === 400, JSON.stringify(duplicate.data));
+  await page.keyboard.press("Escape");
+
+  // ۳. جانمایی با اسکن: مقصد اشتباه رد می‌شود، اسکن درست کالا را به قفسه می‌برد
+  await page.click("[data-testid=app-nav] >> text=جانمایی");
+  const task = (await apiCall(opsToken, "GET", "/putaway/tasks?status=active")).find(t => t.product_id === opsProduct.id && t.source_location_id === rcv.id);
+  check("wms-ops", "putaway task created for the received stock", !!task && task.remaining === 4, JSON.stringify(task));
+  const row = page.locator(`[data-testid=putaway-row][data-code="${task.code}"]`);
+  await row.locator("[data-testid=putaway-execute]").click();
+  await page.fill("[data-testid=scan-product]", opsProduct.sku);
+  await page.keyboard.press("Enter");
+  await page.fill("[data-testid=scan-source]", rcvCode);
+  await page.keyboard.press("Enter");
+  await page.fill("[data-testid=scan-destination]", rcvCode);
+  await page.click("[data-testid=putaway-confirm]");
+  await page.waitForSelector("[data-testid=toast]:has-text('مبدأ')", { timeout: 10000 });
+  check("wms-ops", "scanning the source as destination is rejected", true);
+  await page.fill("[data-testid=scan-destination]", bin.barcode);
+  await page.click("[data-testid=putaway-confirm]");
+  await page.waitForSelector("[data-testid=toast]:has-text('انجام شد')", { timeout: 10000 });
+  const done = await apiCall(opsToken, "GET", `/putaway/tasks/${task.id}`);
+  check("wms-ops", "putaway done into the scanned bin with the failure logged", done.status === "done"
+    && done.destination_location_id === bin.id && done.failure_count === 1, JSON.stringify(done));
+
+  // ۴. مرجوعی (همیشه در انتظار بازرسی) ← بازرسی در صفحه بازرسی کیفی
+  const back = await apiCall(opsToken, "POST", "/inbound/receipts", { receipt_type: "return", warehouse_id: opsWarehouse,
+    lines: [{ product_id: opsProduct.id, expected_quantity: 2 }] });
+  await apiCall(opsToken, "POST", `/inbound/receipts/${back.id}/receive`, { location_id: rcv.id, lines: [{ line_id: back.lines[0].id, quantity: 2 }] });
+  await page.click("[data-testid=app-nav] >> text=بازرسی کیفی");
+  const pendingRow = page.locator(`[data-testid=quality-row][data-sku="${opsProduct.sku}"]`).first();
+  await pendingRow.locator("[data-testid=quality-inspect]").click();
+  await page.waitForSelector("[data-testid=inspect-modal] [data-testid=inspect-row]");
+  await page.click("button[form=inspect-form]");
+  await page.waitForSelector("[data-testid=toast]:has-text('بازرسی')", { timeout: 10000 });
+  await page.waitForSelector("[data-testid=inspections-table] [data-testid=inspection-row]");
+  const inspected = await apiCall(opsToken, "GET", `/inbound/receipts/${back.id}`);
+  check("wms-ops", "inspection accepts the returned goods on the receipt", inspected.lines[0].accepted_quantity === 2, JSON.stringify(inspected.lines[0]));
+
+  // ۵. کاردکس و وضعیت مقدار
+  await page.click("[data-testid=app-nav] >> text=کاردکس کالا");
+  await choose(page, "[data-testid=card-product]", String(opsProduct.id));
+  await page.waitForSelector("[data-testid=stock-card-table] [data-testid=card-row][data-type=inbound_receipt]");
+  check("wms-ops", "stock card lists the receipt documents with running balance", true);
+  await page.click("[data-testid=app-nav] >> text=انبار و کالاها");
+  await page.locator(`[data-testid=product-row][data-sku="${opsProduct.sku}"] [data-testid=product-positions]`).click();
+  await page.waitForSelector("[data-testid=positions-table] [data-testid=position-row]");
+  await page.waitForSelector(`[data-testid=balances-table] >> text=${binCode}`);
+  check("wms-ops", "positions show allocatable stock and bin-level balances", true);
+  const ledger = await apiCall(await apiToken("qazvin_admin", "admin123"), "GET", "/inventory/ledger-check");
+  check("wms-ops", "ledger and detail balances stay consistent", ledger.ok === true, JSON.stringify(ledger.mismatches?.slice(0, 2)));
+});
+
 // ---------------- کنترل‌های سفارشی به‌جای ظاهر پیش‌فرض کروم ----------------
 await session("native-ui-public", null, null, async page => {
   await page.goto(`${BASE}/request`);

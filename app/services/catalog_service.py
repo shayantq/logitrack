@@ -27,6 +27,7 @@ from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 # مشخصات پایه‌ای که با فرم «مشخصات کالا» ویرایش می‌شوند (SKU عمداً نیست)
 MASTER_FIELDS = ("name", "short_name", "weight_kg", "net_weight_kg", "length_cm", "width_cm", "height_cm",
                  "lot_tracked", "serial_tracked", "expiry_tracked", "shelf_life_days", "min_stock", "max_stock",
+                 "inspection_required", "units_per_pallet",
                  "reorder_point", "category", "brand", "unit", "barcode", "description", "origin", "origin_country",
                  "export_eligible", "hs_code", "specs", "parent_id", "variant_label", "is_active")
 
@@ -207,6 +208,7 @@ def _fields(product: Product) -> dict:
         "volume_m3": round(dims[0] * dims[1] * dims[2] / 1_000_000, 6) if all(dims) else None,
         "lot_tracked": bool(product.lot_tracked), "serial_tracked": bool(product.serial_tracked),
         "expiry_tracked": bool(product.expiry_tracked), "shelf_life_days": product.shelf_life_days,
+        "inspection_required": bool(product.inspection_required), "units_per_pallet": product.units_per_pallet,
         "min_stock": product.min_stock, "max_stock": product.max_stock, "reorder_point": product.reorder_point,
         "category": product.category, "brand": product.brand, "unit": product.unit or "عدد", "barcode": product.barcode,
         "description": product.description, "origin": product.origin or "domestic", "origin_country": product.origin_country,

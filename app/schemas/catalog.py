@@ -102,6 +102,8 @@ class ProductDetail(BaseModel):
     lot_tracked: bool = False
     serial_tracked: bool = False
     expiry_tracked: bool = False
+    inspection_required: bool = False
+    units_per_pallet: Optional[int] = None
     shelf_life_days: Optional[int] = None
     min_stock: Optional[int] = None
     max_stock: Optional[int] = None
@@ -146,6 +148,8 @@ class ProductUpdate(BaseModel):
     lot_tracked: Optional[bool] = None
     serial_tracked: Optional[bool] = None
     expiry_tracked: Optional[bool] = None
+    inspection_required: Optional[bool] = None
+    units_per_pallet: Optional[int] = Field(None, gt=0, le=1_000_000)
     shelf_life_days: Optional[int] = Field(None, gt=0, le=36500)
     min_stock: Optional[int] = Field(None, ge=0)
     max_stock: Optional[int] = Field(None, ge=0)

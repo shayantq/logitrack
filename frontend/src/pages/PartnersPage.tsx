@@ -17,11 +17,11 @@ import { Modal, Tooltip } from "@/ui/overlays";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, Textarea, cn } from "@/ui/primitives";
 
 type Partner = Schemas["PartnerOut"];
-type Role = "supplier" | "customer" | "carrier";
+type Role = "supplier" | "customer" | "carrier" | "owner";
 type CarrierService = NonNullable<Schemas["PartnerIn"]["carrier_service"]>;
 
 const EMPTY = {
-  code: "", name: "", kind: "legal" as "legal" | "individual", is_supplier: true, is_customer: false, is_carrier: false,
+  code: "", name: "", kind: "legal" as "legal" | "individual", is_supplier: true, is_customer: false, is_carrier: false, is_owner: false,
   legal_name: "", national_id: "", economic_code: "", registration_number: "", phone: "", mobile: "", email: "", website: "",
   province: "", city: "", address: "", postal_code: "", contact_name: "", contact_mobile: "", iban: "",
   payment_terms_days: "", lead_time_days: "", carrier_service: "" as CarrierService | "", tracking_url: "", notes: "",
@@ -136,7 +136,7 @@ function PartnerForm({ partner, onClose }: { partner: Partner | null; onClose: (
   const save = useMutation({
     mutationFn: () => {
       const body: Schemas["PartnerIn"] = {
-        code: opt(f.code), name: f.name, kind: f.kind, is_supplier: f.is_supplier, is_customer: f.is_customer, is_carrier: f.is_carrier,
+        code: opt(f.code), name: f.name, kind: f.kind, is_supplier: f.is_supplier, is_customer: f.is_customer, is_carrier: f.is_carrier, is_owner: f.is_owner,
         legal_name: opt(f.legal_name), national_id: digits(f.national_id), economic_code: digits(f.economic_code),
         registration_number: digits(f.registration_number), phone: digits(f.phone), mobile: digits(f.mobile), email: opt(f.email),
         website: opt(f.website), province: opt(f.province), city: opt(f.city), address: opt(f.address), postal_code: digits(f.postal_code),

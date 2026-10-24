@@ -121,7 +121,7 @@ class DomainEvent(TenantScoped, Base):
 
 class Partner(TenantScoped, Base):
     """
-    طرف تجاری سازمان: تأمین‌کننده، مشتری (عمده/حقوقی) یا شرکت حمل — یک طرف می‌تواند چند نقش داشته باشد.
+    طرف تجاری سازمان: تأمین‌کننده، مشتری (عمده/حقوقی)، شرکت حمل یا مالک کالای امانی — یک طرف می‌تواند چند نقش داشته باشد.
     مشتریان نهایی سفارش‌ها (اشخاص با شماره همراه) جدا در جدول customers هستند.
     شناسه ملی و شماره شبا فقط برای ادمین سازمان کامل نمایش داده می‌شود.
     """
@@ -129,7 +129,7 @@ class Partner(TenantScoped, Base):
     __table_args__ = (
         UniqueConstraint("organization_id", "code", name="uq_partners_org_code"),
         UniqueConstraint("organization_id", "national_id", name="uq_partners_org_national_id"),
-        CheckConstraint("is_supplier OR is_customer OR is_carrier", name="ck_partners_role"),
+        CheckConstraint("is_supplier OR is_customer OR is_carrier OR is_owner", name="ck_partners_role"),
         CheckConstraint(f"kind IN ({sql_in(PARTNER_KINDS)})", name="ck_partners_kind"),
         CheckConstraint(f"carrier_service IS NULL OR carrier_service IN ({sql_in(CARRIER_SERVICES)})", name="ck_partners_carrier_service"),
         CheckConstraint("payment_terms_days IS NULL OR (payment_terms_days >= 0 AND payment_terms_days <= 365)", name="ck_partners_payment_terms"),
@@ -145,6 +145,8 @@ class Partner(TenantScoped, Base):
     is_supplier = Column(Boolean, nullable=False, default=False, server_default="false")
     is_customer = Column(Boolean, nullable=False, default=False, server_default="false")
     is_carrier = Column(Boolean, nullable=False, default=False, server_default="false")
+    # مالک کالای امانی (مشتری انبار عمومی/۳PL): موجودی‌اش جدا ردیابی می‌شود و به سفارش‌های سازمان تخصیص نمی‌یابد
+    is_owner = Column(Boolean, nullable=False, default=False, server_default="false")
     legal_name = Column(String(200), nullable=True)
     national_id = Column(String(11), nullable=True)              # شناسه ملی (حقوقی، ۱۱ رقم) یا کد ملی (حقیقی، ۱۰ رقم)
     economic_code = Column(String(14), nullable=True)
@@ -246,6 +248,9 @@ LEDGER_TRIGGERS_SQL = (
     "CREATE TRIGGER trg_stock_movements_immutable BEFORE UPDATE OR DELETE ON stock_movements "
     "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
     "CREATE TRIGGER trg_domain_events_immutable BEFORE UPDATE OR DELETE ON domain_events "
+    "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
+    # مایگریشن ۰۰۲۵: ردیف‌های ریز گردش (محل، بچ، سریال) هم مثل خود گردش غیرقابل‌تغییرند
+    "CREATE TRIGGER trg_stock_movement_lines_immutable BEFORE UPDATE OR DELETE ON stock_movement_lines "
     "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
     "CREATE TRIGGER trg_stock_documents_guard BEFORE UPDATE OR DELETE ON stock_documents "
     "FOR EACH ROW EXECUTE FUNCTION pasineh_guard_stock_document()",

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, Download, FileSpreadsheet, FileText, History, Layers, PackagePlus, PackageSearch, Search, Trash2, Upload } from "lucide-react";
+import { ArrowLeftRight, Boxes, Download, FileSpreadsheet, FileText, History, Layers, PackagePlus, PackageSearch, Search, Trash2, Upload } from "lucide-react";
 import { api, errorMessage, isServerError, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { StockBadge } from "@/components/StatusBadges";
@@ -10,7 +10,10 @@ import { useAsyncExport, usePartners, useProducts, useWarehouses } from "@/hooks
 import { STOCK_STATUS, WAREHOUSE_TYPES, type StockStatus } from "@/lib/labels";
 import { faNumber } from "@/lib/format";
 import { Modal, Tooltip } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, cn } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, Textarea, cn } from "@/ui/primitives";
+import { DateField } from "@/ui/datetime";
+import { LocationSelect } from "../warehouse/shared";
+import { PositionsModal } from "./PositionsModal";
 import { useDeepLink } from "@/hooks/useDeepLink";
 import { CatalogImportModal, ProductCatalogModal, UNITS, downloadFile } from "./CatalogModals";
 import { confirmDialog } from "@/ui/dialogs";
@@ -37,7 +40,7 @@ function ProductModal({ open, onClose }: { open: boolean; onClose: () => void })
       name: form.name, sku: form.sku, barcode: form.barcode.trim() || null, price: Number(form.price), weight_kg: Number(form.weight),
       initial_quantity: Number(form.quantity), warehouse_id: form.warehouse ? Number(form.warehouse) : null,
       category: form.category || null, unit: form.unit, origin: form.origin, origin_country: form.origin === "imported" ? form.country || null : null,
-      subsidy_percent: Number(form.subsidy) || 0, lot_tracked: false, serial_tracked: false, expiry_tracked: false,
+      subsidy_percent: Number(form.subsidy) || 0, lot_tracked: false, serial_tracked: false, expiry_tracked: false, inspection_required: false,
     } })),
     onSuccess: () => { toast.success("کالا ثبت شد."); invalidate(); onClose(); setForm(empty); },
     onError: e => toast.error(errorMessage(e)),
@@ -97,6 +100,11 @@ function MovementModal({ product, onClose, products }: { product: Product | null
   const [toStatus, setToStatus] = useState<StockStatus>("available");
   const [supplier, setSupplier] = useState("");
   const [externalRef, setExternalRef] = useState("");
+  const [location, setLocation] = useState("");
+  const [toLocation, setToLocation] = useState("");
+  const [lot, setLot] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [serials, setSerials] = useState("");
   const [requestKey, setRequestKey] = useState(newIdempotencyKey);
   const { data: suppliers = [] } = usePartners("supplier", product !== undefined && kind === "receipt");
   const selectedProduct = productId || (product ? String(product.id) : "");
@@ -114,24 +122,30 @@ function MovementModal({ product, onClose, products }: { product: Product | null
 
   function close() {
     setKind("receipt"); setProductId(""); setWarehouse(""); setToWarehouse(""); setQuantity("1"); setUom(""); setReason("");
-    setStatus(""); setToStatus("available"); setSupplier(""); setExternalRef(""); setRequestKey(newIdempotencyKey()); onClose();
+    setStatus(""); setToStatus("available"); setSupplier(""); setExternalRef(""); setLocation(""); setToLocation(""); setLot("");
+    setExpiry(""); setSerials(""); setRequestKey(newIdempotencyKey()); onClose();
   }
+  const incoming = kind === "receipt" || (kind === "adjustment" && Number(quantity) > 0);
   const submit = useMutation({
     mutationFn: async () => {
       const header = { "Idempotency-Key": requestKey };
       const common = { product_id: Number(selectedProduct), quantity: Number(quantity), reason: reason || null, uom: uom || null };
+      const where = { location_id: location ? Number(location) : null, lot_number: lot || null };
       if (kind === "transfer") {
         return unwrap(api.POST("/inventory/transfers", { params: { header }, body: {
-          ...common, from_warehouse_id: Number(fromWarehouse), to_warehouse_id: Number(toWarehouse), stock_status: status || "available" } }));
+          ...common, from_warehouse_id: Number(fromWarehouse), to_warehouse_id: Number(toWarehouse), stock_status: status || "available",
+          from_location_id: where.location_id, to_location_id: toLocation ? Number(toLocation) : null, lot_number: where.lot_number } }));
       }
       if (kind === "status") {
         return unwrap(api.POST("/inventory/status-changes", { params: { header }, body: {
-          ...common, reason: reason, warehouse_id: fromWarehouse ? Number(fromWarehouse) : null,
+          ...common, ...where, reason: reason, warehouse_id: fromWarehouse ? Number(fromWarehouse) : null,
           from_status: status || "quarantine", to_status: toStatus } }));
       }
       return unwrap(api.POST("/inventory/movements", { params: { header }, body: {
-        ...common, movement_type: kind, warehouse_id: fromWarehouse ? Number(fromWarehouse) : null, stock_status: status || null,
+        ...common, ...where, movement_type: kind, warehouse_id: fromWarehouse ? Number(fromWarehouse) : null, stock_status: status || null,
         partner_id: kind === "receipt" && supplier ? Number(supplier) : null, external_ref: kind === "receipt" ? externalRef || null : null,
+        expiry_date: incoming && expiry ? expiry : null,
+        serial_numbers: incoming ? serials.split(/[\s,،]+/).map(s => s.trim()).filter(Boolean) : [],
       } }));
     },
     onSuccess: () => { toast.success(kind === "status" ? "وضعیت کیفی تغییر کرد." : "گردش کالا ثبت شد."); invalidate(); close(); },
@@ -202,6 +216,29 @@ function MovementModal({ product, onClose, products }: { product: Product | null
             </Field>
           ) : <div className="hidden sm:block" />}
         </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={kind === "transfer" ? "از محل" : "محل"} hint={incoming ? "خالی = بدون محل" : "خالی = برداشت خودکار (اول‌منقضی، اول‌خروج)"}>
+            <LocationSelect warehouseId={fromWarehouse ? Number(fromWarehouse) : null} value={location} onChange={setLocation}
+              empty={incoming ? "بدون محل" : "خودکار"} testId="movement-location" />
+          </Field>
+          {kind === "transfer" ? (
+            <Field label="به محل" hint="در انبار مقصد — خالی = بدون محل">
+              <LocationSelect warehouseId={toWarehouse ? Number(toWarehouse) : null} value={toLocation} onChange={setToLocation} />
+            </Field>
+          ) : (detail?.lot_tracked || lot) ? (
+            <Field label={incoming && detail?.lot_tracked && kind === "receipt" ? "شماره بچ *" : "بچ"} hint={incoming ? undefined : "خالی = هر بچی (FEFO)"}>
+              <Input className="ltr uppercase" required={kind === "receipt" && !!detail?.lot_tracked} maxLength={64} value={lot} onChange={e => setLot(e.target.value)} data-testid="movement-lot" />
+            </Field>
+          ) : <div className="hidden sm:block" />}
+          {incoming && detail?.expiry_tracked && (
+            <Field label="تاریخ انقضا *"><DateField required={kind === "receipt"} value={expiry} onChange={setExpiry} testId="movement-expiry" /></Field>
+          )}
+          {incoming && detail?.serial_tracked && (
+            <Field label="شماره سریال‌ها *" hint="به تعداد واحدها؛ با فاصله یا خط جدید" className="sm:col-span-2">
+              <Textarea required={kind === "receipt"} className="ltr font-mono" rows={2} value={serials} onChange={e => setSerials(e.target.value)} />
+            </Field>
+          )}
+        </div>
         {kind === "receipt" && (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="تأمین‌کننده" hint="اختیاری">
@@ -242,6 +279,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [catalogId, setCatalogId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [positionsFor, setPositionsFor] = useState<Product | null>(null);
   const exporter = useAsyncExport(toast.error, () => toast.success("گزارش آماده و دانلود شد."));
   // از اعلان «رسیدن به نقطه سفارش»: ردیف همان کالا برجسته می‌شود (جستجو پاک می‌شود تا ردیف دیده شود)
   const flash = useDeepLink("product", { ready: !!products, onHit: () => setSearch("") });
@@ -296,7 +334,8 @@ export default function InventoryPage() {
                   <td className="tnum">{faNumber(p.price)}{p.subsidy_percent > 0 && <Badge tone="success" className="ms-1.5">یارانه {faNumber(p.subsidy_percent)}٪</Badge>}</td>
                   <td>
                     <div className="flex gap-1">
-                      <Tooltip content="تاریخچه گردش"><Button variant="ghost" size="icon" onClick={() => navigate(`/app/ledger?product=${p.id}`)}><History className="size-4" /></Button></Tooltip>
+                      <Tooltip content="موجودی ریز و وضعیت مقدار"><Button variant="ghost" size="icon" onClick={() => setPositionsFor(p)} data-testid="product-positions"><Boxes className="size-4" /></Button></Tooltip>
+                      <Tooltip content="کاردکس"><Button variant="ghost" size="icon" onClick={() => navigate(`/app/stock-card?product=${p.id}`)}><History className="size-4" /></Button></Tooltip>
                       <Tooltip content="ثبت سند"><Button variant="ghost" size="icon" onClick={() => setMovementFor(p)}><ArrowLeftRight className="size-4" /></Button></Tooltip>
                       <Tooltip content="حذف (فقط کالای بی‌سابقه)"><Button variant="ghost" size="icon" className="hover:text-danger" onClick={() => confirmDialog({ title: `کالای «${p.name}» حذف شود؟`, text: "کالایی که گردش یا سفارش دارد حذف نمی‌شود؛ آن را در مشخصات کالا غیرفعال کنید.", confirmLabel: "حذف کالا", danger: true }).then(ok => ok && remove.mutate(p.id))}><Trash2 className="size-4" /></Button></Tooltip>
                     </div>
@@ -311,6 +350,7 @@ export default function InventoryPage() {
       <ProductCatalogModal productId={catalogId} onClose={() => setCatalogId(null)} onOpen={setCatalogId} />
       <CatalogImportModal open={importOpen} onClose={() => setImportOpen(false)} />
       <MovementModal product={movementFor} products={products ?? []} onClose={() => setMovementFor(undefined)} />
+      <PositionsModal product={positionsFor} onClose={() => setPositionsFor(null)} />
     </>
   );
 }

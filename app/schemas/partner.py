@@ -79,6 +79,7 @@ class PartnerIn(BaseModel):
     is_supplier: bool = False
     is_customer: bool = False
     is_carrier: bool = False
+    is_owner: bool = False
     legal_name: Optional[Str(200)] = None
     national_id: Optional[Annotated[str, BeforeValidator(normalize_digits)]] = None
     economic_code: Optional[Digits(12, 14, "کد اقتصادی")] = None
@@ -102,8 +103,8 @@ class PartnerIn(BaseModel):
 
     @model_validator(mode="after")
     def _rules(self):
-        if not (self.is_supplier or self.is_customer or self.is_carrier):
-            raise ValueError("دست‌کم یک نقش (تأمین‌کننده، مشتری یا شرکت حمل) را انتخاب کنید.")
+        if not (self.is_supplier or self.is_customer or self.is_carrier or self.is_owner):
+            raise ValueError("دست‌کم یک نقش (تأمین‌کننده، مشتری، شرکت حمل یا مالک کالا) را انتخاب کنید.")
         if self.national_id:
             ok = _legal_id_ok(self.national_id) if self.kind == "legal" else _national_code_ok(self.national_id)
             if not ok:
@@ -127,6 +128,7 @@ class PartnerOut(BaseModel):
     is_supplier: bool
     is_customer: bool
     is_carrier: bool
+    is_owner: bool = False
     roles: list[str]
     legal_name: Optional[str] = None
     national_id: Optional[str] = None       # برای غیرادمین پوشانده می‌شود

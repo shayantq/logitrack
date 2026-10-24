@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.wms import DOCUMENT_TYPES
-from app.models import StockDocument, StockMovement, User
+from app.models import StockDocument, StockMovement, StockMovementLine, User
 from app.services import allocation_service, stock_ledger
 from app.services.exceptions import ConflictError, DomainError, ForbiddenError, NotFoundError
 
@@ -105,6 +105,7 @@ def _options(query):
         selectinload(StockDocument.movements).joinedload(StockMovement.product),
         selectinload(StockDocument.movements).joinedload(StockMovement.warehouse),
         selectinload(StockDocument.movements).joinedload(StockMovement.created_by),
+        selectinload(StockDocument.movements).selectinload(StockMovement.lines).joinedload(StockMovementLine.location),
         joinedload(StockDocument.warehouse), joinedload(StockDocument.partner), joinedload(StockDocument.created_by),
         joinedload(StockDocument.reversal_of),
     )
@@ -195,10 +196,12 @@ def reverse_document(db: Session, user: User, document_id: int, reason: str, ide
                 partner_id=doc.partner_id, reference_type="stock_document", reference_id=doc.id,
                 note=reason, idempotency_key=key, request_hash=digest, reversal_of=doc,
             )
-            # اول افزایش‌ها و بعد کاهش‌ها تا وسط کار موجودی موقتاً منفی نشود
+            # اول افزایش‌ها و بعد کاهش‌ها تا وسط کار موجودی موقتاً منفی نشود. هر گردش دقیقاً از همان
+            # محل/بچ/سریال برمی‌گردد؛ اگر کالا بعداً جابه‌جا شده باشد، برگشت رد می‌شود.
             for m in sorted(doc.movements, key=lambda m: m.quantity_change > 0):
                 stock_ledger.record(db, inventories[m.inventory_id], -m.quantity_change, m.movement_type,
                                     document=reversal, user=user, reversal_of=m,
+                                    lines=[(stock_ledger.key_of(line), abs(line.quantity_change)) for line in m.lines],
                                     reason=f"برگشت سند {doc.code}: {reason}")
             doc.status = "reversed"
             db.commit()

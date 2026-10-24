@@ -8,6 +8,8 @@ rollback شود رویداد هم نیست و اگر commit شود حتماً ه
 ثبت کند یا رزرو بسازد، رویدادش را هم دارد)؛ رویدادهای دیگر با emit() از سرویس‌ها. مصرف‌کننده‌ها
 (گزارش، وب‌هوک، یکپارچه‌سازی آینده) با GET /wms/events?after_id=... به ترتیب شناسه دنبالشان می‌کنند.
 رویدادهایی که در after_flush اضافه می‌شوند در flush بعدیِ همان commit ذخیره می‌شوند.
+رویداد «سند قطعی شد» تا before_commit صبر می‌کند تا همه گردش‌ها و ردیف‌های ریز سند در آن باشد
+(سرویس‌ها وسط ثبت یک سند چند بار flush می‌کنند).
 """
 from __future__ import annotations
 
@@ -52,7 +54,11 @@ def _document_payload(doc: StockDocument) -> dict:
         "reversal_of_id": doc.reversal_of_id,
         "lines": [{"movement_id": m.id, "product_id": m.product_id, "warehouse_id": m.warehouse_id,
                    "stock_status": m.stock_status, "movement_type": m.movement_type,
-                   "quantity_change": m.quantity_change, "balance_after": m.balance_after} for m in doc.movements],
+                   "quantity_change": m.quantity_change, "balance_after": m.balance_after,
+                   "details": [{"location_id": d.location_id, "lot_number": d.lot_number, "serial_number": d.serial_number,
+                                "expiry_date": d.expiry_date.isoformat() if d.expiry_date else None,
+                                "owner_id": d.owner_id, "quantity_change": d.quantity_change} for d in m.lines]}
+                  for m in doc.movements],
     }
 
 
@@ -73,12 +79,29 @@ _MASTER = {Product: ("product", lambda p: {"sku": p.sku, "name": p.name}),
            Partner: ("partner", lambda p: {"code": p.code, "name": p.name})}
 
 
+_POSTED_KEY = "_posted_documents"
+
+
+@event.listens_for(Session, "before_commit")
+def _emit_posted_documents(session):
+    session.flush()      # سندهایی که هنوز flush نشده‌اند هم ثبت شوند
+    for doc in session.info.pop(_POSTED_KEY, []):
+        if inspect(doc).persistent:
+            emit(session, "stock.document.posted", "stock_document", doc.id, _document_payload(doc),
+                 organization_id=doc.organization_id)
+
+
+@event.listens_for(Session, "after_transaction_end")
+def _forget_posted_documents(session, transaction):
+    if transaction.parent is None:
+        session.info.pop(_POSTED_KEY, None)
+
+
 @event.listens_for(Session, "after_flush")
 def _collect_events(session, flush_context):
     for obj in list(session.new):
         if isinstance(obj, StockDocument) and obj.status == "posted":
-            emit(session, "stock.document.posted", "stock_document", obj.id, _document_payload(obj),
-                 organization_id=obj.organization_id)
+            session.info.setdefault(_POSTED_KEY, []).append(obj)
         elif isinstance(obj, StockReservation):
             emit(session, "stock.reserved", "stock_reservation", obj.id, _reservation_payload(obj),
                  organization_id=obj.organization_id)

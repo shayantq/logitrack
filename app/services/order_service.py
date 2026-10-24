@@ -22,8 +22,8 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import (
-    ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderItem, OrderStatusHistory, Organization, Product, User, Vehicle,
-    Warehouse,
+    ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderItem, OrderStatusHistory, Organization, Product, StockReservation, User,
+    Vehicle, Warehouse,
 )
 from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
@@ -113,6 +113,11 @@ def _lock_inventories(db: Session, products: dict[int, Product], quantities: dic
     if warehouse_id is not None:
         query = query.filter(Inventory.warehouse_id == warehouse_id)
     rows = query.order_by(Inventory.id).with_for_update().all()
+    # موجودی قابل وعده: قابل تخصیص (محل نگهداری/برداشت، منقضی‌نشده، مال سازمان) منهای رزرو
+    unallocatable = allocation_service.unallocatable_map(db, [inv.id for inv in rows])
+
+    def free(inv: Inventory) -> int:
+        return (inv.quantity or 0) - unallocatable.get(inv.id, 0) - (inv.reserved_quantity or 0)
 
     by_warehouse: dict[int | None, dict[int, Inventory]] = defaultdict(dict)
     for inv in rows:
@@ -121,13 +126,13 @@ def _lock_inventories(db: Session, products: dict[int, Product], quantities: dic
     candidates = [warehouse_id] if warehouse_id is not None else sorted(by_warehouse, key=lambda w: (w is None, w or 0))
     for candidate in candidates:
         stock = by_warehouse.get(candidate, {})
-        if all((stock[pid].free_quantity if pid in stock else 0) >= qty for pid, qty in quantities.items()):
+        if all((free(stock[pid]) if pid in stock else 0) >= qty for pid, qty in quantities.items()):
             return candidate, stock
 
     # پیام دقیق: کدام کالا کم است (بر اساس بیشترین موجودی آزاد یک انبار)
     shortages = []
     for pid, qty in quantities.items():
-        best = max((inv.free_quantity for inv in rows if inv.product_id == pid), default=0)
+        best = max((max(free(inv), 0) for inv in rows if inv.product_id == pid), default=0)
         if best < qty:
             shortages.append(f"«{products[pid].name}» (موجودی آزاد: {best}، درخواستی: {qty})")
     if shortages:
@@ -442,6 +447,10 @@ def _restore_stock(db: Session, order: Order, user: User | None, reason: str) ->
     if order.stock_state != "issued":
         return
     items = [item for item in order.items if item.product_id]
+    # کالای برگشتی همان بچ/سریال/انقضای حواله خروج را دارد (بدون محل؛ جانمایی دوباره با وظیفه جانمایی)
+    issued = {r.product_id: r.movement for r in db.query(StockReservation).filter(
+        StockReservation.reference_type == "order", StockReservation.reference_id == order.id,
+        StockReservation.status == "consumed").all() if r.movement is not None}
     document = None
     for item in sorted(items, key=lambda i: i.product_id):
         if order.warehouse_id is None:
@@ -452,8 +461,10 @@ def _restore_stock(db: Session, order: Order, user: User | None, reason: str) ->
                 db, "order_return", organization_id=order.organization_id, user=user, warehouse_id=order.warehouse_id,
                 reference_type="order", reference_id=order.id, note=reason,
             )
+        issue = issued.get(item.product_id)
+        lines = stock_ledger.mirror(issue, location_id=None) if issue is not None and -issue.quantity_change == item.quantity else None
         stock_ledger.record(db, inventory, item.quantity, "order_return", document=document, user=user, reason=reason,
-                            reference_type="order", reference_id=order.id)
+                            reference_type="order", reference_id=order.id, lines=lines)
     order.stock_state = "returned"
 
 

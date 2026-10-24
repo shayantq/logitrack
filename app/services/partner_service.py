@@ -17,7 +17,7 @@ from app.models import Partner, ProductSupplier, StockDocument, User
 from app.services import audit_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
-PREFIX = {"supplier": "SUP", "customer": "CUS", "carrier": "CAR"}
+PREFIX = {"supplier": "SUP", "customer": "CUS", "carrier": "CAR", "owner": "OWN"}
 SENSITIVE = ("national_id", "iban")
 
 
