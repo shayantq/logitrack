@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, timezone
 import secrets
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, Boolean, Date, DateTime, Time, UniqueConstraint, CheckConstraint, Text, JSON, and_
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, Boolean, Date, DateTime, Time, UniqueConstraint, CheckConstraint, Text, JSON, Index, and_
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.core.tenancy import TenantScoped
@@ -968,6 +968,7 @@ class AuditLog(TenantScoped, Base):
     __tablename__ = "audit_logs"
     # ورود ناموفق کارکنان پلتفرم سازمان ندارد
     __tenant_nullable__ = True
+    __table_args__ = (Index("ix_audit_logs_target", "target_type", "target_id"),)
 
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)

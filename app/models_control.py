@@ -6,7 +6,7 @@
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, event
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, event
 
 from app.core.tenancy import TenantScoped
 from app.database import Base
@@ -37,6 +37,7 @@ class LabelPrint(TenantScoped, Base):
         CheckConstraint("label_type IN ('product', 'location', 'package')", name="ck_label_prints_type"),
         CheckConstraint("copies > 0 AND copies <= 500", name="ck_label_prints_copies"),
         CheckConstraint("NOT is_reprint OR reason IS NOT NULL", name="ck_label_prints_reason"),
+        Index("ix_label_prints_target", "organization_id", "label_type", "target_id"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
