@@ -93,3 +93,8 @@ export function useMe(): Me {
   if (!me) throw new Error("useMe used outside a protected route");
   return me;
 }
+
+/** آیا کاربر جاری مجوز ریز key را دارد؟ (فقط برای نمایش؛ بررسی اصلی سمت سرور است) */
+export function useCan(key: string): boolean {
+  return useMe().permissions?.includes(key) ?? false;
+}

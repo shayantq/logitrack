@@ -84,10 +84,13 @@ def _plan(db: Session, warehouse_id: int, product_id: int, quantity: int, *, zon
     taken = _planned(db, warehouse_id, product_id)
     groups: dict[tuple, int] = defaultdict(int)
     codes: dict[int | None, str] = {}
+    routes: dict[int | None, tuple] = {}
     for balance, location in query.all():
         if location is not None and not location_service.is_allocatable(location):
             continue
         if location is not None and location.location_type not in ALLOCATABLE_LOCATION_TYPES:
+            continue
+        if location is not None and location.count_lock_id is not None:      # در حال انبارگردانی با قفل
             continue
         if zone is not None and (location is None or location.id not in zone):
             continue
@@ -95,9 +98,10 @@ def _plan(db: Session, warehouse_id: int, product_id: int, quantity: int, *, zon
             continue
         groups[(balance.location_id, balance.lot_number, balance.expiry_date)] += balance.quantity
         codes[balance.location_id] = location.code if location else ""
+        routes[balance.location_id] = location_service.route_key(location)
     plan, remaining = [], quantity
-    # FEFO، سپس محل‌های مشخص به ترتیب مسیر و موجودی «بدون محل» در آخر
-    for key in sorted(groups, key=lambda k: (k[2] or date.max, k[0] is None, codes[k[0]], k[1] or "")):
+    # FEFO، سپس محل‌های مشخص به ترتیب مسیر مارپیچ (location_service.route_key) و موجودی «بدون محل» در آخر
+    for key in sorted(groups, key=lambda k: (k[2] or date.max, routes[k[0]], codes[k[0]], k[1] or "")):
         free = groups[key] - taken.get(key, 0)
         if free <= 0 or remaining <= 0:
             continue
@@ -212,7 +216,7 @@ def create_pick_list(db: Session, user: User, data) -> dict:
                     line = PickLine(pick_list_id=pick_list.id, order_id=order.id, product_id=pid, warehouse_id=warehouse_id,
                                     location_id=location_id, lot_number=lot, expiry_date=expiry, quantity=qty,
                                     picked_quantity=0, status="open")
-                    line._route = code
+                    line._route = (location_service.route_key(db.get(Location, location_id) if location_id else None), code)
                     db.add(line)
                     db.flush()
                     lines.append(line)
@@ -223,7 +227,7 @@ def create_pick_list(db: Session, user: User, data) -> dict:
             raise ConflictError("هیچ سطری برای برداشت نیست؛ " + (
                 f"موجودی قابل تخصیص سفارش‌های {', '.join(skipped)} در محل‌های برداشت کافی نیست." if skipped
                 else "سفارش آماده‌ای (یا موجودی در این منطقه) پیدا نشد."))
-        # ترتیب مسیر: کد محل، سپس کالا (در دسته‌ای/موجی سطرهای هم‌محل کنار هم)
+        # ترتیب مسیر: مسیر مارپیچ محل‌ها، سپس کالا (در دسته‌ای/موجی سطرهای هم‌محل کنار هم)
         for sequence, line in enumerate(sorted(lines, key=lambda ln: (ln._route, ln.product_id, ln.order_id)), start=1):
             line.sequence = sequence
         event_bus.emit(db, "pick.list.created", "pick_list", pick_list.id,

@@ -160,6 +160,57 @@ def scope_warehouse(user: User, warehouse_id: int | None) -> int | None:
     return warehouse_id
 
 
+def _ensure_masterdata(db: Session, user: User) -> None:
+    from app.services import permission_service
+    permission_service.ensure(db, user, "masterdata.locations")
+
+
+def leaf_ids(db: Session, warehouse_id: int, location_ids=None) -> list[int]:
+    """محل‌های انتهایی (بدون زیرمجموعه) زیر محل‌های داده‌شده — یا همه محل‌های انتهایی انبار."""
+    rows = db.query(Location.id, Location.parent_id).filter(Location.warehouse_id == warehouse_id).all()
+    children: dict[int | None, list[int]] = defaultdict(list)
+    for loc_id, parent_id in rows:
+        children[parent_id].append(loc_id)
+    roots = list(location_ids) if location_ids else [loc_id for loc_id, _ in rows]
+    result, seen = [], set()
+    stack = list(roots)
+    while stack:
+        loc_id = stack.pop()
+        if loc_id in seen:
+            continue
+        seen.add(loc_id)
+        if children.get(loc_id):
+            stack.extend(children[loc_id])
+        else:
+            result.append(loc_id)
+    known = {loc_id for loc_id, _ in rows}
+    return sorted(i for i in result if i in known)
+
+
+def route_key(location: Location | None) -> tuple:
+    """
+    ترتیب مسیر برداشت (فصل ۳۰): ترتیب دستی route_sequence اگر تعریف شده، وگرنه مسیر مارپیچ (S-shape):
+    راهروهای فرد رو به جلو و راهروهای زوج برعکس، تا برداشت‌کننده در انتهای هر راهرو برنگردد.
+    کد محل مثل «A-01-03-2» = منطقه-راهرو-قفسه-طبقه. موجودی بدون محل آخر مسیر است.
+    """
+    if location is None:
+        return (2, 0, ())
+    if location.route_sequence is not None:
+        return (0, location.route_sequence, ())
+    parts = [p for p in location.code.replace("_", "-").split("-") if p]
+
+    def num(part: str):
+        return (0, int(part), "") if part.isdigit() else (1, 0, part)
+    keys = [num(p) for p in parts]
+    if len(keys) >= 3:
+        aisle = keys[1]
+        rack = keys[2]
+        forward = aisle[1] % 2 == 1 if aisle[0] == 0 else True
+        rack = rack if forward else (rack[0], -rack[1], rack[2])
+        return (1, 0, (keys[0], aisle, rack, *keys[3:]))
+    return (1, 0, tuple(keys))
+
+
 def get(db: Session, user: User, location_id: int) -> Location:
     location = db.get(Location, location_id)
     if location is None:
@@ -220,6 +271,7 @@ def serialize(location: Location, depth: int, used: dict, leaf: bool) -> dict:
         "allow_mixed_products": location.allow_mixed_products, "allow_mixed_lots": location.allow_mixed_lots,
         "allow_mixed_owners": location.allow_mixed_owners, "is_active": location.is_active is not False,
         "is_blocked": bool(location.is_blocked), "block_reason": location.block_reason,
+        "route_sequence": location.route_sequence, "count_locked": location.count_lock_id is not None,
         "quantity": used["quantity"], "products": used["products"], "weight_kg": used["weight_kg"],
         "volume_m3": used["volume_m3"], "pallets": used["pallets"],
         "weight_pct": pct(used["weight_kg"], location.max_weight_kg), "volume_pct": pct(used["volume_m3"], location.max_volume_m3),
@@ -274,7 +326,7 @@ def lookup(db: Session, user: User, warehouse_id: int, code: str) -> dict:
 # ---------------------------------------------------------------------------
 FIELDS = ("level", "code", "barcode", "name", "location_type", "max_weight_kg", "max_volume_m3", "max_pallets",
           "allow_mixed_products", "allow_mixed_lots", "allow_mixed_owners", "is_active", "is_blocked", "block_reason",
-          "parent_id")
+          "parent_id", "route_sequence")
 
 
 def _rank(level: str) -> int:
@@ -355,6 +407,7 @@ def _check_reservations(db: Session, location: Location) -> None:
 
 def create_location(db: Session, user: User, warehouse_id: int, data: dict) -> dict:
     warehouse_id = scope_warehouse(user, warehouse_id)
+    _ensure_masterdata(db, user)
     warehouse = db.get(Warehouse, warehouse_id)
     if warehouse is None:
         raise NotFoundError("انبار یافت نشد.")
@@ -378,6 +431,7 @@ def create_location(db: Session, user: User, warehouse_id: int, data: dict) -> d
 
 def update_location(db: Session, user: User, location_id: int, data: dict) -> dict:
     location = get(db, user, location_id)
+    _ensure_masterdata(db, user)
     warehouse = db.get(Warehouse, location.warehouse_id)
     try:
         data = _validate(db, warehouse, dict(data), location)
@@ -400,6 +454,7 @@ def update_location(db: Session, user: User, location_id: int, data: dict) -> di
 def delete_location(db: Session, user: User, location_id: int) -> None:
     """فقط محل بی‌سابقه (بدون زیرمجموعه و بدون هیچ گردشی) حذف می‌شود؛ بقیه غیرفعال می‌شوند."""
     location = get(db, user, location_id)
+    _ensure_masterdata(db, user)
     if has_children(db, location.id):
         raise ConflictError("این محل زیرمجموعه دارد؛ ابتدا زیرمجموعه‌ها را حذف کنید.")
     from app.models import InboundReceipt, PutawayTask

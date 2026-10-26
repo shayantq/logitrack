@@ -115,6 +115,7 @@ class AuditLogItem(BaseModel):
     target_id: Optional[int] = None
     target_label: Optional[str] = None
     summary: str
+    reason: Optional[str] = None
     details: Optional[dict[str, Any]] = None
     ip: Optional[str] = None
     user_agent: Optional[str] = None
@@ -139,6 +140,8 @@ class MeResponse(UserResponse):
     organization: Optional[OrganizationBrief] = None
     # راهنمای تعاملی: {"<شناسه راهنما>": "done" | "skipped"} — راهنمایی که اینجا نیست، بار اول خودکار باز می‌شود
     tour_state: Optional[dict[str, str]] = None
+    # مجوزهای ریز فعال این کاربر (app/core/permissions.py) — رابط کاربری دکمه‌ها را با آن نشان/پنهان می‌کند
+    permissions: list[str] = []
 
 
 class TourStateIn(BaseModel):

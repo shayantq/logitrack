@@ -10,7 +10,7 @@ from app.schemas.user import (
     ActivityItem, AuditLogPage, MeResponse, PasswordResetResponse, TokenResponse, TourStateIn, UpdateUserRequest,
     UserDetailResponse, UserResponse, UserUpdateRequest,
 )
-from app.services import audit_service, user_service
+from app.services import audit_service, permission_service, user_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -28,8 +28,10 @@ def _call(fn, *args, **kwargs):
 
 
 @router.get('/me', status_code=status.HTTP_200_OK, response_model=MeResponse, summary="👤 دریافت اطلاعات کاربر لاگین‌شده")
-def get_current_user_info(user: current_user_dependency):
-    return user
+def get_current_user_info(db: db_dependency, user: current_user_dependency):
+    data = MeResponse.model_validate(user, from_attributes=True)
+    data.permissions = permission_service.mine(db, user)
+    return data
 
 
 @router.put('/me/tours/{tour_id}', response_model=dict[str, str], summary="🧭 ثبت دیده/رد شدن یک راهنمای تعاملی (دیگر خودکار باز نمی‌شود)")
@@ -58,13 +60,17 @@ def get_all_users(db: db_dependency, user: user_dependency):
     return _call(user_service.list_users, db, user)
 
 
-@router.get('/activity-log', response_model=AuditLogPage, summary="🕵️ گزارش فعالیت سازمان (ادمین سازمان)")
-def activity_log(db: db_dependency, user=Depends(org_admin), actor_id: int | None = Query(None, gt=0),
+@router.get('/activity-log', response_model=AuditLogPage,
+            summary="🕵️ گزارش فعالیت سازمان — کی، کِی، چه و چرا (مجوز «مشاهده گزارش فعالیت»)")
+def activity_log(db: db_dependency, user: user_dependency, actor_id: int | None = Query(None, gt=0),
                  category: str | None = None, q: str | None = Query(None, max_length=100),
                  date_from: date | None = None, date_to: date | None = None,
+                 action: str | None = Query(None, max_length=48), target_type: str | None = Query(None, max_length=32),
+                 target_id: int | None = Query(None, gt=0),
                  limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)):
     return _call(audit_service.list_logs, db, user, actor_id=actor_id, category=category, q=q,
-                 date_from=date_from, date_to=date_to, limit=limit, offset=offset)
+                 date_from=date_from, date_to=date_to, limit=limit, offset=offset,
+                 action=action, target_type=target_type, target_id=target_id)
 
 
 @router.get('/{user_id}', response_model=UserDetailResponse, summary="👤 جزئیات و آمار یک کاربر (ادمین سازمان)")

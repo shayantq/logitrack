@@ -190,7 +190,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 🕵️ گزارش فعالیت سازمان (ادمین سازمان) */
+        /** 🕵️ گزارش فعالیت سازمان — کی، کِی، چه و چرا (مجوز «مشاهده گزارش فعالیت») */
         get: operations["activity_log_users_activity_log_get"];
         put?: never;
         post?: never;
@@ -2447,7 +2447,7 @@ export interface paths {
         /** 📋 انبارگردانی‌ها */
         get: operations["list_stocktakes_stocktakes__get"];
         put?: never;
-        /** ➕ شروع انبارگردانی (کامل یا بخشی) */
+        /** ➕ شروع انبارگردانی: کامل، بخشی یا دوره‌ای؛ کور یا راهنما؛ عکس لحظه‌ای یا قفل محل */
         post: operations["create_stocktakes__post"];
         delete?: never;
         options?: never;
@@ -2481,6 +2481,23 @@ export interface paths {
         };
         /** 🔔 تعداد کارهای انبارگردانی (برای نشان منو) */
         get: operations["summary_stocktakes_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stocktakes/warehouses/{warehouse_id}/cycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔁 کالاهای سررسید شمارش دوره‌ای (A هر ۳۰، B هر ۹۰، C هر ۱۸۰ روز) */
+        get: operations["cycle_candidates_stocktakes_warehouses__warehouse_id__cycle_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3265,6 +3282,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/putaway/tasks/{task_id}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🧠 مقصدهای برتر با دلیل (تجمیع، محل خالی، نزدیکی مسیر بر اساس ABC) */
+        get: operations["task_suggestions_putaway_tasks__task_id__suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/putaway/tasks/{task_id}/cancel": {
         parameters: {
             query?: never;
@@ -3782,6 +3816,262 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/permissions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔐 ماتریس مجوزهای نقش‌ها (پیش‌فرض و تغییرات سازمان) */
+        get: operations["matrix_permissions__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/permissions/{role}/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** ✏️ دادن یا گرفتن یک مجوز از یک نقش (با دلیل) */
+        put: operations["update_permission_permissions__role___key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/permissions/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ↩️ بازگشت همه مجوزها به پیش‌فرض */
+        post: operations["reset_permissions_permissions_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analytics/kpis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📈 دقت موجودی، تحقق سفارش، دقت برداشت، رسید تا قفسه، گردش موجودی، ضایعات و بهره‌وری ظرفیت */
+        get: operations["kpis_analytics_kpis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/valuation/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ⚙️ روش ارزش‌گذاری و آستانه‌های کنترل موجودی */
+        get: operations["get_settings_valuation_settings_get"];
+        /** ⚙️ تغییر روش ارزش‌گذاری و آستانه‌ها (ادمین، با دلیل) */
+        put: operations["update_settings_valuation_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/valuation/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 💎 ارزش موجودی به سه روش (FIFO، میانگین موزون، استاندارد) و بهای فروش رفته */
+        get: operations["get_valuation_valuation__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/valuation/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🩺 کالای کم‌گردش، راکد و بی‌فروش؛ اقلام نزدیک به انقضا و منقضی */
+        get: operations["get_health_valuation_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/labels/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🖨️ برچسب PDF با بارکد Code128 و QR (چاپ مجدد با دلیل) */
+        post: operations["print_labels_labels_print_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/labels/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📜 سابقه چاپ برچسب‌ها */
+        get: operations["label_history_labels_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔎 این بارکد/QR چیست؟ (کالا، محل، بسته، سفارش، سند، بچ) */
+        get: operations["resolve_scan_resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readiness/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🚀 چک‌لیست راه‌اندازی: بررسی خودکار سلامت داده + موارد دستی */
+        get: operations["get_readiness_readiness__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readiness/manual/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** ✅ ثبت انجام یک مورد دستی چک‌لیست */
+        put: operations["set_manual_readiness_manual__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readiness/import/{kind}/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📄 قالب اکسل ورود محل‌ها یا موجودی اول دوره */
+        get: operations["import_template_readiness_import__kind__template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readiness/import/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 📥 ورود محل‌ها یا موجودی اول دوره: پیش‌نمایش (dry_run) و ثبت نهایی همه یا هیچ */
+        post: operations["import_data_readiness_import__kind__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔄 ماشین وضعیت اسناد: وضعیت‌ها، انتقال‌ها و انجام‌دهنده */
+        get: operations["list_workflows_workflows__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3860,6 +4150,8 @@ export interface components {
             counted_qty: number;
             /** Product Id */
             product_id: number;
+            /** Location Id */
+            location_id?: number | null;
         };
         /** AgendaDay */
         AgendaDay: {
@@ -3925,6 +4217,16 @@ export interface components {
             /** Delivered Kg */
             delivered_kg: number;
         };
+        /** AlertOut */
+        AlertOut: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "danger" | "warning" | "info";
+            /** Text */
+            text: string;
+        };
         /** AllocateIn */
         AllocateIn: {
             /** Warehouse Id */
@@ -3962,6 +4264,8 @@ export interface components {
             reasons: {
                 [key: string]: "damage" | "loss" | "entry_error" | "unrecorded" | "unknown";
             };
+            /** Note */
+            note?: string | null;
         };
         /** AuditLogItem */
         AuditLogItem: {
@@ -3988,6 +4292,8 @@ export interface components {
             target_label?: string | null;
             /** Summary */
             summary: string;
+            /** Reason */
+            reason?: string | null;
             /** Details */
             details?: {
                 [key: string]: unknown;
@@ -4080,6 +4386,19 @@ export interface components {
              * @enum {string}
              */
             stock_mode: "ignore" | "set" | "add";
+            /**
+             * Dry Run
+             * @default true
+             */
+            dry_run: boolean;
+        };
+        /** Body_import_data_readiness_import__kind__post */
+        Body_import_data_readiness_import__kind__post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
             /**
              * Dry Run
              * @default true
@@ -4187,6 +4506,11 @@ export interface components {
              */
             file: string;
         };
+        /** CancelIn */
+        CancelIn: {
+            /** Reason */
+            reason?: string | null;
+        };
         /** Candidate */
         Candidate: {
             /** Vehicle Id */
@@ -4266,6 +4590,13 @@ export interface components {
             /** Reported By */
             reported_by?: string | null;
         };
+        /** CodeLabel */
+        CodeLabel: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+        };
         /** CommissionPlanIn */
         CommissionPlanIn: {
             /** Base Fare */
@@ -4294,6 +4625,39 @@ export interface components {
              * @default false
              */
             is_default: boolean;
+        };
+        /** ControlSettings */
+        ControlSettings: {
+            /** Valuation Method */
+            valuation_method: string;
+            /** Count Approval Value */
+            count_approval_value: number;
+            /** Slow Days */
+            slow_days: number;
+            /** Dead Days */
+            dead_days: number;
+            /** Expiry Warning Days */
+            expiry_warning_days: number;
+            /**
+             * Valuation Methods
+             * @default []
+             */
+            valuation_methods: components["schemas"]["CodeLabel"][];
+        };
+        /** ControlSettingsIn */
+        ControlSettingsIn: {
+            /** Valuation Method */
+            valuation_method?: ("fifo" | "weighted_average" | "standard") | null;
+            /** Count Approval Value */
+            count_approval_value?: number | null;
+            /** Slow Days */
+            slow_days?: number | null;
+            /** Dead Days */
+            dead_days?: number | null;
+            /** Expiry Warning Days */
+            expiry_warning_days?: number | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** CountIn */
         CountIn: {
@@ -4349,6 +4713,50 @@ export interface components {
             mobile: string;
             /** Email */
             email?: string | null;
+        };
+        /** CycleCandidate */
+        CycleCandidate: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku?: string | null;
+            /** Abc Class */
+            abc_class: string;
+            /** Last Counted At */
+            last_counted_at?: string | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Due */
+            due: boolean;
+            /** Interval Days */
+            interval_days: number;
+        };
+        /** DataImportReport */
+        DataImportReport: {
+            /** Kind */
+            kind: string;
+            /** Rows */
+            rows: number;
+            /** Valid */
+            valid: number;
+            /** Error Count */
+            error_count: number;
+            /** Errors */
+            errors: components["schemas"]["app__schemas__control__ImportError_"][];
+            /** Applied */
+            applied: boolean;
+            /** Preview */
+            preview: components["schemas"]["ImportPreview"][];
+            /** Create */
+            create?: number | null;
+            /** Skip */
+            skip?: number | null;
+            /** Units */
+            units?: number | null;
+            /** Document Code */
+            document_code?: string | null;
         };
         /** DayLoad */
         DayLoad: {
@@ -4895,6 +5303,36 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** ExpiringItem */
+        ExpiringItem: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Sku */
+            sku?: string | null;
+            /** Warehouse Name */
+            warehouse_name: string;
+            /** Location Code */
+            location_code?: string | null;
+            /** Lot Number */
+            lot_number?: string | null;
+            /**
+             * Expiry Date
+             * Format: date
+             */
+            expiry_date: string;
+            /** Days Left */
+            days_left: number;
+            /** Stock Status */
+            stock_status: string;
+            /** Quantity */
+            quantity: number;
+            /** Value */
+            value: number;
+            /** Expired */
+            expired: boolean;
+        };
         /** FinanceDetail */
         FinanceDetail: {
             /** Day */
@@ -5042,14 +5480,63 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** ImportError_ */
-        ImportError_: {
+        /** HealthBucket */
+        HealthBucket: {
+            /** Status */
+            status: string;
+            /** Count */
+            count: number;
+            /** Value */
+            value: number;
+        };
+        /** HealthItem */
+        HealthItem: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Sku */
+            sku: string;
+            /** Abc Class */
+            abc_class?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Value */
+            value: number;
+            /** Last Sale At */
+            last_sale_at?: string | null;
+            /** Idle Days */
+            idle_days?: number | null;
+            /** Status */
+            status: string;
+        };
+        /** HealthOut */
+        HealthOut: {
+            /** Settings */
+            settings: {
+                [key: string]: number;
+            };
+            /** Buckets */
+            buckets: components["schemas"]["HealthBucket"][];
+            /** Items */
+            items: components["schemas"]["HealthItem"][];
+            /** Expiring */
+            expiring: components["schemas"]["ExpiringItem"][];
+            /** Expired Value */
+            expired_value: number;
+            /** Expiring Value */
+            expiring_value: number;
+            /** Summary */
+            summary: string;
+        };
+        /** ImportPreview */
+        ImportPreview: {
             /** Line */
             line: number;
-            /** Sku */
-            sku?: string | null;
-            /** Messages */
-            messages: string[];
+            /** Summary */
+            summary: string;
+            /** Ok */
+            ok: boolean;
         };
         /** ImportPreviewRow */
         ImportPreviewRow: {
@@ -5081,7 +5568,7 @@ export interface components {
             /** Stock Rows */
             stock_rows: number;
             /** Errors */
-            errors: components["schemas"]["ImportError_"][];
+            errors: components["schemas"]["app__schemas__catalog__ImportError_"][];
             /** Error Count */
             error_count: number;
             /** Applied */
@@ -5233,6 +5720,96 @@ export interface components {
             price_growth_monthly?: number | null;
             /** Demand Growth Monthly */
             demand_growth_monthly?: number | null;
+        };
+        /** KpiDashboard */
+        KpiDashboard: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Kpis */
+            kpis: components["schemas"]["KpiOut"][];
+            /** Trend */
+            trend: components["schemas"]["TrendPoint"][];
+            /** Snapshot */
+            snapshot: {
+                [key: string]: number;
+            };
+            /** Alerts */
+            alerts: components["schemas"]["AlertOut"][];
+        };
+        /** KpiOut */
+        KpiOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value?: number | null;
+            /** Unit */
+            unit: string;
+            /** Target */
+            target: number;
+            /** Hint */
+            hint: string;
+            /** Higher Better */
+            higher_better: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "good" | "warn" | "bad" | "none";
+            /** Detail */
+            detail?: string | null;
+        };
+        /** LabelPrintIn */
+        LabelPrintIn: {
+            /**
+             * Label Type
+             * @enum {string}
+             */
+            label_type: "product" | "location" | "package";
+            /** Ids */
+            ids: number[];
+            /**
+             * Copies
+             * @default 1
+             */
+            copies: number;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** LabelPrintOut */
+        LabelPrintOut: {
+            /** Id */
+            id: number;
+            /** Label Type */
+            label_type: string;
+            /** Target Id */
+            target_id: number;
+            /** Target Code */
+            target_code: string;
+            /** Copies */
+            copies: number;
+            /** Is Reprint */
+            is_reprint: boolean;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Printed At
+             * Format: date-time
+             */
+            printed_at: string;
+            /** Printed By */
+            printed_by?: string | null;
         };
         /** LastReport */
         LastReport: {
@@ -5425,6 +6002,8 @@ export interface components {
             is_blocked: boolean;
             /** Block Reason */
             block_reason?: string | null;
+            /** Route Sequence */
+            route_sequence?: number | null;
         };
         /**
          * LocationMoveCreate
@@ -5503,6 +6082,13 @@ export interface components {
             is_blocked: boolean;
             /** Block Reason */
             block_reason?: string | null;
+            /** Route Sequence */
+            route_sequence?: number | null;
+            /**
+             * Count Locked
+             * @default false
+             */
+            count_locked: boolean;
             /** Quantity */
             quantity: number;
             /** Products */
@@ -5524,6 +6110,30 @@ export interface components {
              * @default []
              */
             contents: components["schemas"]["LocationContentOut"][];
+        };
+        /** ManualCheck */
+        ManualCheck: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Done */
+            done: boolean;
+            /** Note */
+            note?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Updated By */
+            updated_by?: string | null;
+        };
+        /** ManualCheckIn */
+        ManualCheckIn: {
+            /** Done */
+            done: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** MapOrder */
         MapOrder: {
@@ -5639,11 +6249,25 @@ export interface components {
             tour_state?: {
                 [key: string]: string;
             } | null;
+            /**
+             * Permissions
+             * @default []
+             */
+            permissions: string[];
         };
         /** MessageResponse */
         MessageResponse: {
             /** Message */
             message: string;
+        };
+        /** MethodValues */
+        MethodValues: {
+            /** Fifo */
+            fifo: number;
+            /** Weighted Average */
+            weighted_average: number;
+            /** Standard */
+            standard: number;
         };
         /**
          * MovementLineOut
@@ -6781,6 +7405,39 @@ export interface components {
             /** Earnings */
             earnings: number;
         };
+        /** PermissionMatrix */
+        PermissionMatrix: {
+            /** Roles */
+            roles: components["schemas"]["CodeLabel"][];
+            /** Permissions */
+            permissions: components["schemas"]["PermissionRow"][];
+        };
+        /** PermissionRow */
+        PermissionRow: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Max Roles */
+            max_roles: string[];
+            /** Default Roles */
+            default_roles: string[];
+            /** Sensitive */
+            sensitive: boolean;
+            /** Roles */
+            roles: {
+                [key: string]: components["schemas"]["RoleCell"];
+            };
+        };
+        /** PermissionUpdate */
+        PermissionUpdate: {
+            /** Allowed */
+            allowed: boolean;
+            /** Reason */
+            reason: string;
+        };
         /** PickCandidateOut */
         PickCandidateOut: {
             /** Id */
@@ -7609,6 +8266,19 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** PutawaySuggestionOut */
+        PutawaySuggestionOut: {
+            /** Location Id */
+            location_id: number;
+            /** Code */
+            code: string;
+            /** Barcode */
+            barcode: string;
+            /** Reason */
+            reason: string;
+            /** Rank */
+            rank: number;
+        };
         /** PutawayTaskCreate */
         PutawayTaskCreate: {
             /** Warehouse Id */
@@ -7769,6 +8439,51 @@ export interface components {
             order_id?: number | null;
             /** Tracking Code */
             tracking_code?: string | null;
+        };
+        /** ReadinessCheck */
+        ReadinessCheck: {
+            /** Key */
+            key: string;
+            /** Group */
+            group: string;
+            /** Label */
+            label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "warn" | "fail";
+            /** Detail */
+            detail: string;
+            /** Path */
+            path?: string | null;
+        };
+        /** ReadinessOut */
+        ReadinessOut: {
+            /** Checks */
+            checks: components["schemas"]["ReadinessCheck"][];
+            /** Manual */
+            manual: components["schemas"]["ManualCheck"][];
+            /** Score */
+            score: number;
+            /** Passed */
+            passed: number;
+            /** Total */
+            total: number;
+            /** Blockers */
+            blockers: string[];
+            /** Ready */
+            ready: boolean;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+        };
+        /** ReasonBody */
+        ReasonBody: {
+            /** Reason */
+            reason: string;
         };
         /** ReceiptCloseIn */
         ReceiptCloseIn: {
@@ -8099,13 +8814,13 @@ export interface components {
              * Report
              * @enum {string}
              */
-            report: "inventory" | "orders" | "ledger" | "finance" | "reorder" | "capital";
+            report: "inventory" | "orders" | "ledger" | "finance" | "reorder" | "capital" | "kpi" | "valuation" | "health" | "audit";
             /**
              * Format
              * @default excel
              * @enum {string}
              */
-            format: "excel" | "pdf";
+            format: "excel" | "pdf" | "csv";
             /** Date From */
             date_from?: string | null;
             /** Date To */
@@ -8184,6 +8899,15 @@ export interface components {
         ReviewDecision: {
             /** Note */
             note?: string | null;
+        };
+        /** RoleCell */
+        RoleCell: {
+            /** Allowed */
+            allowed: boolean;
+            /** Editable */
+            editable: boolean;
+            /** Customized */
+            customized: boolean;
         };
         /** RopCalc */
         RopCalc: {
@@ -8349,6 +9073,21 @@ export interface components {
             /** Eta */
             eta?: string | null;
             last_report?: components["schemas"]["LastReport"] | null;
+        };
+        /** ScanResult */
+        ScanResult: {
+            /** Kind */
+            kind: string;
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            /** Path */
+            path: string;
         };
         /** ScheduleUpdate */
         ScheduleUpdate: {
@@ -8967,6 +9706,30 @@ export interface components {
              * @enum {string}
              */
             scope: "full" | "partial";
+            /** Count Type */
+            count_type?: ("full" | "partial" | "cycle") | null;
+            /**
+             * Blind
+             * @default true
+             */
+            blind: boolean;
+            /**
+             * Freeze Mode
+             * @default snapshot
+             * @enum {string}
+             */
+            freeze_mode: "snapshot" | "lock";
+            /**
+             * By Location
+             * @default false
+             */
+            by_location: boolean;
+            /** Location Ids */
+            location_ids?: number[] | null;
+            /** Abc Classes */
+            abc_classes?: ("A" | "B" | "C")[] | null;
+            /** Limit */
+            limit?: number | null;
             /** Product Ids */
             product_ids?: number[] | null;
             /** Title */
@@ -8986,6 +9749,26 @@ export interface components {
             scope: string;
             /** Status */
             status: string;
+            /**
+             * Count Type
+             * @default full
+             */
+            count_type: string;
+            /**
+             * Blind
+             * @default true
+             */
+            blind: boolean;
+            /**
+             * Freeze Mode
+             * @default snapshot
+             */
+            freeze_mode: string;
+            /**
+             * By Location
+             * @default false
+             */
+            by_location: boolean;
             /** Warehouse Id */
             warehouse_id: number;
             /** Warehouse Name */
@@ -9024,12 +9807,36 @@ export interface components {
             shortage_value?: number | null;
             /** Surplus Value */
             surplus_value?: number | null;
+            /** Variance Value Total */
+            variance_value_total?: number | null;
+            /**
+             * Approval Threshold
+             * @default 0
+             */
+            approval_threshold: number;
+            /**
+             * Needs Full Approval
+             * @default false
+             */
+            needs_full_approval: boolean;
+            /** Approval Note */
+            approval_note?: string | null;
+            /**
+             * Locked Locations
+             * @default 0
+             */
+            locked_locations: number;
             /** Can Count */
             can_count: boolean;
             /** Can Submit */
             can_submit: boolean;
             /** Can Review */
             can_review: boolean;
+            /**
+             * Can Approve
+             * @default false
+             */
+            can_approve: boolean;
             /** Can Cancel */
             can_cancel: boolean;
             /** Self Review */
@@ -9045,6 +9852,10 @@ export interface components {
             product_name: string;
             /** Product Sku */
             product_sku?: string | null;
+            /** Location Id */
+            location_id?: number | null;
+            /** Location Code */
+            location_code?: string | null;
             /** Added During Count */
             added_during_count: boolean;
             /** Counted Qty */
@@ -9059,6 +9870,8 @@ export interface components {
             recount_note?: string | null;
             /** Expected Qty */
             expected_qty?: number | null;
+            /** System Qty */
+            system_qty?: number | null;
             /** Variance */
             variance?: number | null;
             /** Variance Value */
@@ -9080,6 +9893,26 @@ export interface components {
             scope: string;
             /** Status */
             status: string;
+            /**
+             * Count Type
+             * @default full
+             */
+            count_type: string;
+            /**
+             * Blind
+             * @default true
+             */
+            blind: boolean;
+            /**
+             * Freeze Mode
+             * @default snapshot
+             */
+            freeze_mode: string;
+            /**
+             * By Location
+             * @default false
+             */
+            by_location: boolean;
             /** Warehouse Id */
             warehouse_id: number;
             /** Warehouse Name */
@@ -9593,6 +10426,22 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** TrendPoint */
+        TrendPoint: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Orders */
+            orders: number;
+            /** Delivered */
+            delivered: number;
+            /** Shipped Units */
+            shipped_units: number;
+            /** Received Units */
+            received_units: number;
+        };
         /** UomIn */
         UomIn: {
             /** Name */
@@ -9730,6 +10579,62 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValuationOut */
+        ValuationOut: {
+            /** Method */
+            method: string;
+            /** Method Label */
+            method_label: string;
+            /** Methods */
+            methods: components["schemas"]["CodeLabel"][];
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            totals: components["schemas"]["MethodValues"];
+            cogs: components["schemas"]["MethodValues"];
+            /** Selected Total */
+            selected_total: number;
+            /** Estimated Items */
+            estimated_items: number;
+            /** Items */
+            items: components["schemas"]["ValuationRow"][];
+        };
+        /** ValuationRow */
+        ValuationRow: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Sku */
+            sku: string;
+            /** Category */
+            category?: string | null;
+            /** Abc Class */
+            abc_class?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Org Quantity */
+            org_quantity: number;
+            unit_cost: components["schemas"]["MethodValues"];
+            value: components["schemas"]["MethodValues"];
+            /** Selected Value */
+            selected_value: number;
+            /** Issued Qty */
+            issued_qty: number;
+            /** Estimated */
+            estimated: boolean;
+            /** Reconciled */
+            reconciled: boolean;
         };
         /** VariantIn */
         VariantIn: {
@@ -10001,6 +10906,65 @@ export interface components {
             active?: components["schemas"]["StocktakeSummary"] | null;
             /** Items */
             items: number;
+            /**
+             * Cycle Due
+             * @default 0
+             */
+            cycle_due: number;
+            /**
+             * Has Locations
+             * @default false
+             */
+            has_locations: boolean;
+        };
+        /** WorkflowOut */
+        WorkflowOut: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note?: string | null;
+            /** States */
+            states: components["schemas"]["WorkflowState"][];
+            /** Transitions */
+            transitions: components["schemas"]["WorkflowTransition"][];
+        };
+        /** WorkflowState */
+        WorkflowState: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Final */
+            final: boolean;
+        };
+        /** WorkflowTransition */
+        WorkflowTransition: {
+            /** From */
+            from: string;
+            /** To */
+            to: string;
+            /** Action */
+            action: string;
+            /** Actor */
+            actor: string;
+        };
+        /** ImportError_ */
+        app__schemas__catalog__ImportError_: {
+            /** Line */
+            line: number;
+            /** Sku */
+            sku?: string | null;
+            /** Messages */
+            messages: string[];
+        };
+        /** ImportError_ */
+        app__schemas__control__ImportError_: {
+            /** Line */
+            line: number;
+            /** Message */
+            message: string;
         };
         /** ReasonIn */
         app__schemas__fulfillment__ReasonIn: {
@@ -10313,6 +11277,9 @@ export interface operations {
                 q?: string | null;
                 date_from?: string | null;
                 date_to?: string | null;
+                action?: string | null;
+                target_type?: string | null;
+                target_id?: number | null;
                 limit?: number;
                 offset?: number;
             };
@@ -15208,6 +16175,37 @@ export interface operations {
             };
         };
     };
+    cycle_candidates_stocktakes_warehouses__warehouse_id__cycle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                warehouse_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleCandidate"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_interval_stocktakes_warehouses__warehouse_id__interval_put: {
         parameters: {
             query?: never;
@@ -15455,7 +16453,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CancelIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -17007,6 +18009,37 @@ export interface operations {
             };
         };
     };
+    task_suggestions_putaway_tasks__task_id__suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PutawaySuggestionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_task_putaway_tasks__task_id__cancel_post: {
         parameters: {
             query?: never;
@@ -18224,6 +19257,482 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    matrix_permissions__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionMatrix"];
+                };
+            };
+        };
+    };
+    update_permission_permissions__role___key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                role: "org_admin" | "warehouse_manager";
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionMatrix"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_permissions_permissions_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionMatrix"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kpis_analytics_kpis_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KpiDashboard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_valuation_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlSettings"];
+                };
+            };
+        };
+    };
+    update_settings_valuation_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ControlSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_valuation_valuation__get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValuationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_health_valuation_health_get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    print_labels_labels_print_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelPrintIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    label_history_labels_history_get: {
+        parameters: {
+            query?: {
+                label_type?: ("product" | "location" | "package") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelPrintOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_scan_resolve_get: {
+        parameters: {
+            query: {
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_readiness_readiness__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessOut"];
+                };
+            };
+        };
+    };
+    set_manual_readiness_manual__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_template_readiness_import__kind__template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "locations" | "opening";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_data_readiness_import__kind__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "locations" | "opening";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_data_readiness_import__kind__post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataImportReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_workflows_workflows__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowOut"][];
                 };
             };
         };

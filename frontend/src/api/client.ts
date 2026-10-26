@@ -81,9 +81,21 @@ export function errorMessage(error: unknown, fallback = "خطایی رخ داد�
  * استفاده: const orders = await unwrap(api.GET("/orders/", {...}))
  */
 export async function unwrap<T>(promise: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
-  const { data, error, response } = await promise;
+  let result: { data?: T; error?: unknown; response: Response };
+  try {
+    result = await promise;
+  } catch {
+    // قطع شبکه یا سرور در دسترس نیست (پاسخی نرسیده) — status خالی می‌ماند تا کلید یکتایی ثبت عوض نشود
+    throw new ApiError(navigator.onLine === false ? "اتصال اینترنت قطع است؛ پس از وصل شدن دوباره تلاش کنید."
+      : "سرور در دسترس نیست؛ چند لحظه بعد دوباره تلاش کنید.");
+  }
+  const { data, error, response } = result;
   if (error !== undefined || !response.ok) {
-    throw new ApiError(errorMessage(error, `خطای سرور (${response.status})`), response.status);
+    let message = errorMessage(error, `خطای سرور (${response.status})`);
+    // خطای پیش‌بینی‌نشده سرور: کد پیگیری برای پشتیبانی (اگر در خود پیام نیامده باشد)
+    const requestId = (error as { request_id?: string } | undefined)?.request_id ?? response.headers.get("x-request-id");
+    if (response.status >= 500 && requestId && !message.includes(requestId)) message += ` (کد پیگیری: ${requestId})`;
+    throw new ApiError(message, response.status);
   }
   return data as T;
 }

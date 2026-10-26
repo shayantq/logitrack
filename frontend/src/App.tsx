@@ -38,6 +38,12 @@ const TransfersPage = lazy(() => import("./pages/warehouse/TransfersPage"));
 const BackordersPage = lazy(() => import("./pages/warehouse/BackordersPage"));
 const ReplenishmentRulesPage = lazy(() => import("./pages/warehouse/ReplenishmentRulesPage"));
 const DispositionsPage = lazy(() => import("./pages/warehouse/DispositionsPage"));
+const AnalyticsPage = lazy(() => import("./pages/control/AnalyticsPage"));
+const ValuationPage = lazy(() => import("./pages/control/ValuationPage"));
+const LabelsPage = lazy(() => import("./pages/control/LabelsPage"));
+const PermissionsPage = lazy(() => import("./pages/control/PermissionsPage"));
+const ReadinessPage = lazy(() => import("./pages/control/ReadinessPage"));
+const WorkflowsPage = lazy(() => import("./pages/control/WorkflowsPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
 const UserDetailPage = lazy(() => import("./pages/users/UserDetailPage"));
@@ -174,6 +180,12 @@ export function App() {
             <Route path="backorders" element={guard(ORG_STAFF, <BackordersPage />)} />
             <Route path="replenishment" element={guard(ORG_STAFF, <ReplenishmentRulesPage />)} />
             <Route path="dispositions" element={guard(ORG_STAFF, <DispositionsPage />)} />
+            <Route path="analytics" element={guard(ORG_STAFF, <AnalyticsPage />)} />
+            <Route path="valuation" element={guard(ORG_STAFF, <ValuationPage />)} />
+            <Route path="labels" element={guard(ORG_STAFF, <LabelsPage />)} />
+            <Route path="permissions" element={guard(["org_admin"], <PermissionsPage />)} />
+            <Route path="readiness" element={guard(ORG_STAFF, <ReadinessPage />)} />
+            <Route path="workflows" element={guard(ORG_STAFF, <WorkflowsPage />)} />
             <Route path="partners" element={guard(ORG_STAFF, <PartnersPage />)} />
             <Route path="reports" element={guard(ORG_STAFF, <ReportsPage />)} />
             <Route path="finance" element={guard(["org_admin"], <FinancePage />)} />
@@ -182,7 +194,7 @@ export function App() {
             <Route path="vehicles" element={guard(["org_admin"], <VehiclesPage />)} />
             <Route path="users" element={guard(["org_admin"], <UsersPage />)} />
             <Route path="users/:id" element={guard(["org_admin"], <UserDetailPage />)} />
-            <Route path="activity" element={guard(["org_admin"], <ActivityPage />)} />
+            <Route path="activity" element={guard(ORG_STAFF, <ActivityPage />)} />
             <Route path="organization" element={guard(["org_admin"], <OrganizationPage />)} />
             <Route path="drivers" element={guard(["org_admin"], <DriverReviewPage />)} />
             <Route path="drivers/top" element={guard(ORG_STAFF, <TopDriversPage />)} />

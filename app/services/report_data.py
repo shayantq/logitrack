@@ -17,10 +17,12 @@ from app.services.exceptions import ConflictError, ForbiddenError
 from app.services.order_service import STATUS_LABELS
 from app.services.report_builder import Col, Report, Section, jalali
 
-REPORTS = ("inventory", "orders", "ledger", "finance", "reorder", "capital")
+REPORTS = ("inventory", "orders", "ledger", "finance", "reorder", "capital", "kpi", "valuation", "health", "audit")
 TITLES = {"inventory": "گزارش موجودی انبار", "orders": "گزارش سفارش‌ها", "ledger": "گزارش دفتر گردش کالا",
           "finance": "گزارش مالی حمل‌ونقل", "reorder": "گزارش نقطه سفارش و پیشنهاد خرید",
-          "capital": "برآورد سرمایه خرید ماه‌های آینده"}
+          "capital": "برآورد سرمایه خرید ماه‌های آینده", "kpi": "داشبورد شاخص‌های عملکرد انبار و ارسال",
+          "valuation": "ارزش‌گذاری موجودی", "health": "کالای کم‌گردش، راکد و نزدیک به انقضا",
+          "audit": "گزارش فعالیت و ممیزی"}
 MOVEMENT_LABELS = {
     "initial": "موجودی اولیه", "receipt": "ورود کالا", "order_out": "خروج سفارش", "order_return": "برگشت از سفارش",
     "adjustment": "اصلاح موجودی", "damage": "ضایعات", "transfer_out": "انتقال (خروج)", "transfer_in": "انتقال (ورود)",
@@ -33,7 +35,11 @@ def _role(user: User) -> str:
     return getattr(user.role, "value", user.role)
 
 
-def check_access(user: User, report: str) -> None:
+# مجوز ریز لازم برای گزارش‌های فصل‌های ۱۷، ۲۶ و ۲۸ (app/core/permissions.py)
+REPORT_PERMISSIONS = {"kpi": "analytics.view", "valuation": "valuation.view", "health": "valuation.view", "audit": "audit.view"}
+
+
+def check_access(user: User, report: str, db: Session | None = None) -> None:
     role = _role(user)
     if role not in ("org_admin", "warehouse_manager"):
         raise ForbiddenError("گزارش‌ها فقط برای ادمین سازمان و مدیر انبار است.")
@@ -41,6 +47,9 @@ def check_access(user: User, report: str) -> None:
         raise ForbiddenError("گزارش مالی و برآورد سرمایه فقط برای ادمین سازمان است.")
     if report not in REPORTS:
         raise ConflictError("نوع گزارش معتبر نیست.")
+    if report in REPORT_PERMISSIONS and db is not None:
+        from app.services import permission_service
+        permission_service.ensure(db, user, REPORT_PERMISSIONS[report])
 
 
 def _range(date_from: date | None, date_to: date | None) -> tuple[date, date]:
@@ -326,7 +335,92 @@ def capital(db: Session, user: User, warehouse_id: int | None = None, months: in
                   kpis=kpis, landscape=True, filename="Pasineh_Purchase_Capital_Plan")
 
 
-BUILDERS = {"inventory": inventory, "orders": orders, "ledger": ledger, "finance": finance, "reorder": reorder, "capital": capital}
+def kpi(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, warehouse_id: int | None = None, **_) -> Report:
+    from app.services import analytics_service
+    data = analytics_service.kpis(db, user, date_from=date_from, date_to=date_to, warehouse_id=warehouse_id)
+    status = {"good": "در هدف", "warn": "نزدیک هدف", "bad": "دور از هدف", "none": "بدون داده"}
+    rows = [{"label": k["label"], "value": "—" if k["value"] is None else f"{k['value']:g}", "unit": k["unit"],
+             "target": f"{'≥' if k['higher_better'] else '≤'} {k['target']:g}", "status": status[k["status"]],
+             "detail": k["detail"] or "", "hint": k["hint"]} for k in data["kpis"]]
+    cols = [Col("label", "شاخص", width=20), Col("value", "مقدار", width=10), Col("unit", "واحد", width=8),
+            Col("target", "هدف", width=10), Col("status", "وضعیت", width=12), Col("detail", "جزئیات", width=30),
+            Col("hint", "تعریف", width=40)]
+    trend = [{"day": jalali(t["day"]), "orders": t["orders"], "delivered": t["delivered"], "shipped": t["shipped_units"],
+              "received": t["received_units"]} for t in data["trend"]]
+    tcols = [Col("day", "روز", width=12), Col("orders", "سفارش ثبت‌شده", "number", 12, True),
+             Col("delivered", "تحویل‌شده", "number", 12, True), Col("shipped", "واحد خارج‌شده", "number", 12, True),
+             Col("received", "واحد واردشده", "number", 12, True)]
+    snap = data["snapshot"]
+    kpis = [("سفارش باز", f"{snap['open_orders']:,}"), ("واحد معوق", f"{snap['backorder_units']:,}"),
+            ("جانمایی باز", f"{snap['open_putaway']:,}"), ("در انتظار بازرسی", f"{snap['pending_inspection']:,}")]
+    return Report(title=TITLES["kpi"], period=period_text(data["date_from"], data["date_to"]),
+                  sections=[Section("شاخص‌ها", cols, rows, totals=False), Section("روند روزانه", tcols, trend)],
+                  kpis=kpis, landscape=True, filename="Pasineh_KPI")
+
+
+def valuation(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, warehouse_id: int | None = None, **_) -> Report:
+    from app.services import valuation_service
+    data = valuation_service.valuation(db, user, warehouse_id=warehouse_id, date_from=date_from, date_to=date_to)
+    rows = [{"sku": r["sku"], "name": r["product_name"], "abc": r["abc_class"] or "—", "qty": r["quantity"],
+             "fifo_unit": r["unit_cost"]["fifo"], "avg_unit": r["unit_cost"]["weighted_average"],
+             "fifo": r["value"]["fifo"], "avg": r["value"]["weighted_average"], "std": r["value"]["standard"],
+             "est": "تخمینی" if r["estimated"] else ""} for r in data["items"]]
+    cols = [Col("sku", "کد کالا", width=11), Col("name", "نام کالا", width=24), Col("abc", "ABC", width=5),
+            Col("qty", "مقدار", "number", 9, True), Col("fifo_unit", "بهای واحد FIFO", "money", 12),
+            Col("avg_unit", "بهای واحد میانگین", "money", 12), Col("fifo", "ارزش FIFO", "money", 14, True),
+            Col("avg", "ارزش میانگین موزون", "money", 14, True), Col("std", "ارزش استاندارد", "money", 14, True),
+            Col("est", "بها", width=8)]
+    c = data["cogs"]
+    kpis = [("روش جاری", data["method_label"]), ("ارزش (روش جاری)", _money(data["selected_total"])),
+            ("بهای فروش رفته FIFO", _money(c["fifo"])), ("بهای فروش رفته میانگین", _money(c["weighted_average"]))]
+    return Report(title=TITLES["valuation"], period=period_text(data["date_from"], data["date_to"]),
+                  sections=[Section("ارزش هر کالا به سه روش", cols, rows)], kpis=kpis, landscape=True,
+                  filename="Pasineh_Inventory_Valuation")
+
+
+def health(db: Session, user: User, warehouse_id: int | None = None, **_) -> Report:
+    from app.services import valuation_service
+    data = valuation_service.health(db, user, warehouse_id=warehouse_id)
+    labels = {"slow": "کم‌گردش", "dead": "راکد", "no_sales": "بی‌فروش", "active": "فعال"}
+    rows = [{"sku": i["sku"], "name": i["product_name"], "status": labels[i["status"]], "qty": i["quantity"], "value": i["value"],
+             "idle": i["idle_days"] if i["idle_days"] is not None else "—",
+             "last": jalali(_local(i["last_sale_at"])) if i["last_sale_at"] else "—"} for i in data["items"]]
+    cols = [Col("sku", "کد کالا", width=11), Col("name", "نام کالا", width=26), Col("status", "وضعیت", width=10),
+            Col("qty", "مقدار", "number", 9, True), Col("value", "ارزش", "money", 14, True), Col("idle", "روز بی‌گردشی", width=10),
+            Col("last", "آخرین فروش", width=12)]
+    exp = [{"sku": e["sku"] or "", "name": e["product_name"], "wh": e["warehouse_name"], "loc": e["location_code"] or "—",
+            "lot": e["lot_number"] or "—", "expiry": jalali(e["expiry_date"]), "days": e["days_left"], "qty": e["quantity"],
+            "value": e["value"]} for e in data["expiring"]]
+    ecols = [Col("sku", "کد کالا", width=11), Col("name", "نام کالا", width=22), Col("wh", "انبار", width=14),
+             Col("loc", "محل", width=10), Col("lot", "بچ", width=10), Col("expiry", "انقضا", width=11),
+             Col("days", "روز مانده", "number", 9), Col("qty", "مقدار", "number", 9, True), Col("value", "ارزش", "money", 13, True)]
+    kpis = [(labels[b["status"]], f"{b['count']:,} کالا — {_money(b['value'])}") for b in data["buckets"] if b["status"] != "active"]
+    return Report(title=TITLES["health"], period=f"در تاریخ {jalali(catalog_service.today_local())}",
+                  sections=[Section("کالای کم‌گردش، راکد و بی‌فروش", cols, rows), Section("نزدیک به انقضا و منقضی", ecols, exp)],
+                  kpis=kpis, landscape=True, filename="Pasineh_Inventory_Health")
+
+
+def audit(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, **_) -> Report:
+    from app.services import audit_service
+    start, end = _range(date_from, date_to)
+    rows, offset = [], 0
+    while offset < 5000:
+        data = audit_service.list_logs(db, user, date_from=start, date_to=end, limit=200, offset=offset)
+        for r in data["items"]:
+            rows.append({"at": jalali(_local(r["at"]), with_time=True), "actor": r["actor_name"] or "سیستم",
+                         "category": data["categories"].get(r["category"], r["category"]), "summary": r["summary"],
+                         "reason": r["reason"] or "", "ip": r["ip"] or ""})
+        offset += len(data["items"])
+        if offset >= data["total"] or not data["items"]:
+            break
+    cols = [Col("at", "زمان", width=16), Col("actor", "انجام‌دهنده", width=16), Col("category", "بخش", width=14),
+            Col("summary", "چه شد", width=44), Col("reason", "چرا", width=24), Col("ip", "IP", width=13)]
+    return Report(title=TITLES["audit"], period=period_text(start, end), sections=[Section("رویدادها", cols, rows, totals=False)],
+                  kpis=[("تعداد رویداد", f"{len(rows):,}")], landscape=True, filename="Pasineh_Audit_Log")
+
+
+BUILDERS = {"inventory": inventory, "orders": orders, "ledger": ledger, "finance": finance, "reorder": reorder, "capital": capital,
+            "kpi": kpi, "valuation": valuation, "health": health, "audit": audit}
 
 
 def organization(db: Session, organization_id: int) -> Organization:

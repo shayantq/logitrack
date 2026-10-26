@@ -177,6 +177,8 @@ def get_document(db: Session, user: User, document_id: int) -> dict:
 # ---------------------------------------------------------------------------
 def reverse_document(db: Session, user: User, document_id: int, reason: str, idempotency_key: str | None = None) -> dict:
     _ensure_staff(user)
+    from app.services import permission_service
+    permission_service.ensure(db, user, "stock.reverse")
 
     def create(key, digest):
         try:

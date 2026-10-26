@@ -12,7 +12,7 @@ from app.schemas.product import (
 )
 from app.schemas.operations import StockBalanceOut, StockCardOut, StockPositionOut
 from app.schemas.wms import ReservationOut, ReverseRequest, StockBucketOut, StockDocumentOut
-from app.services import inventory_service, stock_document_service, stock_position_service
+from app.services import audit_service, inventory_service, stock_document_service, stock_position_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -98,6 +98,11 @@ def record_movement(data: StockMovementCreate, db: db_dependency, user: user_dep
         movement = inventory_service.record_movement(db, user, data, idempotency_key)
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+    if data.movement_type != "receipt":
+        audit_service.record(db, user, "stock.adjust",
+                             f"{'ضایعات' if data.movement_type == 'damage' else 'اصلاح موجودی'} {movement.quantity_change:+d} — "
+                             f"{movement.product.name if movement.product else ''}", target_type="movement",
+                             target_id=movement.id, reason=data.reason, details={"document_id": movement.document_id})
     return StockMovementResponse.from_movement(movement)
 
 
@@ -121,7 +126,10 @@ def _call(fn, *args, **kwargs):
 @router.post("/status-changes", status_code=status.HTTP_201_CREATED, response_model=StockDocumentOut,
              summary="🧪 تغییر وضعیت کیفی (قرنطینه، توقیف، معیوب ↔ سالم و آزاد)")
 def change_status(data: StatusChangeCreate, db: db_dependency, user: user_dependency, idempotency_key: IdempotencyKey = None):
-    return _call(inventory_service.change_status, db, user, data, idempotency_key)
+    result = _call(inventory_service.change_status, db, user, data, idempotency_key)
+    audit_service.record(db, user, "stock.status_change", f"تغییر وضعیت کیفی {data.quantity} واحد: {data.from_status} ← {data.to_status}",
+                         target_type="document", target_id=result.get("id"), target_label=result.get("code"), reason=data.reason)
+    return result
 
 
 @router.get("/documents", response_model=list[StockDocumentOut], summary="🧾 اسناد انبار (رسید، حواله، اصلاحیه، انتقال، ...)")
@@ -152,7 +160,10 @@ def get_document(db: db_dependency, user: user_dependency, document_id: int = Pa
              summary="↩️ سند برگشت: خنثی کردن یک سند قطعی (بدون حذف یا ویرایش)")
 def reverse_document(data: ReverseRequest, db: db_dependency, user: user_dependency, document_id: int = Path(gt=0),
                      idempotency_key: IdempotencyKey = None):
-    return _call(stock_document_service.reverse_document, db, user, document_id, data.reason, idempotency_key)
+    result = _call(stock_document_service.reverse_document, db, user, document_id, data.reason, idempotency_key)
+    audit_service.record(db, user, "stock.reverse", f"سند برگشت {result.get('code')} ثبت شد", target_type="document",
+                         target_id=document_id, target_label=result.get("code"), reason=data.reason)
+    return result
 
 
 @router.get("/stock", response_model=list[StockBucketOut], summary="📊 موجودی به تفکیک انبار و وضعیت کیفی (با رزرو و موجودی آزاد)")

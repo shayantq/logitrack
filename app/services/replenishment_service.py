@@ -113,7 +113,8 @@ def update_policy(db: Session, user: User, data: dict) -> dict:
         policy[key] = int(value) if isinstance(DEFAULT_POLICY[key], int) else float(value)
     if policy["min_history_days"] > policy["history_days"]:
         raise ConflictError("حداقل تاریخچه لازم نمی‌تواند از بازه تاریخچه بیشتر باشد.")
-    org.inventory_policy = policy
+    # بقیه کلیدهای سیاست انبار (control_settings: روش ارزش‌گذاری، سقف تأیید انبارگردانی، …) دست نمی‌خورند
+    org.inventory_policy = {**(org.inventory_policy or {}), **policy}
     audit_service.log(db, user, "inventory.policy", "سیاست نقطه سفارش و برنامه خرید سازمان به‌روز شد", details=policy)
     recalculate(db, user.organization_id)
     db.commit()

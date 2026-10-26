@@ -22,6 +22,8 @@ from app.services.exceptions import ForbiddenError, NotFoundError
 CATEGORIES = {
     "auth": "ورود و امنیت", "users": "کاربران", "settings": "تنظیمات سازمان", "catalog": "کاتالوگ و قیمت",
     "reports": "گزارش‌گیری", "drivers": "رانندگان", "partners": "طرف‌های تجاری", "orders": "سفارش‌ها",
+    "inventory": "موجودی و انبارگردانی", "security": "مجوزها و امنیت", "labels": "برچسب و بارکد",
+    "system": "راه‌اندازی و داده",
 }
 ACTION_CATEGORY = {
     "auth.login": "auth", "auth.login_failed": "auth", "auth.locked": "auth", "auth.password_changed": "auth",
@@ -38,6 +40,12 @@ ACTION_CATEGORY = {
     "catalog.delete": "catalog", "catalog.uoms": "catalog", "catalog.suppliers": "catalog", "order.delete": "orders",
     "partner.create": "partners", "partner.update": "partners", "partner.archive": "partners",
     "partner.activate": "partners", "partner.delete": "partners",
+    "stock.adjust": "inventory", "stock.reverse": "inventory", "stock.status_change": "inventory", "stock.disposition": "inventory",
+    "stocktake.create": "inventory", "stocktake.approve": "inventory", "stocktake.cancel": "inventory",
+    "stocktake.recount": "inventory", "location.lock": "inventory", "valuation.method": "settings",
+    "permission.update": "security", "permission.reset": "security",
+    "label.print": "labels", "label.reprint": "labels",
+    "data.import": "system", "cutover.check": "system",
 }
 
 
@@ -47,7 +55,7 @@ def actor_label(user: User | None) -> str | None:
 
 def log(db: Session, actor: User | None, action: str, summary: str, *, target: User | None = None,
         target_type: str | None = None, target_id: int | None = None, target_label: str | None = None,
-        details: dict | None = None, organization_id: int | None = None) -> AuditLog:
+        details: dict | None = None, organization_id: int | None = None, reason: str | None = None) -> AuditLog:
     if target is not None:
         target_type, target_id, target_label = "user", target.id, target_label or actor_label(target)
     org_id = organization_id
@@ -56,7 +64,8 @@ def log(db: Session, actor: User | None, action: str, summary: str, *, target: U
     row = AuditLog(organization_id=org_id, actor_id=actor.id if actor is not None else None, actor_name=actor_label(actor),
                    action=action, category=ACTION_CATEGORY.get(action, action.split(".")[0][:16]),
                    target_type=target_type, target_id=target_id, target_label=(target_label or None) and target_label[:200],
-                   summary=summary[:500], details=details, ip=request_context.client_ip.get(),
+                   summary=summary[:500], reason=(reason or None) and reason[:500], details=details,
+                   ip=request_context.client_ip.get(),
                    user_agent=request_context.user_agent.get())
     db.add(row)
     return row
@@ -71,7 +80,11 @@ def record(db: Session, actor: User | None, action: str, summary: str, **kwargs)
         db.rollback()
 
 
-def _require_admin(user: User) -> None:
+def _require_admin(user: User, db: Session | None = None) -> None:
+    if db is not None:
+        from app.services import permission_service
+        permission_service.ensure(db, user, "audit.view", "گزارش فعالیت فقط برای ادمین سازمان است.")
+        return
     if getattr(user.role, "value", user.role) != "org_admin":
         raise ForbiddenError("گزارش فعالیت فقط برای ادمین سازمان است.")
 
@@ -85,21 +98,35 @@ def _bounds(date_from: date | None, date_to: date | None):
 def _out(row: AuditLog) -> dict:
     return {"id": row.id, "at": row.created_at, "actor_id": row.actor_id, "actor_name": row.actor_name, "action": row.action,
             "category": row.category, "target_type": row.target_type, "target_id": row.target_id, "target_label": row.target_label,
-            "summary": row.summary, "details": row.details, "ip": row.ip, "user_agent": row.user_agent}
+            "summary": row.summary, "reason": row.reason, "details": row.details, "ip": row.ip, "user_agent": row.user_agent}
 
 
-def list_logs(db: Session, user: User, *, actor_id: int | None = None, category: str | None = None, q: str | None = None,
-              date_from: date | None = None, date_to: date | None = None, limit: int = 50, offset: int = 0) -> dict:
-    _require_admin(user)
+def _filtered(db: Session, *, actor_id: int | None = None, category: str | None = None, q: str | None = None,
+              date_from: date | None = None, date_to: date | None = None, action: str | None = None,
+              target_type: str | None = None, target_id: int | None = None):
     query = db.query(AuditLog)
     if actor_id:
         query = query.filter(or_(AuditLog.actor_id == actor_id, (AuditLog.target_type == "user") & (AuditLog.target_id == actor_id)))
     if category:
         query = query.filter(AuditLog.category == category)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if target_type:
+        query = query.filter(AuditLog.target_type == target_type)
+    if target_id:
+        query = query.filter(AuditLog.target_id == target_id)
     if q and q.strip():
         like = f"%{q.strip()}%"
         query = query.filter(or_(AuditLog.summary.ilike(like), AuditLog.actor_name.ilike(like), AuditLog.target_label.ilike(like),
-                                 AuditLog.ip.ilike(like)))
+                                 AuditLog.ip.ilike(like), AuditLog.reason.ilike(like)))
+    return query
+
+
+def list_logs(db: Session, user: User, *, actor_id: int | None = None, category: str | None = None, q: str | None = None,
+              date_from: date | None = None, date_to: date | None = None, limit: int = 50, offset: int = 0,
+              action: str | None = None, target_type: str | None = None, target_id: int | None = None) -> dict:
+    _require_admin(user, db)
+    query = _filtered(db, actor_id=actor_id, category=category, q=q, action=action, target_type=target_type, target_id=target_id)
     lo, hi = _bounds(date_from, date_to)
     if lo:
         query = query.filter(AuditLog.created_at >= lo)

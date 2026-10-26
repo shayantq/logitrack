@@ -43,6 +43,8 @@
   --violet-soft: #eeeafb;
   /* رنگ‌های تفکیک بخش‌ها و نمودارها (کنار آبی پالت، گرم و مکمل) */
   --orange: #b9531a;
+  --chart-1: #4672ad;         /* نمودار دوسری (بررسی‌شده برای کوررنگی) */
+  --chart-2: #b9531a;
   --orange-soft: #fcebdd;
   --pink: #b0336b;
   --pink-soft: #fbe6ef;
@@ -80,6 +82,8 @@
   --violet: #b49cff;
   --violet-soft: #221d5c;
   --orange: #ff9a5c;
+  --chart-1: #6a86f2;
+  --chart-2: #d9773a;
   --orange-soft: #3a2230;
   --pink: #f27bb0;
   --pink-soft: #3a1d45;
@@ -187,6 +191,7 @@
 
 /* انیمیشن‌های عمومی */
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes drawer-in { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes bell { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 75% { transform: rotate(2deg); } }
 /* ردیفی که از اعلان به آن رسیده‌اید چند لحظه برجسته می‌شود */
 @keyframes focus-flash { 0%, 35% { background-color: color-mix(in oklab, var(--brand) 18%, transparent); } 100% { background-color: transparent; } }

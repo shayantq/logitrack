@@ -1,75 +1,20 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
-import {
-  BarChart3, BookOpen, Building2, ChevronsLeft, ChevronsRight, Inbox, LogOut, Menu as MenuIcon,
-  Package, Route, Truck, Users, Warehouse, type LucideIcon, Building, Factory, Map as MapIcon, LifeBuoy, ClipboardCheck, UserRound, ShieldCheck, IdCard, CalendarClock, CalendarDays, Send, Mail, Trophy, Percent, FileBarChart, Wallet, History, KeyRound, ShoppingCart, PiggyBank, Compass, MapPinned, FileStack, Handshake, PackageOpen, ScanLine, FlaskConical, ClipboardList,
-  ListChecks, PackageCheck, ArrowLeftRight, Repeat, Recycle, Hourglass,
-} from "lucide-react";
+import { Building2, ChevronsLeft, ChevronsRight, Compass, KeyRound, LogOut, MapPinned, Menu as MenuIcon, UserRound, X } from "lucide-react";
 import { api, authFetch, unwrap } from "@/api/client";
-import { isApprovedDriver, useAuth, useMe } from "@/auth/AuthContext";
+import { useAuth, useMe } from "@/auth/AuthContext";
 import { TourProvider, useTour } from "@/components/tour/TourProvider";
 import { NotificationCenter } from "@/components/NotificationCenter";
-import { SECTION_TONE, toneColor } from "@/ui/primitives";
-import { ROLE_LABELS, type Role } from "@/lib/labels";
+import { NavLinks, navItemsFor } from "@/components/navigation";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { ScanButton } from "@/components/ScanDialog";
+import { ROLE_LABELS } from "@/lib/labels";
 import { Logo, LogoMark, ThemeToggle } from "@/ui/brand";
-import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Tooltip } from "@/ui/overlays";
+import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "@/ui/overlays";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { Button, cn } from "@/ui/primitives";
-
-type NavItem = {
-  to: string; label: string; icon: LucideIcon; roles: Role[]; end?: boolean; group: string;
-  /** برای راننده: فقط وقتی تأییدشده است (true) یا فقط وقتی هنوز تأیید نشده (false) */
-  approvedDriver?: boolean; badge?: "pending-drivers" | "pending-requests" | "tickets" | "platform-tickets" | "stocktakes";
-};
-
-/** منوی هر نقش — گروه‌بندی‌شده */
-const NAV: NavItem[] = [
-  { to: "/app", label: "نمای کلی", icon: BarChart3, roles: ["org_admin", "warehouse_manager"], end: true, group: "عملیات" },
-  { to: "/app/orders", label: "سفارش‌ها", icon: Package, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
-  { to: "/app/backorders", label: "سفارش‌های معوق", icon: Hourglass, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
-  { to: "/app/map", label: "نقشه ارسال‌ها", icon: MapIcon, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
-  { to: "/app/schedules", label: "برنامه رانندگان", icon: CalendarClock, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
-  { to: "/app/warehouses", label: "انبارها", icon: Factory, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/locations", label: "محل‌های انبار", icon: MapPinned, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/inventory", label: "انبار و کالاها", icon: Warehouse, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/receipts", label: "رسید و دریافت", icon: PackageOpen, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/quality", label: "بازرسی کیفی", icon: FlaskConical, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/putaway", label: "جانمایی", icon: ScanLine, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/picking", label: "پیکینگ", icon: ListChecks, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/shipping", label: "بسته‌بندی و ارسال", icon: PackageCheck, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/transfers", label: "سفارش انتقال", icon: ArrowLeftRight, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/replenishment", label: "تأمین مجدد و ABC", icon: Repeat, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/dispositions", label: "تعیین تکلیف معیوب", icon: Recycle, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/stocktakes", label: "انبارگردانی", icon: ClipboardCheck, roles: ["org_admin", "warehouse_manager"], group: "انبار", badge: "stocktakes" },
-  { to: "/app/ledger", label: "دفتر گردش کالا", icon: BookOpen, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/stock-card", label: "کاردکس کالا", icon: ClipboardList, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/documents", label: "اسناد انبار", icon: FileStack, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/partners", label: "طرف‌های تجاری", icon: Handshake, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/reorder", label: "نقطه سفارش هوشمند", icon: ShoppingCart, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
-  { to: "/app/reports", label: "گزارش‌های اکسل و PDF", icon: FileBarChart, roles: ["org_admin", "warehouse_manager"], group: "گزارش‌ها" },
-  { to: "/app/finance", label: "مالی حمل‌ونقل", icon: Wallet, roles: ["org_admin"], group: "گزارش‌ها" },
-  { to: "/app/capital", label: "برآورد سرمایه خرید", icon: PiggyBank, roles: ["org_admin"], group: "گزارش‌ها" },
-  { to: "/app/vehicles", label: "ناوگان", icon: Truck, roles: ["org_admin"], group: "تیم" },
-  { to: "/app/users", label: "کاربران و رانندگان", icon: Users, roles: ["org_admin"], group: "تیم" },
-  { to: "/app/tickets", label: "پشتیبانی و تیکت‌ها", icon: LifeBuoy, roles: ["org_admin", "warehouse_manager"], group: "عملیات", badge: "tickets" },
-  { to: "/app/drivers/top", label: "برترین رانندگان", icon: Trophy, roles: ["org_admin", "warehouse_manager"], group: "تیم" },
-  { to: "/app/drivers", label: "احراز هویت رانندگان", icon: ShieldCheck, roles: ["org_admin"], group: "تیم", badge: "pending-drivers", end: true },
-  { to: "/app/driver-requests", label: "درخواست‌های رانندگان", icon: Mail, roles: ["org_admin"], group: "تیم", badge: "pending-requests" },
-  { to: "/app/organization", label: "پروفایل سازمان", icon: Building2, roles: ["org_admin"], group: "تنظیمات" },
-  { to: "/app/activity", label: "گزارش فعالیت", icon: History, roles: ["org_admin"], group: "تنظیمات" },
-  { to: "/app/commission", label: "سطح‌ها و پورسانت", icon: Percent, roles: ["org_admin"], group: "تنظیمات" },
-  { to: "/app/driver", label: "خودرو و سفارش‌های امروز", icon: Route, roles: ["driver"], group: "راننده", approvedDriver: true, end: true },
-  { to: "/app/driver/agenda", label: "برنامه و کارنامه", icon: CalendarDays, roles: ["driver"], group: "راننده", approvedDriver: true },
-  { to: "/app/driver/requests", label: "درخواست مرخصی / خودرو", icon: Send, roles: ["driver"], group: "راننده", approvedDriver: true },
-  { to: "/app/driver/support", label: "پشتیبانی", icon: LifeBuoy, roles: ["driver"], group: "راننده", approvedDriver: true, badge: "tickets" },
-  { to: "/app/driver/profile", label: "پروفایل من", icon: UserRound, roles: ["driver"], group: "راننده", approvedDriver: true },
-  { to: "/app/onboarding", label: "تکمیل پرونده", icon: IdCard, roles: ["driver"], group: "راننده", approvedDriver: false },
-  { to: "/app/platform", label: "سازمان‌ها", icon: Building, roles: ["platform_admin", "platform_support"], end: true, group: "پلتفرم" },
-  { to: "/app/platform/tickets", label: "تیکت‌های پشتیبانی", icon: LifeBuoy, roles: ["platform_admin", "platform_support"], group: "پلتفرم", badge: "platform-tickets" },
-  { to: "/app/platform/requests", label: "درخواست‌های ثبت سازمان", icon: Inbox, roles: ["platform_admin", "platform_support"], group: "پلتفرم" },
-];
 
 function useOrgLogo(enabled: boolean) {
   const { data: profile } = useQuery({
@@ -83,85 +28,28 @@ function useOrgLogo(enabled: boolean) {
   return url ?? null;
 }
 
-/** تعداد پرونده‌های راننده منتظر بررسی (برای نشان کنار منو) */
-function usePendingDrivers(enabled: boolean) {
-  return useQuery({
-    queryKey: ["driver-pending-count"],
-    queryFn: () => unwrap(api.GET("/drivers/applications/pending-count")) as Promise<{ count: number }>,
-    enabled, refetchInterval: 60_000,
-  }).data?.count ?? 0;
-}
-
-/** درخواست‌های منتظر رانندگان (مرخصی فوری با نشان قرمز) */
-function usePendingRequests(enabled: boolean) {
-  return useQuery({
-    queryKey: ["driver-requests-count"],
-    queryFn: () => unwrap(api.GET("/driver-requests/pending-count")) as Promise<{ count: number; urgent: number }>,
-    enabled, refetchInterval: 30_000,
-  }).data ?? { count: 0, urgent: 0 };
-}
-
-/** تیکت‌هایی که منتظر پاسخ این کاربرند (سازمان، راننده یا پشتیبانی پلتفرم) */
-function useTicketCount(kind: "tickets" | "platform-tickets" | null) {
-  return useQuery({
-    queryKey: ["tickets-summary", kind],
-    queryFn: () => kind === "platform-tickets" ? unwrap(api.GET("/platform/tickets/summary")) : unwrap(api.GET("/tickets/summary")),
-    enabled: !!kind, refetchInterval: 30_000,
-  }).data?.needs_action ?? 0;
-}
-
-function NavLinks({ items, collapsed, onNavigate }: { items: NavItem[]; collapsed: boolean; onNavigate?: () => void }) {
-  const pendingDrivers = usePendingDrivers(items.some(i => i.badge === "pending-drivers"));
-  const pendingRequests = usePendingRequests(items.some(i => i.badge === "pending-requests"));
-  const ticketKind = items.find(i => i.badge === "tickets" || i.badge === "platform-tickets")?.badge as "tickets" | "platform-tickets" | undefined;
-  const tickets = useTicketCount(ticketKind ?? null);
-  const stocktakes = useQuery({
-    queryKey: ["stocktakes-summary"], queryFn: () => unwrap(api.GET("/stocktakes/summary")),
-    enabled: items.some(i => i.badge === "stocktakes"), refetchInterval: 60_000,
-  }).data?.count ?? 0;
-  const groups = [...new Set(items.map(i => i.group))];
-  return (
-    <nav className="flex flex-col gap-5" data-testid="app-nav">
-      {groups.map(group => (
-        // هر گروه منو رنگ خودش را دارد (همان رنگ برچسب بالای صفحه‌های آن بخش) — آیکن‌ها و حالت فعال با همین رنگ
-        <div key={group} data-tour={`nav-${group}`} style={{
-          "--g": toneColor(SECTION_TONE[group] ?? "brand"),
-          "--g-soft": `var(--${SECTION_TONE[group] ?? "brand"}-soft)`,
-        } as React.CSSProperties}>
-          {!collapsed && <div className="mb-1.5 flex items-center gap-2 px-3 text-[11px] font-medium text-muted">
-            <span className="size-1.5 rounded-full bg-[var(--g)]" />{group}</div>}
-          <div className="flex flex-col gap-0.5">
-            {items.filter(i => i.group === group).map(({ to, label, icon: Icon, end, badge }) => {
-              const count = badge === "pending-drivers" ? pendingDrivers : badge === "pending-requests" ? pendingRequests.count
-                : badge === "tickets" || badge === "platform-tickets" ? tickets : badge === "stocktakes" ? stocktakes : 0;
-              const urgentBadge = badge === "pending-requests" && pendingRequests.urgent > 0;
-              const link = (
-                <NavLink key={to} to={to} end={end} onClick={onNavigate}
-                  className={({ isActive }) => cn("group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
-                    collapsed && "justify-center px-0",
-                    isActive ? "bg-[var(--g-soft)] font-semibold text-text before:absolute before:inset-y-2 before:right-0 before:w-1 before:rounded-full before:bg-[var(--g)]"
-                      : "text-text-2 hover:bg-surface-2 hover:text-text")}>
-                  <span className="relative">
-                    <Icon className="size-[18px] shrink-0 text-[var(--g)]" />
-                    {collapsed && count > 0 && <span className="absolute -left-1.5 -top-1.5 size-2.5 rounded-full bg-warning" />}
-                  </span>
-                  {!collapsed && <span className="truncate">{label}</span>}
-                  {!collapsed && count > 0 && (
-                    <span className={cn("ms-auto grid min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold text-white",
-                      urgentBadge ? "animate-pulse bg-danger" : badge === "tickets" || badge === "platform-tickets" ? "bg-brand" : "bg-warning")}
-                      data-testid={badge === "pending-requests" ? "pending-requests-badge" : badge === "pending-drivers" ? "pending-drivers-badge" : badge === "stocktakes" ? "stocktakes-badge" : "tickets-badge"}>
-                      {count.toLocaleString("fa-IR")}
-                    </span>
-                  )}
-                </NavLink>
-              );
-              return collapsed ? <Tooltip key={to} content={label}>{link}</Tooltip> : link;
-            })}
-          </div>
-        </div>
-      ))}
-    </nav>
-  );
+/** کشیدن کشوی موبایل به سمت راست (بیرون صفحه در RTL) آن را می‌بندد */
+function useSwipeToClose(onClose: () => void) {
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const [dx, setDx] = useState(0);
+  return {
+    offset: dx,
+    handlers: {
+      onTouchStart: (e: React.TouchEvent) => { start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; },
+      onTouchMove: (e: React.TouchEvent) => {
+        if (!start.current) return;
+        const moveX = e.touches[0].clientX - start.current.x;
+        const moveY = Math.abs(e.touches[0].clientY - start.current.y);
+        if (moveY > Math.abs(moveX)) return;              // اسکرول عمودی منو
+        setDx(Math.max(0, moveX));
+      },
+      onTouchEnd: () => {
+        if (dx > 80) onClose();
+        start.current = null;
+        setDx(0);
+      },
+    },
+  };
 }
 
 export function AppShell() {
@@ -174,13 +62,14 @@ function Shell() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar") === "collapsed");
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("sidebar") === "collapsed"; } catch { return false; } });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const items = NAV.filter(item => item.roles.includes(me.role)
-    && (item.approvedDriver === undefined || item.approvedDriver === isApprovedDriver(me)));
+  const items = navItemsFor(me);
   const logo = useOrgLogo(!!me.organization_id);
-  const showNotifications = me.role === "org_admin" || me.role === "warehouse_manager" || me.role === "driver";
+  const staff = me.role === "org_admin" || me.role === "warehouse_manager";
+  const showNotifications = staff || me.role === "driver";
+  const swipe = useSwipeToClose(() => setMobileOpen(false));
 
   useEffect(() => { try { localStorage.setItem("sidebar", collapsed ? "collapsed" : "open"); } catch { /* */ } }, [collapsed]);
   useEffect(() => setMobileOpen(false), [location.pathname]);
@@ -188,32 +77,40 @@ function Shell() {
   return (
     <div className="flex min-h-dvh bg-bg">
       {/* سایدبار دسکتاپ */}
-      <aside className={cn("sticky top-0 hidden h-dvh shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-300 lg:flex",
-        collapsed ? "w-[76px]" : "w-64")}>
+      <aside data-testid="sidebar" data-collapsed={collapsed}
+        className={cn("sticky top-0 hidden h-dvh shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-300 ease-out lg:flex",
+          collapsed ? "w-[76px]" : "w-[17rem]")}>
         <div className={cn("flex h-16 items-center border-b border-border", collapsed ? "justify-center" : "px-5")}>
           {collapsed ? <LogoMark /> : <Logo />}
         </div>
-        <div className="flex-1 overflow-y-auto p-3"><NavLinks items={items} collapsed={collapsed} /></div>
-        <button onClick={() => setCollapsed(c => !c)} className="flex h-12 items-center justify-center gap-2 border-t border-border text-xs text-muted transition hover:text-text">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-3"><NavLinks items={items} collapsed={collapsed} /></div>
+        <button onClick={() => setCollapsed(c => !c)} data-testid="sidebar-toggle" aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+          className="flex h-12 items-center justify-center gap-2 border-t border-border text-xs text-muted transition hover:bg-surface-2 hover:text-text">
           {collapsed ? <ChevronsLeft className="size-4" /> : <><ChevronsRight className="size-4" /> جمع کردن منو</>}
         </button>
       </aside>
 
-      {/* منوی کشویی موبایل */}
+      {/* منوی کشویی موبایل (iOS Safari / Android Chrome): کشیدن به راست یا لمس بیرون، می‌بندد */}
       <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 lg:hidden" />
-          <Dialog.Content dir="rtl" className="fixed inset-y-0 right-0 z-50 flex w-72 flex-col bg-surface shadow-float animate-rise lg:hidden">
-            <Dialog.Title className="flex h-16 items-center border-b border-border px-5"><Logo /></Dialog.Title>
-            <Dialog.Description className="sr-only">منوی اصلی</Dialog.Description>
-            <div className="flex-1 overflow-y-auto p-3"><NavLinks items={items} collapsed={false} onNavigate={() => setMobileOpen(false)} /></div>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-fade lg:hidden" />
+          <Dialog.Content dir="rtl" data-testid="mobile-nav" {...swipe.handlers}
+            style={{ transform: swipe.offset ? `translateX(${swipe.offset}px)` : undefined, transition: swipe.offset ? "none" : undefined }}
+            className="fixed inset-y-0 right-0 z-50 flex w-[86vw] max-w-80 flex-col bg-surface pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-float transition-transform duration-300 data-[state=open]:animate-[drawer-in_.28s_ease-out] lg:hidden">
+            <div className="flex h-16 items-center justify-between border-b border-border px-5">
+              <Dialog.Title asChild><div><Logo /></div></Dialog.Title>
+              <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="بستن منو" data-testid="mobile-nav-close"><X className="size-5" /></Button></Dialog.Close>
+            </div>
+            <Dialog.Description className="sr-only">منوی اصلی — برای بستن به راست بکشید</Dialog.Description>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-3"><NavLinks items={items} collapsed={false} onNavigate={() => setMobileOpen(false)} /></div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <OfflineBanner />
         <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-xl md:px-6">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)} aria-label="منو"><MenuIcon className="size-5" /></Button>
+          <Button variant="ghost" size="icon" className="size-11 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="منو" data-testid="mobile-nav-open"><MenuIcon className="size-5" /></Button>
           <div className="flex min-w-0 items-center gap-3">
             {logo && <img src={logo} alt="" className="size-9 rounded-lg bg-white object-contain p-0.5" />}
             <div className="min-w-0">
@@ -222,6 +119,7 @@ function Shell() {
             </div>
           </div>
           <div className="ms-auto flex items-center gap-1">
+            {staff && <ScanButton />}
             {showNotifications && <NotificationCenter />}
             <ThemeToggle />
             <Menu trigger={

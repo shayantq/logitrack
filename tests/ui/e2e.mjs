@@ -1123,10 +1123,10 @@ await session("reports", "qazvin_admin", "admin123", async page => {
   await page.waitForSelector("[data-testid=brand-save]:disabled");
   check("reports", "brand colour saved", true);
 
-  await page.click("[data-testid=app-nav] >> text=گزارش‌های اکسل و PDF");
+  await page.click("[data-testid=app-nav] >> text=مرکز گزارش و خروجی");
   await page.waitForSelector("[data-testid=report-card-finance]");
   // موجودی، سفارش‌ها، دفتر گردش، مالی، نقطه سفارش، برآورد سرمایه
-  check("reports", "admin sees all six report cards", (await page.locator("[data-testid^=report-card-]").count()) === 6);
+  check("reports", "admin sees all ten report cards", (await page.locator("[data-testid^=report-card-]").count()) === 10);
   await page.click("[data-testid=period-picker] button >> text=امسال");
   const pdf = await grabDownload(page, "[data-testid=report-pdf-finance]");
   check("reports", "finance PDF downloads with Jalali-stamped name", pdf.head === "%PDF" && /^Pasineh_Transport_Finance_14\d\d-\d\d-\d\d\.pdf$/.test(pdf.name), pdf.name);
@@ -1149,10 +1149,10 @@ await session("reports", "qazvin_admin", "admin123", async page => {
 });
 await session("reports-manager", "qazvin_manager", "manager123", async page => {
   check("reports-manager", "no finance entry for warehouse manager", (await page.locator("[data-testid=app-nav] >> text=مالی حمل‌ونقل").count()) === 0);
-  await page.click("[data-testid=app-nav] >> text=گزارش‌های اکسل و PDF");
+  await page.click("[data-testid=app-nav] >> text=مرکز گزارش و خروجی");
   await page.waitForSelector("[data-testid=report-card-inventory]");
   // بدون مالی و برآورد سرمایه
-  check("reports-manager", "manager sees four report cards", (await page.locator("[data-testid^=report-card-]").count()) === 4);
+  check("reports-manager", "manager sees five report cards (incl. KPI)", (await page.locator("[data-testid^=report-card-]").count()) === 5);
   const inv = await grabDownload(page, "[data-testid=report-pdf-inventory]");
   check("reports-manager", "manager inventory PDF", inv.head === "%PDF", inv.name);
 });
@@ -1175,7 +1175,7 @@ await session("catalog", "qazvin_admin", "admin123", async page => {
   await page.fill("[data-testid=price-subsidy]", "10");
   check("catalog", "subsidy preview computes the selling price", latinize(await page.locator("[data-testid=price-preview]").textContent()).replace(/[,٬]/g, "").includes("1800000"));
   await page.click("[data-testid=price-submit]");
-  await page.waitForFunction(n => document.querySelectorAll("[data-testid=price-row]").length > n, before);
+  await page.waitForFunction(() => (document.querySelector("[data-testid=catalog-current-price]")?.textContent ?? "").replace(/[۰-۹]/g, d => "۰۱۲۳۴۵۶۷۸۹".indexOf(d)).replace(/[,٬]/g, "").includes("1800000"), null, { timeout: 15000 });
   check("catalog", "new dated price becomes current", latinize(await page.locator("[data-testid=catalog-current-price]").textContent()).replace(/[,٬]/g, "").includes("1800000"));
   await page.click("[data-testid=catalog-product] button >> text=تنوع‌ها");
   await page.fill("[data-testid=variant-sku]", `VAR-${runId}`);
@@ -1423,6 +1423,109 @@ await session("wms-fulfill", "qazvin_manager", "manager123", async page => {
   const ledger = await apiCall(await apiToken("qazvin_admin", "admin123"), "GET", "/inventory/ledger-check");
   check("wms-fulfill", "ledger stays consistent after picking, shipping and transfer", ledger.ok === true, JSON.stringify(ledger.mismatches?.slice(0, 2)));
 });
+
+// ---------------- کنترل و راه‌اندازی (فصل ۱۶ تا ۳۵): منو، شاخص‌ها، ارزش‌گذاری، مجوزها، برچسب، اسکن، آمادگی، قفل شمارش ----------------
+const ctrlAdmin = await apiToken("qazvin_admin", "admin123");
+await session("wms-control", "qazvin_admin", "admin123", async page => {
+  // منوی گروه‌بندی‌شده: شش گروه، جمع/باز شدن گروه و جمع شدن کل منو
+  const groups = await page.locator("[data-testid=sidebar] [data-group]").evaluateAll(els => els.map(e => e.getAttribute("data-group")));
+  check("wms-control", "sidebar has the six work groups", JSON.stringify(groups) === JSON.stringify(["overview", "operations", "master", "logistics", "reports", "system"]), JSON.stringify(groups));
+  await page.click("[data-testid=sidebar] [data-testid=nav-group-reports]");
+  await page.waitForSelector("[data-testid=sidebar] [data-group=reports][data-open=false]");
+  await page.click("[data-testid=sidebar] [data-testid=nav-group-reports]");
+  await page.waitForSelector("[data-testid=sidebar] [data-group=reports][data-open=true]");
+  await page.click("[data-testid=sidebar-toggle]");
+  await page.waitForSelector("[data-testid=sidebar][data-collapsed=true]");
+  await page.click("[data-testid=sidebar-toggle]");
+  await page.waitForSelector("[data-testid=sidebar][data-collapsed=false]");
+  check("wms-control", "nav groups collapse and the sidebar folds to icons", true);
+
+  await page.click("[data-testid=app-nav] >> text=شاخص‌های عملکرد");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=kpi-tile]").length === 9, null, { timeout: 15000 });
+  check("wms-control", "KPI dashboard shows nine indicators with trend charts", (await page.locator("[data-testid=kpi-trend]").count()) === 2);
+
+  await page.click("[data-testid=app-nav] >> text=ارزش‌گذاری و کالای راکد");
+  await page.waitForSelector("[data-testid=valuation-table] [data-testid=valuation-row]", { timeout: 15000 });
+  await page.click("button >> text=راکد و انقضا");
+  await page.waitForSelector("[data-testid=health-buckets]");
+  check("wms-control", "valuation (three methods) and stock health render", true);
+
+  // مجوز: گزارش فعالیت به مدیر انبار با دلیل ← سمت سرور اعمال می‌شود
+  await page.click("[data-testid=app-nav] >> text=مجوزهای نقش‌ها");
+  await page.click("[data-testid=permission-row][data-key='audit.view'] [data-testid=permission-toggle][data-role=warehouse_manager]");
+  await page.fill("[data-testid=prompt-input]", "سرپرست شیفت آزمون");
+  await page.click("[data-testid=dialog-ok]");
+  await page.waitForSelector("[data-testid=permission-row][data-key='audit.view'] [data-role=warehouse_manager][aria-checked=true]");
+  const managerPerms = (await apiCall(opsToken, "GET", "/users/me")).permissions;
+  check("wms-control", "permission granted in the matrix is enforced for the manager", managerPerms.includes("audit.view"));
+  await apiCall(ctrlAdmin, "POST", "/permissions/reset", { reason: "پایان آزمون" });
+
+  // برچسب محل: اولین چاپ آزاد، سابقه ثبت می‌شود
+  await page.click("[data-testid=app-nav] >> text=برچسب و بارکد");
+  await choose(page, "[data-testid=labels-warehouse]", String(opsWarehouse));
+  const labelRow = page.locator(`[data-testid=label-row]`).first();
+  await labelRow.waitFor();
+  await labelRow.click();
+  const popup = page.waitForEvent("popup", { timeout: 10000 }).catch(() => null);
+  await page.click("[data-testid=labels-print]");
+  await page.waitForSelector("[data-testid=toast]:has-text('برچسب‌ها آماده شد')", { timeout: 10000 });
+  (await popup)?.close().catch(() => {});
+  await page.waitForSelector("[data-testid=label-history] tbody tr");
+  check("wms-control", "location label printed as PDF and logged", true);
+
+  // اسکن سراسری کد کالا ← کاردکس همان کالا
+  await page.click("[data-testid=scan-open]");
+  await page.fill("[data-testid=scan-input]", opsProduct.sku);
+  await page.click("[data-testid=scan-submit]");
+  await page.waitForSelector("[data-testid=scan-result][data-kind=product]");
+  await page.waitForURL(/\/app\/stock-card\?product=/, { timeout: 10000 });
+  check("wms-control", "global scan resolves a product barcode and opens its stock card", true);
+
+  await page.click("[data-testid=app-nav] >> text=آمادگی راه‌اندازی");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=readiness-check]").length >= 10, null, { timeout: 15000 });
+  check("wms-control", "readiness checklist scores automatic and manual checks",
+    (await page.locator("[data-testid=manual-item]").count()) === 7, await page.locator("[data-testid=readiness-score]").textContent());
+  await page.click("[data-testid=app-nav] >> text=گردش‌کار اسناد");
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=workflow-item]").length >= 9);
+  check("wms-control", "document workflows page lists the state machines", true);
+
+  // قطع شبکه: نوار وضعیت، و برگشت اتصال
+  await page.context().setOffline(true);
+  await page.waitForSelector("[data-testid=offline-banner][data-online=false]");
+  await page.context().setOffline(false);
+  await page.waitForSelector("[data-testid=offline-banner][data-online=true]");
+  check("wms-control", "offline banner appears and clears on reconnect", true);
+
+  // انبارگردانی در سطح محل با قفل: محل قفل گردش نمی‌پذیرد، لغو قفل را برمی‌دارد
+  const locs = await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`);
+  const stocked = (await apiCall(opsToken, "GET", `/inventory/balances?product_id=${opsProduct.id}&warehouse_id=${opsWarehouse}`))
+    .find(b => b.location_id && b.stock_status === "available" && b.quantity > 0);
+  const lockBin = locs.find(l => l.id === stocked.location_id);
+  const other = locs.find(l => l.id !== lockBin.id && l.is_leaf && !l.is_blocked && l.location_type === "storage") ?? locs.find(l => l.id !== lockBin.id && l.is_leaf);
+  const st = await apiCall(opsToken, "POST", "/stocktakes/", { warehouse_id: opsWarehouse, scope: "partial", product_ids: [opsProduct.id],
+    by_location: true, freeze_mode: "lock", location_ids: [lockBin.id] });
+  const blocked = await apiCall(opsToken, "POST", "/inventory/location-moves",
+    { product_id: opsProduct.id, warehouse_id: opsWarehouse, from_location_id: lockBin.id, to_location_id: other.id, quantity: 1 }, false);
+  check("wms-control", "a count-locked bin rejects stock movements", blocked.status === 400 && String(blocked.data?.detail).includes("قفل"), JSON.stringify(blocked));
+  await page.goto(`${BASE}/app/stocktakes/${st.id}`);
+  await page.waitForSelector("[data-testid=stocktake-locked]");
+  await apiCall(ctrlAdmin, "POST", `/stocktakes/${st.id}/cancel`, { reason: "پایان آزمون قفل" });
+  const unlocked = await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`);
+  check("wms-control", "canceling the count releases the lock", !unlocked.find(l => l.id === lockBin.id).count_locked);
+});
+
+await session("wms-control-mobile", "qazvin_manager", "manager123", async page => {
+  await page.click("[data-testid=mobile-nav-open]");
+  await page.waitForSelector("[data-testid=mobile-nav] [data-testid=app-nav]");
+  await page.click("[data-testid=mobile-nav] >> text=پیکینگ");
+  await page.waitForSelector("[data-testid=mobile-nav]", { state: "detached" });
+  check("wms-control-mobile", "mobile drawer opens and closes after navigating", page.url().includes("/app/picking"));
+  const groups = await page.evaluate(async () => {
+    const r = await fetch("/users/me", { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } });
+    return (await r.json()).permissions;
+  });
+  check("wms-control-mobile", "manager has no permission-matrix access by default", !groups.includes("permissions.manage"));
+}, { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
 // ---------------- کنترل‌های سفارشی به‌جای ظاهر پیش‌فرض کروم ----------------
 await session("native-ui-public", null, null, async page => {

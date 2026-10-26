@@ -267,6 +267,15 @@ def pick_lines(db: Session, inventory: Inventory, quantity: int, *, match: dict 
     return lines
 
 
+def _ensure_not_counting(db: Session, location_ids: set[int]) -> None:
+    """محل قفل‌شده برای انبارگردانی (فصل ۱۶) تا تأیید یا لغو همان انبارگردانی گردشی نمی‌پذیرد."""
+    if not location_ids:
+        return
+    locked = db.query(Location.code).filter(Location.id.in_(location_ids), Location.count_lock_id.is_not(None)).first()
+    if locked is not None:
+        raise ConflictError(f"محل {locked[0]} در حال انبارگردانی و قفل است؛ تا پایان شمارش، کالا از این محل یا به آن جابه‌جا نمی‌شود.")
+
+
 # ---------------------------------------------------------------------------
 # ثبت گردش
 # ---------------------------------------------------------------------------
@@ -312,6 +321,8 @@ def record(
     lines = [(key, qty) for key, qty in lines if qty]
     if any(qty < 0 for _, qty in lines) or sum(qty for _, qty in lines) != quantity:
         raise ValueError("مجموع ردیف‌های ریز گردش با مقدار گردش برابر نیست.")
+    if movement_type != "stocktake":
+        _ensure_not_counting(db, {key.location_id for key, _ in lines if key.location_id})
 
     if document is None:
         document = new_document(

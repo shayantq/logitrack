@@ -37,6 +37,8 @@ class LocationIn(BaseModel):
     is_active: bool = True
     is_blocked: bool = False
     block_reason: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]] = None
+    # ترتیب مسیر برداشت؛ خالی = مسیر مارپیچ خودکار از روی کد محل
+    route_sequence: Optional[int] = Field(None, ge=0, le=1_000_000)
 
 
 class LocationContentOut(BaseModel):
@@ -77,6 +79,8 @@ class LocationOut(BaseModel):
     is_active: bool
     is_blocked: bool
     block_reason: Optional[str] = None
+    route_sequence: Optional[int] = None
+    count_locked: bool = False
     quantity: int
     products: int
     weight_kg: float
@@ -328,6 +332,14 @@ class PutawayProblemIn(BaseModel):
     problem: Literal[PUTAWAY_PROBLEMS]
     location_id: Optional[int] = Field(None, gt=0, description="محل مقصدی که مشکل دارد (خالی = مقصد پیشنهادی)")
     note: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]] = None
+
+
+class PutawaySuggestionOut(BaseModel):
+    location_id: int
+    code: str
+    barcode: str
+    reason: str
+    rank: int
 
 
 class PutawayTaskOut(BaseModel):

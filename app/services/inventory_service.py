@@ -23,7 +23,7 @@ from app.schemas.product import (
     LocationMoveCreate, ProductCreate, StatusChangeCreate, StockMovementCreate, StockTransferCreate, StockUpdate,
 )
 from app.services import (
-    allocation_service, audit_service, catalog_service, location_service, quality_service, receiving_service,
+    allocation_service, audit_service, catalog_service, location_service, permission_service, quality_service, receiving_service,
     stock_document_service, stock_ledger, warehouse_service,
 )
 from app.services.stock_ledger import StockKey
@@ -107,6 +107,7 @@ def _get_product(db: Session, product_id: int) -> Product:
 def create_product(db: Session, user: User, product_data: ProductCreate) -> Product:
     if _role(user) not in ['org_admin', 'warehouse_manager']:
         raise ForbiddenError("⚠️ خطا: حساب کاربری شما سطح دسترسی لازم (ادمین/مدیر انبار) برای ثبت کالا را ندارد.")
+    permission_service.ensure(db, user, "masterdata.products")
 
     target_warehouse_id = product_data.warehouse_id
     if _role(user) == 'warehouse_manager':
@@ -164,6 +165,7 @@ def delete_product(db: Session, user: User, product_id: int) -> None:
     """
     if _role(user) not in ['org_admin', 'warehouse_manager']:
         raise ForbiddenError("⚠️ خطا: شما اجازه حذف کالا را ندارید.")
+    permission_service.ensure(db, user, "masterdata.products")
 
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -267,6 +269,8 @@ def _supplier(db: Session, partner_id: int | None) -> Partner | None:
 
 def record_movement(db: Session, user: User, data: StockMovementCreate, idempotency_key: str | None = None) -> StockMovement:
     _require_stock_role(user)
+    if data.movement_type != "receipt":
+        permission_service.ensure(db, user, "stock.adjust")
     product = _get_product(db, data.product_id)
 
     def create(key, digest):
@@ -375,6 +379,7 @@ def transfer_stock(db: Session, user: User, data: StockTransferCreate, idempoten
 def change_status(db: Session, user: User, data: StatusChangeCreate, idempotency_key: str | None = None) -> dict:
     """تغییر وضعیت کیفی بخشی از موجودی (مثلاً آزادسازی از قرنطینه پس از بازرسی): یک سند با دو گردش."""
     _require_stock_role(user)
+    permission_service.ensure(db, user, "stock.status_change")
     product = _get_product(db, data.product_id)
     quality_service.ensure_transition(user, data.from_status, data.to_status)
 

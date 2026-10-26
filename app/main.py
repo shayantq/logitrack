@@ -1,7 +1,13 @@
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
+import logging
+import secrets
+
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,19 +15,20 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.database import db_dependency
-from app.core.request_context import RequestContextMiddleware
+from app.core.request_context import RequestContextMiddleware, request_id
 from app.core.tenancy import TenantIsolationError
 from app.services.stock_ledger import LedgerViolationError
 
 from app.routers import (
     auth, inventory, orders, users, vehicles, reports, warehouses, notifications, platform,
     organization, organization_requests, drivers, dispatch, driver_portal, performance, tracking, routes, tickets, stocktakes, catalog, replenishment,
-    partners, wms, locations, inbound, fulfillment,
+    partners, wms, locations, inbound, fulfillment, control,
 )
 
 # ------------------------------------------------------------------------------
 # رابط کاربری: خروجی build اپ React (داخل داکر: /code/frontend/dist)
 # ------------------------------------------------------------------------------
+logger = logging.getLogger("pasineh")
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIST = Path(os.getenv("FRONTEND_DIST", BASE_DIR.parent / "frontend" / "dist"))
 SPA_INDEX = FRONTEND_DIST / "index.html"
@@ -176,18 +183,25 @@ app.include_router(fulfillment.replenishment)
 app.include_router(fulfillment.picking)
 app.include_router(fulfillment.shipping)
 app.include_router(fulfillment.dispositions)
+app.include_router(control.permissions)
+app.include_router(control.analytics)
+app.include_router(control.valuation)
+app.include_router(control.labels)
+app.include_router(control.scan)
+app.include_router(control.readiness)
+app.include_router(control.workflow)
 
 
 # محافظ‌های لایه داده آخرین سدند (سرویس‌ها پیش از آن خطای خوانا می‌دهند)؛ اگر کدی از آن‌ها رد شود،
 # درخواست با پیام روشن رد می‌شود و هیچ تغییری ذخیره نمی‌شود.
 @app.exception_handler(TenantIsolationError)
 async def tenant_isolation_handler(request: Request, exc: TenantIsolationError):
-    return JSONResponse(status_code=403, content={"detail": "دسترسی به داده سازمان دیگر مجاز نیست."})
+    return JSONResponse(status_code=403, content=_error_body(403, "دسترسی به داده سازمان دیگر مجاز نیست."))
 
 
 @app.exception_handler(LedgerViolationError)
 async def ledger_violation_handler(request: Request, exc: LedgerViolationError):
-    return JSONResponse(status_code=409, content={"detail": str(exc)})
+    return JSONResponse(status_code=409, content=_error_body(409, str(exc)))
 
 
 # قیدهای یکتای دیتابیس آخرین سد درخواست‌های هم‌زمان‌اند (مثلاً یک سریال در دو انبار در یک لحظه)
@@ -201,4 +215,38 @@ _CONSTRAINT_MESSAGES = {
 async def integrity_error_handler(request: Request, exc: IntegrityError):
     message = next((m for name, m in _CONSTRAINT_MESSAGES.items() if name in str(exc.orig)),
                    "این تغییر با داده‌ای که هم‌زمان ثبت شد تداخل دارد؛ دوباره تلاش کنید.")
-    return JSONResponse(status_code=409, content={"detail": message})
+    return JSONResponse(status_code=409, content=_error_body(409, message))
+
+
+# ------------------------------------------------------------------------------
+# قالب یکسان خطا (فصل ۲۱): {"detail": پیام فارسی، "code": نوع خطا، "request_id": شناسه پیگیری}
+# شناسه پیگیری در هدر X-Request-ID هم برمی‌گردد و در لاگ سرور ثبت می‌شود تا پشتیبانی خطا را پیدا کند.
+# ------------------------------------------------------------------------------
+ERROR_CODES = {400: "business_rule", 401: "unauthenticated", 403: "forbidden", 404: "not_found", 409: "conflict",
+               410: "gone", 413: "too_large", 422: "validation", 429: "rate_limited"}
+
+
+def _error_body(status_code: int, detail) -> dict:
+    return {"detail": detail, "code": ERROR_CODES.get(status_code, "error" if status_code < 500 else "server_error"),
+            "request_id": request_id.get()}
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(status_code=exc.status_code, content=_error_body(exc.status_code, exc.detail),
+                        headers=getattr(exc, "headers", None))
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content=_error_body(422, jsonable_encoder(exc.errors())))
+
+
+@app.exception_handler(Exception)
+async def unexpected_error_handler(request: Request, exc: Exception):
+    # این هندلر بیرون از middleware اجرا می‌شود؛ شناسه پیگیری همین‌جا ساخته و در لاگ و پاسخ هر دو ثبت می‌شود
+    rid = request_id.get() or secrets.token_hex(6)
+    logger.exception("خطای پیش‌بینی‌نشده در %s %s (request_id=%s)", request.method, request.url.path, rid)
+    body = _error_body(500, f"خطای غیرمنتظره سرور؛ با کد پیگیری {rid} به پشتیبانی اطلاع دهید. هیچ تغییری ذخیره نشد.")
+    body["request_id"] = rid
+    return JSONResponse(status_code=500, content=body, headers={"X-Request-ID": rid})

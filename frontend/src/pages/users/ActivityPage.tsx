@@ -10,8 +10,9 @@ import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select,
 import { deviceLabel } from "./shared";
 
 const PAGE = 50;
-const CATEGORY_TONE: Record<string, Tone> = { auth: "info", users: "violet", settings: "pink", catalog: "orange", reports: "brand", drivers: "success" };
-const DANGER = new Set(["auth.login_failed", "auth.locked", "user.deactivate", "user.delete"]);
+const CATEGORY_TONE: Record<string, Tone> = { auth: "info", users: "violet", settings: "pink", catalog: "orange", reports: "brand", drivers: "success",
+  inventory: "warning", security: "danger", labels: "accent", system: "violet", partners: "orange", orders: "brand" };
+const DANGER = new Set(["auth.login_failed", "auth.locked", "user.deactivate", "user.delete", "permission.update", "label.reprint", "stock.reverse"]);
 
 export default function ActivityPage() {
   const [params, setParams] = useSearchParams();
@@ -86,6 +87,7 @@ export default function ActivityPage() {
                       {item.target_type === "user" && item.target_id && item.target_id !== item.actor_id && (
                         <Link to={`/app/users/${item.target_id}`} className="ms-2 text-xs text-brand hover:underline">مشاهده کاربر</Link>
                       )}
+                      {item.reason && <div className="mt-0.5 text-xs text-text-2" data-testid="activity-reason">چرا: {item.reason}</div>}
                     </td>
                     <td><Badge tone={CATEGORY_TONE[item.category] ?? "muted"}>{categories[item.category] ?? item.category}</Badge></td>
                     <td className="whitespace-nowrap text-xs text-muted"><span className="font-mono ltr">{item.ip ?? "—"}</span><div>{deviceLabel(item.user_agent)}</div></td>

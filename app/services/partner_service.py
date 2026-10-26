@@ -30,7 +30,12 @@ def _ensure_reader(user: User) -> None:
         raise ForbiddenError("طرف‌های تجاری فقط برای ادمین سازمان و مدیر انبار است.")
 
 
-def _ensure_admin(user: User) -> None:
+def _ensure_admin(user: User, db: Session | None = None) -> None:
+    """مجوز «تعریف و ویرایش طرف‌های تجاری» (پیش‌فرض فقط ادمین؛ ادمین می‌تواند به مدیر انبار هم بدهد)."""
+    if db is not None and _role(user) in ("org_admin", "warehouse_manager"):
+        from app.services import permission_service
+        permission_service.ensure(db, user, "masterdata.partners", "تعریف و ویرایش طرف‌های تجاری با ادمین سازمان است.")
+        return
     if _role(user) != "org_admin":
         raise ForbiddenError("تعریف و ویرایش طرف‌های تجاری با ادمین سازمان است.")
 
@@ -111,7 +116,7 @@ def _check_unique(db: Session, data: dict, exclude_id: int | None) -> None:
 
 
 def create_partner(db: Session, user: User, data: dict) -> dict:
-    _ensure_admin(user)
+    _ensure_admin(user, db)
     data["code"] = data.get("code") or _next_code(db, data)
     _check_unique(db, data, None)
     partner = Partner(**{**data, "email": str(data["email"]) if data.get("email") else None}, created_by_id=user.id)
@@ -124,7 +129,7 @@ def create_partner(db: Session, user: User, data: dict) -> dict:
 
 
 def update_partner(db: Session, user: User, partner_id: int, data: dict) -> dict:
-    _ensure_admin(user)
+    _ensure_admin(user, db)
     partner = _get(db, partner_id)
     data["code"] = data.get("code") or partner.code
     _check_unique(db, data, partner.id)
@@ -146,7 +151,7 @@ def update_partner(db: Session, user: User, partner_id: int, data: dict) -> dict
 
 
 def set_active(db: Session, user: User, partner_id: int, active: bool) -> dict:
-    _ensure_admin(user)
+    _ensure_admin(user, db)
     partner = _get(db, partner_id)
     if partner.is_active != active:
         partner.is_active = active
@@ -158,7 +163,7 @@ def set_active(db: Session, user: User, partner_id: int, active: bool) -> dict:
 
 
 def delete_partner(db: Session, user: User, partner_id: int) -> None:
-    _ensure_admin(user)
+    _ensure_admin(user, db)
     partner = _get(db, partner_id)
     if db.query(StockDocument.id).filter(StockDocument.partner_id == partner.id).first() or \
             db.query(ProductSupplier.id).filter(ProductSupplier.partner_id == partner.id).first():

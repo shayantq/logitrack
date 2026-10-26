@@ -14,7 +14,7 @@ from app.schemas.fulfillment import (
 )
 from app.schemas.order import OrderResponse
 from app.services import (
-    backorder_service, disposition_service, picking_service, replenishment_rule_service, shipping_service,
+    audit_service, backorder_service, disposition_service, picking_service, replenishment_rule_service, shipping_service,
     transfer_order_service,
 )
 from app.services.exceptions import DomainError
@@ -231,4 +231,7 @@ def list_dispositions(db: db_dependency, user: user_dependency, warehouse_id: Op
 @dispositions.post("/", response_model=DispositionOut, status_code=status.HTTP_201_CREATED,
                    summary="♻️ امحا، تعمیر، برگشت به تأمین‌کننده یا بازرسی دوباره")
 def dispose(data: DispositionCreate, db: db_dependency, user: user_dependency):
-    return _call(disposition_service.dispose, db, user, data)
+    result = _call(disposition_service.dispose, db, user, data)
+    audit_service.record(db, user, "stock.disposition", f"تعیین تکلیف {result.get('code')}: {data.action} — {data.quantity} واحد",
+                         target_type="disposition", target_id=result.get("id"), target_label=result.get("code"), reason=data.reason)
+    return result

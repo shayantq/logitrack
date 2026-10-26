@@ -68,6 +68,10 @@ class Location(TenantScoped, Base):
     # مسدود (مثلاً قفسه آسیب‌دیده): کالای جدید نمی‌گیرد و موجودی‌اش قابل تخصیص نیست
     is_blocked = Column(Boolean, nullable=False, default=False, server_default="false")
     block_reason = Column(String(200), nullable=True)
+    # در حال انبارگردانی با قفل (فصل ۱۶): هیچ گردشی جز اصلاحیه همان انبارگردانی از این محل/به این محل ثبت نمی‌شود
+    count_lock_id = Column(Integer, ForeignKey("stocktakes.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ترتیب مسیر برداشت (فصل ۳۰)؛ خالی = مسیر مارپیچ خودکار از روی کد محل
+    route_sequence = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_now)
     updated_at = Column(DateTime, nullable=True, onupdate=_now)
 

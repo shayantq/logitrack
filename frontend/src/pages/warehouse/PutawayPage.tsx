@@ -126,6 +126,11 @@ function ExecuteModal({ task, onClose }: { task: Task | null; onClose: () => voi
     }
   }, [task?.id]);
   const set = (k: keyof typeof scans) => (e: { target: { value: string } }) => setScans(s => ({ ...s, [k]: e.target.value }));
+  // مقصدهای برتر با دلیل (تجمیع، محل خالی، نزدیکی مسیر بر اساس ABC)
+  const options = useQuery({
+    queryKey: ["putaway-suggestions", task?.id, task?.suggested_location_code], enabled: !!task,
+    queryFn: () => unwrap(api.GET("/putaway/tasks/{task_id}/suggestions", { params: { path: { task_id: task!.id } } })),
+  });
   const run = useMutation({
     mutationFn: () => unwrap(api.POST("/putaway/tasks/{task_id}/execute", {
       params: { path: { task_id: task!.id }, header: { "Idempotency-Key": key } },
@@ -149,8 +154,20 @@ function ExecuteModal({ task, onClose }: { task: Task | null; onClose: () => voi
         <div className="flex items-center gap-3 rounded-xl bg-brand-soft/60 p-3 text-sm">
           <MapPin className="size-5 shrink-0 text-brand" />
           <div>مقصد پیشنهادی: <span className="font-mono text-base font-bold ltr" data-testid="putaway-target">{task.suggested_location_code ?? "—"}</span>
-            {!task.suggested_location_code && <div className="text-xs text-warning">محل مناسبی پیدا نشد؛ یک محل نگهداری با ظرفیت آزاد را اسکن کنید.</div>}</div>
+            {!task.suggested_location_code && <div className="text-xs text-warning">محل مناسبی پیدا نشد؛ یک محل نگهداری با ظرفیت آزاد را اسکن کنید.</div>}
+            {options.data?.[0] && <div className="text-xs text-text-2" data-testid="putaway-reason">چرا: {options.data[0].reason}</div>}</div>
         </div>
+        {(options.data?.length ?? 0) > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs" data-testid="putaway-alternatives">
+            <span className="text-muted">جایگزین‌ها:</span>
+            {options.data!.slice(1).map(o => (
+              <Tooltip key={o.location_id} content={o.reason}>
+                <button type="button" className="rounded-lg border border-border px-2 py-1 font-mono transition hover:border-brand"
+                  onClick={() => setScans(s => ({ ...s, destination: o.barcode }))}>{o.code}</button>
+              </Tooltip>
+            ))}
+          </div>
+        )}
         <Field label="۱. اسکن کالا" hint={`SKU، بارکد کالا یا بارکد کارتن — ${task.product_barcode ?? task.product_sku}`}>
           <Input ref={refs.product} required className="ltr font-mono" autoComplete="off" value={scans.product} onChange={set("product")}
             onKeyDown={scanKeyDown(() => refs.source.current?.focus())} data-testid="scan-product" />

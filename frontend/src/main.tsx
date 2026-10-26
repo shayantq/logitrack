@@ -10,13 +10,15 @@ import "@fontsource/jetbrains-mono/500.css";
 import "./styles.css";
 
 import { App } from "./App";
+import { ApiError } from "./api/client";
 import { ToastProvider } from "./components/Toast";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { DialogsProvider } from "./ui/dialogs";
 import { TitleTooltips, ValidationBubbles } from "./ui/globalLayers";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 10_000 } },
+  // قطع موقت شبکه (فصل ۲۱): خواندن‌ها تا سه بار با فاصله افزایشی دوباره تلاش می‌شوند؛ خطای خود سرور (۴xx) تکرار نمی‌شود
+  defaultOptions: { queries: { retry: (count, error) => count < 3 && !(error instanceof ApiError && error.status !== undefined && error.status < 500), retryDelay: n => Math.min(1000 * 2 ** n, 8000), refetchOnWindowFocus: false, refetchOnReconnect: true, staleTime: 10_000 } },
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

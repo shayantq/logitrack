@@ -858,6 +858,8 @@ class Stocktake(TenantScoped, Base):
     __table_args__ = (
         CheckConstraint("status IN ('counting', 'review', 'approved', 'canceled')", name="ck_stocktakes_status"),
         CheckConstraint("scope IN ('full', 'partial')", name="ck_stocktakes_scope"),
+        CheckConstraint("count_type IN ('full', 'partial', 'cycle')", name="ck_stocktakes_count_type"),
+        CheckConstraint("freeze_mode IN ('snapshot', 'lock')", name="ck_stocktakes_freeze_mode"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -874,6 +876,13 @@ class Stocktake(TenantScoped, Base):
     approved_at = Column(DateTime, nullable=True)
     approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     canceled_at = Column(DateTime, nullable=True)
+    # فصل ۱۶: کامل / بخشی / دوره‌ای (ABC)؛ کور یا با نمایش عدد سیستم؛ عکس لحظه‌ای یا قفل محل‌ها
+    count_type = Column(String(16), nullable=False, default="full", server_default="full")
+    blind = Column(Boolean, nullable=False, default=True, server_default="true")
+    freeze_mode = Column(String(16), nullable=False, default="snapshot", server_default="snapshot")
+    by_location = Column(Boolean, nullable=False, default=False, server_default="false")
+    location_ids = Column(JSON, nullable=True)                 # محدوده محل‌ها (خالی = همه محل‌های انبار)
+    approval_note = Column(String(500), nullable=True)
 
     lines = relationship("StocktakeLine", back_populates="stocktake", cascade="all, delete-orphan", order_by="StocktakeLine.id")
 
@@ -884,12 +893,16 @@ class StocktakeLine(TenantScoped, Base):
     انبار در طول انبارگردانی متوقف نمی‌شود: اصلاح نهایی = شمرده‌شده − موجودی سیستم در لحظه شمارش.
     """
     __tablename__ = "stocktake_lines"
-    __table_args__ = (UniqueConstraint("stocktake_id", "product_id", name="uq_stocktake_lines_product"),
+    __table_args__ = (UniqueConstraint("stocktake_id", "product_id", "location_id", name="uq_stocktake_lines_product",
+                                       postgresql_nulls_not_distinct=True),
                       CheckConstraint("counted_qty IS NULL OR counted_qty >= 0", name="ck_stocktake_lines_counted"))
 
     id = Column(Integer, primary_key=True, index=True)
     stocktake_id = Column(Integer, ForeignKey("stocktakes.id", ondelete="CASCADE"), nullable=False, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    # شمارش در سطح محل (by_location): هر کالا × محل یک سطر؛ محل خالی = موجودی «بدون محل» همان انبار
+    location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
+    location_code = Column(String(32), nullable=True)
     inventory_id = Column(Integer, ForeignKey("inventories.id", ondelete="SET NULL"), nullable=True)
     product_name = Column(String(200), nullable=False)
     product_sku = Column(String(64), nullable=True)
@@ -966,6 +979,7 @@ class AuditLog(TenantScoped, Base):
     target_id = Column(Integer, nullable=True, index=True)
     target_label = Column(String(200), nullable=True)
     summary = Column(String(500), nullable=False)
+    reason = Column(String(500), nullable=True)                 # «چرا» — دلیل کاربر برای عملیات حساس
     details = Column(JSON, nullable=True)
     ip = Column(String(45), nullable=True)
     user_agent = Column(String(255), nullable=True)
@@ -985,6 +999,8 @@ from app.models_fulfillment import (  # noqa: E402,F401
     Backorder, Disposition, Package, PackageItem, PickLine, PickList, ReplenishmentRule, Shipment, TransferOrder,
     TransferOrderLine,
 )
+# کنترل و راه‌اندازی: مجوزهای نقش، سابقه چاپ برچسب، چک‌لیست راه‌اندازی
+from app.models_control import CutoverCheck, LabelPrint, RolePermission  # noqa: E402,F401
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401
 # رویدادهای دامنه (after_flush)

@@ -358,6 +358,8 @@ def build_report_file(db, organization_id: int, user, report: str, fmt: str, par
     stamp = report_builder.jalali(now).replace("/", "-")
     if fmt == "pdf":
         content, ext, ctype = report_builder.to_pdf(rep, branding, now), "pdf", "application/pdf"
+    elif fmt == "csv":
+        content, ext, ctype = report_builder.to_csv(rep, branding, now), "csv", "text/csv; charset=utf-8"
     else:
         content, ext, ctype = report_builder.to_excel(rep, branding, now), "xlsx", XLSX_TYPE
     return {"organization_id": organization_id, "filename": f"{rep.filename}_{stamp}.{ext}", "content_type": ctype,

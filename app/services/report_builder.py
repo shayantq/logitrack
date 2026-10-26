@@ -219,6 +219,30 @@ def to_excel(report: Report, b: Branding, now_local: datetime) -> bytes:
 # ---------------------------------------------------------------------------
 # PDF
 # ---------------------------------------------------------------------------
+def to_csv(report: Report, b: Branding, now_local: datetime) -> bytes:
+    """
+    خروجی CSV برای ورود به نرم‌افزارهای دیگر و حجم بالا: سربرگ کوتاه، سپس هر بخش با سطر عنوان ستون‌ها.
+    با BOM ذخیره می‌شود تا اکسل حروف فارسی را درست باز کند؛ اعداد خام (بدون جداکننده) می‌مانند.
+    """
+    import csv
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow([b.name])
+    writer.writerow([report.title])
+    if report.period:
+        writer.writerow([report.period])
+    writer.writerow([f"تولید: {jalali(now_local, with_time=True)}"])
+    for label, value in report.kpis:
+        writer.writerow([label, value])
+    for section in report.sections:
+        writer.writerow([])
+        writer.writerow([section.title])
+        writer.writerow([c.title for c in section.columns])
+        for row in section.rows:
+            writer.writerow(["" if row.get(c.key) is None else row.get(c.key) for c in section.columns])
+    return ("﻿" + out.getvalue()).encode("utf-8")
+
+
 def _rtl(text) -> str:
     if text is None:
         return ""

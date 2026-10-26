@@ -39,9 +39,12 @@ def _role(user: User) -> str:
     return getattr(user.role, "value", user.role)
 
 
-def _ensure_editor(user: User) -> None:
+def _ensure_editor(user: User, db: Session | None = None) -> None:
     if _role(user) not in EDITORS:
         raise ForbiddenError("ویرایش کاتالوگ فقط برای ادمین سازمان و مدیر انبار است.")
+    if db is not None:
+        from app.services import permission_service
+        permission_service.ensure(db, user, "masterdata.products")
 
 
 def today_local() -> date:
@@ -113,7 +116,7 @@ def set_price(db: Session, user: User | None, product: Product, *, effective_fro
 
 
 def add_price(db: Session, user: User, product_id: int, **data) -> dict:
-    _ensure_editor(user)
+    _ensure_editor(user, db)
     product = _product(db, product_id)
     set_price(db, user, product, **data)
     db.commit()
@@ -121,7 +124,7 @@ def add_price(db: Session, user: User, product_id: int, **data) -> dict:
 
 
 def delete_price(db: Session, user: User, price_id: int) -> dict:
-    _ensure_editor(user)
+    _ensure_editor(user, db)
     row = db.get(ProductPrice, price_id)
     if row is None:
         raise NotFoundError("قیمت یافت نشد.")
@@ -298,7 +301,7 @@ def apply_fields(product: Product, data: dict) -> None:
 
 
 def update(db: Session, user: User, product_id: int, data: dict) -> dict:
-    _ensure_editor(user)
+    _ensure_editor(user, db)
     product = _product(db, product_id)
     if "sku" in data and data["sku"] != product.sku:
         raise ConflictError("کد کالا (SKU) پس از ثبت تغییرناپذیر است؛ برای کد جدید، کالای تازه تعریف و این کالا را بایگانی کنید.")
@@ -318,7 +321,7 @@ def update(db: Session, user: User, product_id: int, data: dict) -> dict:
 
 def set_uoms(db: Session, user: User, product_id: int, uoms: list[dict]) -> dict:
     """جایگزینی کامل فهرست واحدهای فرعی کالا (مقادیر اسناد قبلی به واحد پایه ثبت شده‌اند و عوض نمی‌شوند)."""
-    _ensure_editor(user)
+    _ensure_editor(user, db)
     product = _product(db, product_id)
     names = [u["name"] for u in uoms]
     if len(set(names)) != len(names):
@@ -355,7 +358,7 @@ def set_uoms(db: Session, user: User, product_id: int, uoms: list[dict]) -> dict
 
 def set_suppliers(db: Session, user: User, product_id: int, links: list[dict]) -> dict:
     """جایگزینی کامل تأمین‌کننده‌های کالا؛ فقط طرف‌های فعال با نقش «تأمین‌کننده»، حداکثر یک تأمین‌کننده اصلی."""
-    _ensure_editor(user)
+    _ensure_editor(user, db)
     product = _product(db, product_id)
     ids = [link["partner_id"] for link in links]
     if len(set(ids)) != len(ids):
@@ -390,7 +393,7 @@ def set_suppliers(db: Session, user: User, product_id: int, links: list[dict]) -
 
 def create_variant(db: Session, user: User, product_id: int, data: dict) -> dict:
     """تنوع جدید: مشخصات کالای اصلی کپی می‌شود؛ کد، عنوان تنوع، مبدأ و قیمت جدید."""
-    _ensure_editor(user)
+    _ensure_editor(user, db)
     base = _product(db, product_id)
     root = db.get(Product, base.parent_id) if base.parent_id else base
     _ensure_unique_sku(db, data["sku"])

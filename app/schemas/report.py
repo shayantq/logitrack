@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 
 
 class ReportRequest(BaseModel):
-    report: Literal["inventory", "orders", "ledger", "finance", "reorder", "capital"]
-    format: Literal["excel", "pdf"] = "excel"
+    report: Literal["inventory", "orders", "ledger", "finance", "reorder", "capital", "kpi", "valuation", "health", "audit"]
+    format: Literal["excel", "pdf", "csv"] = "excel"
     date_from: Optional[date] = None
     date_to: Optional[date] = None
     warehouse_id: Optional[int] = Field(None, gt=0)

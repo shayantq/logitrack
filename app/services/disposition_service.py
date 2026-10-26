@@ -52,6 +52,9 @@ def _check_supplier_return(db: Session, data, product: Product, warehouse_id: in
 
 def dispose(db: Session, user: User, data) -> dict:
     location_service.ensure_staff(user)
+    if data.action in ("scrap", "return_to_supplier"):
+        from app.services import permission_service
+        permission_service.ensure(db, user, "stock.scrap")
     product = db.get(Product, data.product_id)
     if product is None:
         raise NotFoundError("کالا یافت نشد.")

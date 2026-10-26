@@ -7,7 +7,7 @@ from app.core.wms import PUTAWAY_STATUSES, RECEIPT_STATUSES, RECEIPT_TYPES, TASK
 from app.database import db_dependency
 from app.dependencies import IdempotencyKey, user_dependency
 from app.schemas.operations import (
-    InspectionCreate, InspectionOut, PutawayExecute, PutawayProblemIn, PutawayTaskCreate, PutawayTaskOut,
+    InspectionCreate, InspectionOut, PutawayExecute, PutawayProblemIn, PutawaySuggestionOut, PutawayTaskCreate, PutawayTaskOut,
     QualityTransitionOut, ReasonIn, ReceiptCloseIn, ReceiptCreate, ReceiptOut, ReceiveIn,
 )
 from app.services import putaway_service, quality_service, receiving_service
@@ -134,6 +134,12 @@ def report_problem(data: PutawayProblemIn, db: db_dependency, user: user_depende
 @putaway_router.post("/tasks/{task_id}/suggest", response_model=PutawayTaskOut, summary="🔄 پیشنهاد دوباره مقصد")
 def refresh_suggestion(db: db_dependency, user: user_dependency, task_id: int = Path(gt=0)):
     return _call(putaway_service.refresh_suggestion, db, user, task_id)
+
+
+@putaway_router.get("/tasks/{task_id}/suggestions", response_model=list[PutawaySuggestionOut],
+                    summary="🧠 مقصدهای برتر با دلیل (تجمیع، محل خالی، نزدیکی مسیر بر اساس ABC)")
+def task_suggestions(db: db_dependency, user: user_dependency, task_id: int = Path(gt=0)):
+    return _call(putaway_service.suggestions, db, user, task_id)
 
 
 @putaway_router.post("/tasks/{task_id}/cancel", response_model=PutawayTaskOut, summary="✖️ لغو وظیفه")

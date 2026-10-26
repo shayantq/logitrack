@@ -181,7 +181,7 @@ def get_task_result(
              summary="📑 (ناهمگام) گزارش اکسل/PDF با لوگو و رنگ سازمان: موجودی، سفارش‌ها، دفتر گردش، مالی حمل‌ونقل")
 def generate_report(data: ReportRequest, db: db_dependency, current_user=Depends(require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER]))):
     try:
-        report_data.check_access(current_user, data.report)
+        report_data.check_access(current_user, data.report, db)
         if data.date_from and data.date_to and data.date_to < data.date_from:
             raise HTTPException(status_code=400, detail="تاریخ پایان باید بعد از تاریخ شروع باشد.")
     except DomainError as e:
@@ -191,7 +191,7 @@ def generate_report(data: ReportRequest, db: db_dependency, current_user=Depends
               "warehouse_id": data.warehouse_id, "status": data.status, "months": data.months}
     task = generate_report_task.delay(current_user.organization_id, current_user.id, data.report, data.format, params)
     audit_service.record(db, current_user, "report.generate",
-                         f"{report_data.TITLES[data.report]} ({'PDF' if data.format == 'pdf' else 'اکسل'}) گرفته شد",
+                         f"{report_data.TITLES[data.report]} ({ {'pdf': 'PDF', 'csv': 'CSV'}.get(data.format, 'اکسل') }) گرفته شد",
                          details={k: v for k, v in params.items() if v})
     return {"task_id": task.id, "message": "✅ تولید گزارش در پس‌زمینه آغاز شد."}
 

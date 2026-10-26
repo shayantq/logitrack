@@ -20,6 +20,7 @@ const REASONS: Record<string, string> = {
   unknown: "نامشخص", damage: "خرابی و آسیب", loss: "مفقودی یا سرقت", entry_error: "خطای ثبت قبلی", unrecorded: "ورود/خروج ثبت‌نشده",
 };
 const STEPS = [["counting", "شمارش"], ["review", "بررسی ادمین"], ["approved", "اصلاح موجودی"]] as const;
+const COUNT_TYPES: Record<string, string> = { full: "کامل", partial: "بخشی", cycle: "دوره‌ای (ABC)" };
 
 export default function StocktakeDetailPage() {
   const { id } = useParams();
@@ -45,8 +46,11 @@ export default function StocktakeDetailPage() {
   return (
     <>
       <PageHeader eyebrow="انبارگردانی" title={st.title ?? st.code}
-        subtitle={<span className="flex flex-wrap items-center gap-2"><span className="font-mono ltr">{st.code}</span> · {st.warehouse_name} · {st.scope === "full" ? "کامل" : "بخشی"}
-          <Badge tone={STOCKTAKE_STATUS[st.status].tone} dot>{STOCKTAKE_STATUS[st.status].label}</Badge></span>}
+        subtitle={<span className="flex flex-wrap items-center gap-2"><span className="font-mono ltr">{st.code}</span> · {st.warehouse_name} · {COUNT_TYPES[st.count_type] ?? st.scope}
+          <Badge tone={STOCKTAKE_STATUS[st.status].tone} dot>{STOCKTAKE_STATUS[st.status].label}</Badge>
+          <Badge tone={st.blind ? "muted" : "info"}>{st.blind ? "کور" : "راهنما"}</Badge>
+          {st.by_location && <Badge tone="info">در سطح محل</Badge>}
+          {st.locked_locations > 0 && <Badge tone="warning" dot><span data-testid="stocktake-locked">{faNumber(st.locked_locations)} محل قفل</span></Badge>}</span>}
         actions={<>
           <Link to="/app/stocktakes" className="inline-flex h-9 items-center gap-1.5 rounded-xl px-3 text-sm text-text-2 hover:bg-surface-2"><ArrowRight className="size-4" />همه انبارگردانی‌ها</Link>
           {st.can_cancel && <Button size="sm" variant="ghost" icon={<X className="size-4" />} data-testid="stocktake-cancel"
@@ -89,7 +93,7 @@ function CountView({ st, onChange, run }: { st: Detail; onChange: (d: Detail) =>
   const [adding, setAdding] = useState(false);
   const recounts = st.lines.filter(l => l.recount_note && l.counted_qty === null).length;
   const lines = st.lines.filter(l => (filter === "all" || (filter === "todo" ? l.counted_qty === null : l.counted_qty !== null))
-    && (!q.trim() || `${l.product_name} ${l.product_sku ?? ""}`.includes(q.trim())));
+    && (!q.trim() || `${l.product_name} ${l.product_sku ?? ""} ${l.location_code ?? ""}`.toUpperCase().includes(q.trim().toUpperCase())));
   const percent = st.lines_total ? Math.round((st.lines_counted / st.lines_total) * 100) : 0;
   const save = async (line: Line, value: string) => {
     const qty = Number(value.replace(/[۰-۹]/g, d => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))));
@@ -113,7 +117,10 @@ function CountView({ st, onChange, run }: { st: Detail; onChange: (d: Detail) =>
               .then(ok => ok && run(() => unwrap(api.POST("/stocktakes/{stocktake_id}/submit", { params: { path: { stocktake_id: st.id } } }))))}>
             ارسال برای بررسی</Button>
         </div>
-        <p className="mt-3 text-xs text-muted">عدد واقعی هر قلم را بشمارید و بنویسید؛ موجودی ثبت‌شده در سیستم عمداً نمایش داده نمی‌شود. با Enter ذخیره و به قلم بعدی بروید.</p>
+        <p className="mt-3 text-xs text-muted">{st.blind
+          ? "عدد واقعی هر قلم را بشمارید و بنویسید؛ موجودی ثبت‌شده در سیستم عمداً نمایش داده نمی‌شود. با Enter ذخیره و به قلم بعدی بروید."
+          : "شمارش راهنما: موجودی لحظه‌ای سیستم کنار هر قلم آمده؛ عدد واقعی را بنویسید. با Enter ذخیره و به قلم بعدی بروید."}
+          {st.freeze_mode === "lock" && " محل‌های این شمارش تا تأیید قفل‌اند و ورود و خروجی نمی‌پذیرند."}</p>
         {recounts > 0 && <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-warning"><RotateCcw className="size-4" />ادمین شمارش مجدد {faNumber(recounts)} قلم را خواسته است.</p>}
       </Card>
 
@@ -133,10 +140,12 @@ function CountView({ st, onChange, run }: { st: Detail; onChange: (d: Detail) =>
           <div key={l.id} className="flex flex-wrap items-center gap-3 px-4 py-3" data-testid="stocktake-line" data-product={l.product_name} data-counted={l.counted_qty ?? ""}>
             <div className="min-w-40 flex-1">
               <div className="font-medium">{l.product_name}{l.added_during_count && <Badge tone="info" className="ms-2">اضافه‌شده</Badge>}</div>
-              <div className="font-mono text-xs text-muted">{l.product_sku}</div>
+              <div className="font-mono text-xs text-muted">{l.product_sku}
+                {st.by_location && <span className="ms-2 rounded bg-surface-2 px-1.5 py-0.5 text-text-2" data-testid="stocktake-line-location">{l.location_code ?? "بدون محل"}</span>}</div>
               {l.recount_note && l.counted_qty === null && <div className="mt-1 text-xs text-warning">شمارش مجدد: {l.recount_note}</div>}
             </div>
             <div className="flex items-center gap-2">
+              {l.system_qty !== null && l.system_qty !== undefined && <span className="text-xs text-muted" data-testid="stocktake-system-qty">سیستم: {faNumber(l.system_qty)}</span>}
               {l.counted_qty !== null && <CheckCircle2 className="size-4 text-success" />}
               <Input key={`${l.id}-${l.counted_qty}`} inputMode="numeric" defaultValue={l.counted_qty ?? ""} placeholder="تعداد"
                 className="h-11 w-28 text-center text-base font-semibold tnum" aria-label={`تعداد ${l.product_name}`} data-testid="stocktake-qty"
@@ -161,9 +170,16 @@ function AddFound({ st, onDone, onCancel }: { st: Detail; onDone: (d: Detail) =>
   const { data: products = [] } = useProducts();
   const [product, setProduct] = useState("");
   const [qty, setQty] = useState("");
-  const options = products.filter(p => !st.lines.some(l => l.product_id === p.id));
+  const [location, setLocation] = useState("");
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations", st.warehouse_id], enabled: st.by_location,
+    queryFn: () => unwrap(api.GET("/warehouses/{warehouse_id}/locations", { params: { path: { warehouse_id: st.warehouse_id } } })),
+  });
+  const locationId = location ? Number(location) : null;
+  const options = st.by_location ? products : products.filter(p => !st.lines.some(l => l.product_id === p.id));
   const add = useMutation({
-    mutationFn: () => unwrap(api.POST("/stocktakes/{stocktake_id}/lines", { params: { path: { stocktake_id: st.id } }, body: { product_id: Number(product), counted_qty: Number(qty) } })),
+    mutationFn: () => unwrap(api.POST("/stocktakes/{stocktake_id}/lines", { params: { path: { stocktake_id: st.id } },
+      body: { product_id: Number(product), counted_qty: Number(qty), location_id: locationId } })),
     onSuccess: onDone, onError: e => toast.error(errorMessage(e)),
   });
   return (
@@ -174,6 +190,8 @@ function AddFound({ st, onDone, onCancel }: { st: Detail; onDone: (d: Detail) =>
           <option value="">انتخاب کالا</option>{options.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
         </Select>
       </div>
+      {st.by_location && <div className="w-40"><Select value={location} onChange={e => setLocation(e.target.value)} aria-label="محل" data-testid="stocktake-add-location">
+        <option value="">بدون محل</option>{locations.filter(l => l.is_leaf).map(l => <option key={l.id} value={l.id}>{l.code}</option>)}</Select></div>}
       <Input inputMode="numeric" value={qty} onChange={e => setQty(e.target.value)} placeholder="تعداد" className="w-28 text-center" data-testid="stocktake-add-qty" />
       <Button disabled={!product || qty === ""} loading={add.isPending} onClick={() => add.mutate()}>افزودن</Button>
       <Button variant="ghost" onClick={onCancel}>انصراف</Button>
@@ -188,6 +206,7 @@ function ReviewView({ st, run, busy }: { st: Detail; run: (fn: () => Promise<Det
   const [onlyDiff, setOnlyDiff] = useState(true);
   const [reasons, setReasons] = useState<Record<number, string>>({});
   const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [note, setNote] = useState("");
   const review = st.can_review;
   const lines = useMemo(() => st.lines.filter(l => !onlyDiff || (l.variance ?? 0) !== 0), [st.lines, onlyDiff]);
   const path = { params: { path: { stocktake_id: st.id } } };
@@ -197,6 +216,11 @@ function ReviewView({ st, run, busy }: { st: Detail; run: (fn: () => Promise<Det
       {st.self_review && (
         <p className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft/50 px-4 py-3 text-sm text-text-2">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />بخشی از این شمارش را خودتان انجام داده‌اید؛ بهتر است شمارش و تأیید با دو نفر باشد.</p>
+      )}
+      {review && (
+        <p className={cn("rounded-xl px-4 py-3 text-sm", st.needs_full_approval ? "bg-warning-soft/60 text-text" : "bg-surface-2 text-text-2")} data-testid="stocktake-threshold">
+          ارزش کل مغایرت {faNumber(st.variance_value_total ?? 0)} ریال — سقف تأیید سازمان {faNumber(st.approval_threshold)} ریال
+          {st.needs_full_approval ? "؛ تأیید با مجوز «بالای سقف» (ادمین) لازم است." : "؛ تأیید «زیر سقف» کافی است."}</p>
       )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="دقت موجودی" value={`${faNumber(st.accuracy ?? 0)}٪`} tone={(st.accuracy ?? 0) >= 95 ? "success" : "warning"} hint={`${faNumber(st.variance_lines ?? 0)} قلم مغایرت از ${faNumber(st.lines_total)}`} />
@@ -213,9 +237,11 @@ function ReviewView({ st, run, busy }: { st: Detail; run: (fn: () => Promise<Det
               onClick={() => promptDialog({ title: "شمارش مجدد", label: "توضیح برای شمارنده", placeholder: "مثلاً قفسه پشتی را هم بشمارید", required: false, confirmLabel: `شمارش مجدد ${faNumber(picked.size)} قلم` })
                 .then(note => note !== null && run(() => unwrap(api.POST("/stocktakes/{stocktake_id}/recount", { ...path, body: { line_ids: [...picked], note: note || null } }))))}>
               شمارش مجدد انتخاب‌شده‌ها</Button>
-            <Button size="sm" icon={<CheckCircle2 className="size-4" />} loading={busy} data-testid="stocktake-approve"
+            <Input value={note} onChange={e => setNote(e.target.value)} placeholder="یادداشت تأیید (در گزارش فعالیت)" className="h-8 w-56 text-xs" data-testid="stocktake-approve-note" />
+            <Button size="sm" icon={<CheckCircle2 className="size-4" />} loading={busy} data-testid="stocktake-approve" disabled={!st.can_approve}
+              title={st.can_approve ? undefined : st.needs_full_approval ? "ارزش مغایرت از سقف تأیید شما بیشتر است" : "تأیید این شمارش با شما نیست (تفکیک وظایف)"}
               onClick={() => confirmDialog({ title: "تأیید و اصلاح موجودی؟", text: `${faNumber(st.variance_lines ?? 0)} قلم مغایرت در دفتر گردش با نوع «انبارگردانی» ثبت و موجودی اصلاح می‌شود. این کار برگشت ندارد.`, confirmLabel: "تأیید و اصلاح" })
-                .then(ok => ok && run(() => unwrap(api.POST("/stocktakes/{stocktake_id}/approve", { ...path, body: { reasons: reasons as never } }))))}>
+                .then(ok => ok && run(() => unwrap(api.POST("/stocktakes/{stocktake_id}/approve", { ...path, body: { reasons: reasons as never, note: note || null } }))))}>
               تأیید و اصلاح موجودی</Button>
           </div>}
         </div>
@@ -229,6 +255,7 @@ function ReviewView({ st, run, busy }: { st: Detail; run: (fn: () => Promise<Det
                   {review && <td><input type="checkbox" checked={picked.has(l.id)} aria-label="شمارش مجدد"
                     onChange={() => setPicked(s => { const n = new Set(s); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })} /></td>}
                   <td><div className="font-medium">{l.product_name}</div><div className="font-mono text-xs text-muted">{l.product_sku}
+                    {st.by_location && <span className="ms-2 text-text-2">{l.location_code ?? "بدون محل"}</span>}
                     {l.previous_count !== null && <span className="ms-2 text-warning">شمارش قبلی: {faNumber(l.previous_count)}</span>}</div></td>
                   <td className="tnum">{faNumber(l.expected_qty)}</td>
                   <td className="tnum font-semibold">{faNumber(l.counted_qty)}</td>
@@ -248,7 +275,7 @@ function ReviewView({ st, run, busy }: { st: Detail; run: (fn: () => Promise<Det
       </Card>
       <p className="text-xs text-muted">
         مبنای مغایرت، موجودی سیستم در لحظه شمارش هر قلم است؛ ورود و خروج‌های بعد از شمارش دست نمی‌خورند.
-        {st.approved_at && <> تأیید: {faDate(st.approved_at)} توسط {st.approved_by}. <Link to="/app/ledger" className="text-brand hover:underline">دفتر گردش</Link></>}
+        {st.approved_at && <> تأیید: {faDate(st.approved_at)} توسط {st.approved_by}{st.approval_note ? ` — «${st.approval_note}»` : ""}. <Link to="/app/ledger" className="text-brand hover:underline">دفتر گردش</Link></>}
       </p>
     </div>
   );

@@ -64,19 +64,28 @@ def candidates(db: Session, warehouse_id: int, stock_status: str) -> list[Locati
                                                                    Location.parent_id.is_not(None)).all()}
     return [loc for loc in db.query(Location).filter(
         Location.warehouse_id == warehouse_id, Location.location_type.in_(types), Location.is_active.is_not(False),
-        Location.is_blocked.is_not(True),
+        Location.is_blocked.is_not(True), Location.count_lock_id.is_(None),
     ).order_by(Location.code).all() if loc.id not in parents]
 
 
-def suggest(db: Session, *, warehouse_id: int, product: Product, quantity: int, stock_status: str,
-            lot_number: str | None, owner_id: int | None, exclude=()) -> Location | None:
+RANK_REASONS = ("کنار همین بچ (تجمیع)", "کنار همین کالا (تجمیع)", "محل خالی", "محل مشترک با کالای دیگر")
+
+
+def ranked_options(db: Session, *, warehouse_id: int, product: Product, quantity: int, stock_status: str,
+                   lot_number: str | None, owner_id: int | None, exclude=()) -> list[tuple[tuple, Location, str]]:
+    """
+    مقصدهای مجاز به ترتیب پیشنهاد (فصل ۳۰): ۱) تجمیع با همان بچ/کالا ۲) محل خالی ۳) محل مشترک؛ در هر دسته
+    کالای کلاس A نزدیک‌ترین محل مسیر و کلاس C دورترین محل را می‌گیرد تا محل‌های دم دست برای پرگردش‌ها بماند.
+    """
     options = [loc for loc in candidates(db, warehouse_id, stock_status) if loc.id not in set(exclude)]
     if not options:
-        return None
+        return []
     db.flush()
     groups = location_service.contents(db, [loc.id for loc in options])
     products = {p.id: p for p in db.query(Product).filter(
         Product.id.in_({c.product_id for items in groups.values() for c in items} or {-1})).all()}
+    order = {loc.id: i for i, loc in enumerate(sorted(options, key=lambda x: (location_service.route_key(x), x.code)))}
+    direction = {"A": 1, "C": -1}.get(product.abc_class or "", 0)
     ranked = []
     for loc in options:
         items = groups.get(loc.id, [])
@@ -85,8 +94,19 @@ def suggest(db: Session, *, warehouse_id: int, product: Product, quantity: int, 
             continue
         same_product = [c for c in items if c.product_id == product.id]
         rank = 0 if any(c.lot_number == lot_number for c in same_product) else 1 if same_product else 2 if not items else 3
-        ranked.append((rank, loc.code, loc))
-    return min(ranked, key=lambda r: (r[0], r[1]))[2] if ranked else None
+        reason = RANK_REASONS[rank]
+        if direction and rank >= 2:
+            reason += "، نزدیک مسیر برداشت (کالای پرگردش A)" if direction > 0 else "، انتهای مسیر (کالای کم‌گردش C)"
+        ranked.append(((rank, direction * order[loc.id] if direction else order[loc.id], loc.code), loc, reason))
+    ranked.sort(key=lambda r: r[0])
+    return ranked
+
+
+def suggest(db: Session, *, warehouse_id: int, product: Product, quantity: int, stock_status: str,
+            lot_number: str | None, owner_id: int | None, exclude=()) -> Location | None:
+    ranked = ranked_options(db, warehouse_id=warehouse_id, product=product, quantity=quantity, stock_status=stock_status,
+                            lot_number=lot_number, owner_id=owner_id, exclude=exclude)
+    return ranked[0][1] if ranked else None
 
 
 def _resuggest(db: Session, task: PutawayTask) -> None:
@@ -420,6 +440,20 @@ def get_task(db: Session, user: User, task_id: int) -> dict:
     location_service.scope_warehouse(user, task.warehouse_id)
     warehouse = db.get(Warehouse, task.warehouse_id)
     return _serialize(task, warehouse.code if warehouse else None)
+
+
+def suggestions(db: Session, user: User, task_id: int, limit: int = 5) -> list[dict]:
+    """چند مقصد برتر با دلیل پیشنهاد — برای انتخاب آگاهانه کارگر وقتی مقصد اول در دسترس نیست."""
+    task = db.get(PutawayTask, task_id)
+    if task is None:
+        raise NotFoundError("وظیفه جانمایی یافت نشد.")
+    location_service.scope_warehouse(user, task.warehouse_id)
+    exclude = set(task.excluded_location_ids or []) | ({task.source_location_id} if task.source_location_id else set())
+    ranked = ranked_options(db, warehouse_id=task.warehouse_id, product=db.get(Product, task.product_id),
+                            quantity=task.remaining or 1, stock_status=task.stock_status, lot_number=task.lot_number,
+                            owner_id=task.owner_id, exclude=exclude)
+    return [{"location_id": loc.id, "code": loc.code, "barcode": loc.barcode, "reason": reason, "rank": i + 1}
+            for i, (_, loc, reason) in enumerate(ranked[:limit])]
 
 
 def list_tasks(db: Session, user: User, *, status: str | None = None, warehouse_id: int | None = None,
