@@ -52,7 +52,26 @@ def unallocatable_map(db: Session, inventory_ids=None) -> dict[int, int]:
     )
     if inventory_ids is not None:
         query = query.filter(StockBalance.inventory_id.in_(list(inventory_ids) or [-1]))
-    return {inventory_id: int(total or 0) for inventory_id, total in query.group_by(StockBalance.inventory_id).all()}
+    result = {inventory_id: int(total or 0) for inventory_id, total in query.group_by(StockBalance.inventory_id).all()}
+    # کالای برداشت‌شده‌ای که در محل آماده‌سازی منتظر حواله است همچنان پوشش رزرو همان سفارش است
+    for inventory_id, staged in staged_map(db, result.keys()).items():
+        result[inventory_id] = max(result[inventory_id] - staged, 0)
+    return result
+
+
+def staged_map(db: Session, inventory_ids) -> dict[int, int]:
+    """مقدار برداشت‌شده و منتقل‌شده به محل آماده‌سازی (هنوز بدون حواله) به تفکیک ردیف موجودی تأییدشده."""
+    ids = list(inventory_ids)
+    if not ids:
+        return {}
+    from app.models import PickLine
+    rows = db.query(Inventory.id, func.sum(PickLine.picked_quantity)).join(
+        PickLine, (PickLine.product_id == Inventory.product_id) & (PickLine.warehouse_id == Inventory.warehouse_id),
+    ).filter(
+        Inventory.id.in_(ids), Inventory.stock_status == AVAILABLE, PickLine.staged_location_id.is_not(None),
+        PickLine.issued.is_(False), PickLine.picked_quantity > 0,
+    ).group_by(Inventory.id).all()
+    return {inventory_id: int(total or 0) for inventory_id, total in rows}
 
 
 def allocatable(db: Session, inventory: Inventory) -> int:
@@ -136,14 +155,35 @@ def release(db: Session, reservation: StockReservation, *, user: User | None = N
     _close(reservation, "released", user, reason)
 
 
+def transfer(db: Session, reservation: StockReservation, *, reference_type: str, reference_id: int,
+             user: User | None = None, reason: str | None = None) -> StockReservation:
+    """
+    رزرو را به سند دیگری می‌سپارد (مثلاً رزرو سفارش معوق ← سفارش تکمیلی): رزرو قبلی آزاد و همان مقدار در همان
+    تراکنش و روی همان ردیف قفل‌شده برای مرجع جدید رزرو می‌شود — بین این دو، سفارش دیگری نمی‌تواند آن را بردارد.
+    """
+    inventory = _close(reservation, "released", user, reason)
+    stock_ledger.set_reserved(inventory, (inventory.reserved_quantity or 0) + reservation.quantity)
+    moved = StockReservation(
+        organization_id=inventory.organization_id, inventory=inventory, product_id=inventory.product_id,
+        warehouse_id=inventory.warehouse_id, quantity=reservation.quantity, status="active",
+        reference_type=reference_type, reference_id=reference_id, created_at=_now(),
+        created_by_id=user.id if user else None,
+    )
+    db.add(moved)
+    return moved
+
+
 def consume(db: Session, reservation: StockReservation, document: StockDocument, *, user: User | None = None,
-            reason: str | None = None, movement_type: str = "order_out") -> StockMovement:
-    """رزرو را مصرف و همان مقدار را با گردش خروج (برداشت FEFO از موجودی قابل تخصیص) زیر سند document کم می‌کند."""
+            reason: str | None = None, movement_type: str = "order_out", lines=None) -> StockMovement:
+    """
+    رزرو را مصرف و همان مقدار را با گردش خروج زیر سند document کم می‌کند: از همان محل/بچ‌هایی که برداشت
+    (پیکینگ) شده‌اند (lines)، یا اگر سفارش پیکینگ نداشت با برداشت خودکار FEFO از موجودی قابل تخصیص.
+    """
     inventory = _close(reservation, "consumed", user, reason)
     movement = stock_ledger.record(
         db, inventory, -reservation.quantity, movement_type, document=document, user=user, reason=reason,
         reference_type=reservation.reference_type, reference_id=reservation.reference_id,
-        pick=stock_ledger.ALLOCATABLE_FIRST,
+        pick=stock_ledger.ALLOCATABLE_FIRST, lines=lines,
     )
     reservation.movement = movement
     return movement

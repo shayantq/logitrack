@@ -335,6 +335,8 @@ class PutawayTaskOut(BaseModel):
     code: str
     status: str
     status_label: str
+    task_type: str = "putaway"
+    task_type_label: str = "جانمایی"
     warehouse_id: int
     warehouse_code: Optional[str] = None
     product_id: int
@@ -387,6 +389,7 @@ class StockPositionOut(BaseModel):
     pending_inspection: int
     quarantine: int
     not_put_away: int
+    picked: int = 0
     expired: int
     consigned: int
     in_transit: int

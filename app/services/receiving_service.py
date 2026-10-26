@@ -174,6 +174,12 @@ def create_receipt(db: Session, user: User, data, idempotency_key: str | None = 
                 ordered = defaultdict(int)
                 for item in db.query(OrderItem).filter(OrderItem.order_id == order.id).all():
                     ordered[item.product_id] += item.quantity
+                # مرجوعی‌های قبلی همین سفارش (رسیدهای لغونشده) از سقف کم می‌شوند
+                for line, _ in db.query(InboundReceiptLine, InboundReceipt).join(
+                        InboundReceipt, InboundReceiptLine.receipt_id == InboundReceipt.id).filter(
+                        InboundReceipt.order_id == order.id, InboundReceipt.receipt_type == "return",
+                        InboundReceipt.status != "canceled").all():
+                    ordered[line.product_id] -= line.expected_quantity
             seen = set()
             for number, entry in enumerate(data.lines, start=1):
                 product = db.get(Product, entry.product_id)
@@ -186,7 +192,8 @@ def create_receipt(db: Session, user: User, data, idempotency_key: str | None = 
                 seen.add((product.id, entry.lot_number))
                 expected = catalog_service.to_base(product, entry.expected_quantity, entry.uom)
                 if order is not None and expected > ordered.get(product.id, 0):
-                    raise ConflictError(f"مقدار مرجوعی «{product.name}» بیشتر از مقدار سفارش ({ordered.get(product.id, 0)}) است.")
+                    raise ConflictError(f"مقدار مرجوعی «{product.name}» بیشتر از مقدار ارسال‌شده و هنوز برنگشته سفارش "
+                                        f"({max(ordered.get(product.id, 0), 0)}) است.")
                 receipt.lines.append(InboundReceiptLine(
                     organization_id=user.organization_id, line_no=number, product_id=product.id, expected_quantity=expected,
                     lot_number=entry.lot_number, note=entry.note,

@@ -25,13 +25,13 @@ from datetime import date, datetime, time
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.wms import (
-    AVAILABLE, DOCUMENT_TYPES, HELD_STATUSES, PENDING, STOCK_STATUS_LABELS, WAREHOUSE_TYPES,
+    AVAILABLE, DOCUMENT_TYPES, HELD_STATUSES, IN_TRANSIT, PENDING, STOCK_STATUS_LABELS, WAREHOUSE_TYPES,
 )
 from app.models import (
     InboundReceipt, InboundReceiptLine, Inventory, Location, Product, StockBalance, StockDocument, StockMovement,
     StockMovementLine, User, Warehouse,
 )
-from app.services import catalog_service, dispatch_service, location_service
+from app.services import allocation_service, catalog_service, dispatch_service, location_service
 from app.services.exceptions import NotFoundError
 
 OPEN_RECEIPT_STATUSES = ("open", "receiving")
@@ -84,7 +84,7 @@ def positions(db: Session, user: User, *, product_id: int | None = None, warehou
                 "warehouse_name": wh.name if wh else "—", "warehouse_type": kind.code,
                 "on_hand": 0, "approved": 0, "allocatable": 0, "reserved": 0, "available": 0, "pending_inspection": 0,
                 "quarantine": 0, "not_put_away": 0, "expired": 0, "consigned": 0, "in_transit": 0,
-                "inbound_expected": 0, "by_status": {},
+                "inbound_expected": 0, "by_status": {}, "picked": 0, "transit_status": 0,
             }
         row = groups[key]
         qty = inv.quantity or 0
@@ -98,6 +98,8 @@ def positions(db: Session, user: User, *, product_id: int | None = None, warehou
             row["pending_inspection"] += qty
         elif inv.stock_status in HELD_STATUSES:
             row["quarantine"] += qty
+        elif inv.stock_status == IN_TRANSIT:
+            row["transit_status"] += qty
 
     for b in balances:
         if b.stock_status != AVAILABLE:
@@ -114,12 +116,21 @@ def positions(db: Session, user: User, *, product_id: int | None = None, warehou
         else:
             row["allocatable"] += b.quantity
 
+    # برداشت‌شده و منتقل‌شده به آماده‌سازی: پوشش رزرو همان سفارش (از «در انتظار جانمایی» به «برداشت‌شده»)
+    staged = allocation_service.staged_map(db, [inv.id for inv in inventories])
+    for inv in inventories:
+        if inv.id in staged:
+            row = groups[(inv.product_id, inv.warehouse_id)]
+            row["picked"] += staged[inv.id]
+            row["not_put_away"] = max(row["not_put_away"] - staged[inv.id], 0)
     for row in groups.values():
-        row["available"] = max(row["allocatable"] - row["reserved"], 0)
+        row["available"] = max(row["allocatable"] + row["picked"] - row["reserved"], 0)
         if row["warehouse_type"] == "transit":
             row["in_transit"] = row["on_hand"]
         else:
-            row["in_transit"] = outstanding.get((row["product_id"], row["warehouse_id"], "transfer"), 0)
+            # سفارش انتقال (وضعیت «در راه» در همین انبار) + رسید انتقالِ باز از انبار در راه
+            row["in_transit"] = row["transit_status"] + outstanding.get((row["product_id"], row["warehouse_id"], "transfer"), 0)
+        row.pop("transit_status")
         row["inbound_expected"] = sum(v for (p, w, t), v in outstanding.items()
                                       if p == row["product_id"] and w == row["warehouse_id"] and t != "transfer")
     return list(groups.values())

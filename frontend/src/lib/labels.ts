@@ -75,10 +75,11 @@ export const MOVEMENT_TYPES: Record<string, { label: string; tone: Tone }> = {
   status_in: { label: "تغییر وضعیت (ورود)", tone: "muted" },
   move_out: { label: "جابه‌جایی (خروج از محل)", tone: "muted" },
   move_in: { label: "جابه‌جایی (ورود به محل)", tone: "muted" },
+  supplier_return: { label: "برگشت به تأمین‌کننده", tone: "orange" },
 };
 
 /** وضعیت کیفی موجودی — هم‌خوان با app/core/wms.py */
-export type StockStatus = "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+export type StockStatus = "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
 export const STOCK_STATUS: Record<StockStatus, { label: string; tone: Tone; hint: string }> = {
   available: { label: "تأییدشده (سالم)", tone: "success", hint: "قابل فروش و مصرف — تنها وضعیت قابل تخصیص" },
   pending: { label: "در انتظار بازرسی", tone: "info", hint: "کالای تازه‌رسیده یا مرجوعی که هنوز بازرسی نشده" },
@@ -87,6 +88,8 @@ export const STOCK_STATUS: Record<StockStatus, { label: string; tone: Tone; hint
   rejected: { label: "مردود", tone: "danger", hint: "در بازرسی رد شد؛ برگشت به تأمین‌کننده یا امحا" },
   defective: { label: "معیوب", tone: "orange", hint: "نقص فنی؛ تعمیر یا مرجوع" },
   damaged: { label: "آسیب‌دیده", tone: "orange", hint: "آسیب فیزیکی (شکستگی، خیسی، بسته‌بندی)" },
+  repair: { label: "در تعمیر", tone: "violet", hint: "پس از تعمیر دوباره بازرسی می‌شود" },
+  in_transit: { label: "در راه", tone: "brand", hint: "سفارش انتقال ارسال شده و هنوز در مقصد دریافت نشده" },
 };
 export const stockStatusLabel = (s: string) => STOCK_STATUS[s as StockStatus]?.label ?? s;
 
@@ -106,6 +109,13 @@ export const DOCUMENT_TYPES: Record<string, { label: string; tone: Tone }> = {
   inspection: { label: "بازرسی کیفی", tone: "info" },
   putaway: { label: "جانمایی", tone: "brand" },
   location_move: { label: "جابه‌جایی بین محل‌ها", tone: "violet" },
+  transfer_ship: { label: "ارسال سفارش انتقال", tone: "violet" },
+  transfer_receive: { label: "دریافت سفارش انتقال", tone: "brand" },
+  pick: { label: "برداشت (پیکینگ)", tone: "info" },
+  replenishment: { label: "تأمین مجدد", tone: "brand" },
+  scrap: { label: "امحا", tone: "danger" },
+  supplier_return: { label: "برگشت به تأمین‌کننده", tone: "orange" },
+  disposition: { label: "تعیین تکلیف کیفی", tone: "muted" },
 };
 export const DOCUMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
   draft: { label: "پیش‌نویس", tone: "muted" },
@@ -171,6 +181,51 @@ export const PUTAWAY_STATUS: Record<string, { label: string; tone: Tone }> = {
   done: { label: "انجام‌شده", tone: "success" },
   canceled: { label: "لغوشده", tone: "muted" },
 };
+/** فصل‌های ۱۱ تا ۱۵ */
+export const BACKORDER_STATUS: Record<string, { label: string; tone: Tone }> = {
+  open: { label: "در انتظار موجودی", tone: "warning" },
+  allocated: { label: "تخصیص‌یافته", tone: "success" },
+  fulfilled: { label: "ارسال‌شده", tone: "muted" },
+  canceled: { label: "لغوشده", tone: "muted" },
+};
+export const TRANSFER_STATUS: Record<string, { label: string; tone: Tone }> = {
+  open: { label: "آماده ارسال", tone: "info" },
+  in_transit: { label: "در راه", tone: "brand" },
+  received: { label: "دریافت کامل", tone: "success" },
+  closed: { label: "بسته‌شده", tone: "muted" },
+  canceled: { label: "لغوشده", tone: "muted" },
+};
+export const PICK_STRATEGIES: Record<string, { label: string; hint: string }> = {
+  single: { label: "تک‌سفارشی", hint: "یک سفارش در هر فهرست" },
+  batch: { label: "دسته‌ای", hint: "چند سفارش انتخابی با یک مسیر" },
+  wave: { label: "موجی", hint: "همه سفارش‌های آماده یک روز تحویل" },
+  zone: { label: "منطقه‌ای", hint: "فقط محل‌های یک منطقه" },
+};
+export const PICK_LIST_STATUS: Record<string, { label: string; tone: Tone }> = {
+  open: { label: "باز", tone: "info" },
+  in_progress: { label: "در حال برداشت", tone: "warning" },
+  picked: { label: "برداشت‌شده", tone: "success" },
+  canceled: { label: "لغوشده", tone: "muted" },
+};
+export const FULFILLMENT: Record<string, { label: string; tone: Tone }> = {
+  open: { label: "آماده‌نشده", tone: "muted" },
+  picking: { label: "در حال برداشت", tone: "warning" },
+  picked: { label: "برداشت‌شده", tone: "info" },
+  packed: { label: "بسته‌بندی‌شده", tone: "brand" },
+  shipped: { label: "ارسال‌شده", tone: "success" },
+};
+export const SHIPMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  open: { label: "در حال بارگیری", tone: "warning" },
+  dispatched: { label: "تحویل راننده شد", tone: "success" },
+  canceled: { label: "لغوشده", tone: "muted" },
+};
+export const DISPOSITION_ACTIONS: Record<string, { label: string; tone: Tone; hint: string }> = {
+  scrap: { label: "امحا (ضایعات)", tone: "danger", hint: "کالا با سند امحا از موجودی خارج می‌شود" },
+  repair: { label: "ارسال به تعمیر", tone: "violet", hint: "وضعیت «در تعمیر» در همان محل" },
+  return_to_supplier: { label: "برگشت به تأمین‌کننده", tone: "orange", hint: "خروج با سند برگشت، با ارجاع به رسید خرید" },
+  reinspect: { label: "بازرسی دوباره", tone: "info", hint: "«در انتظار بازرسی» — فقط بازرسی آن را قابل تخصیص می‌کند" },
+};
+
 export const PUTAWAY_PROBLEMS: Record<string, string> = {
   destination_full: "محل مقصد پر است",
   destination_blocked: "محل مقصد مسدود/خراب است",

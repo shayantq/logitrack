@@ -22,7 +22,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.wms import (
-    AVAILABLE, LOCATION_TYPES, PENDING, PUTAWAY_PROBLEM_LABELS, PUTAWAY_STATUS_LABELS, STOCK_STATUS_LABELS, quality_roles,
+    AVAILABLE, LOCATION_TYPES, PENDING, PUTAWAY_PROBLEM_LABELS, PUTAWAY_STATUS_LABELS, STOCK_STATUS_LABELS, TASK_TYPE_LABELS,
+    quality_roles,
 )
 from app.models import (
     Location, Product, ProductUom, PutawayTask, StockBalance, StockDocument, StockMovement, User, Warehouse,
@@ -125,7 +126,8 @@ def _open_quantity(db: Session, *, warehouse_id: int, product_id: int, stock_sta
 
 
 def _create(db: Session, user: User | None, *, warehouse_id: int, product: Product, quantity: int, stock_status: str,
-            scope: dict, receipt_id: int | None = None, inspection_id: int | None = None, note: str | None = None) -> PutawayTask:
+            scope: dict, receipt_id: int | None = None, inspection_id: int | None = None, note: str | None = None,
+            task_type: str = "putaway", destination_id: int | None = None) -> PutawayTask:
     on_hand = _scope_quantity(db, warehouse_id=warehouse_id, product_id=product.id, stock_status=stock_status, scope=scope)
     planned = _open_quantity(db, warehouse_id=warehouse_id, product_id=product.id, stock_status=stock_status, scope=scope)
     if quantity > on_hand - planned:
@@ -136,10 +138,13 @@ def _create(db: Session, user: User | None, *, warehouse_id: int, product: Produ
         product=product, stock_status=stock_status, quantity=quantity, quantity_done=0,
         source_location_id=scope["location_id"], owner_id=scope["owner_id"], lot_number=scope["lot_number"],
         expiry_date=scope["expiry_date"], receipt_id=receipt_id, inspection_id=inspection_id, excluded_location_ids=[],
-        note=note, created_at=_now(), created_by_id=user.id if user else None,
+        note=note, created_at=_now(), created_by_id=user.id if user else None, task_type=task_type,
     )
     db.add(task)
-    _resuggest(db, task)
+    if destination_id is not None:
+        task.suggested_location_id = destination_id       # تأمین مجدد: مقصد همان محل برداشت قاعده است
+    else:
+        _resuggest(db, task)
     db.flush()
     event_bus.emit(db, "putaway.task.created", "putaway_task", task.id,
                    {"code": task.code, "product_id": product.id, "quantity": quantity, "stock_status": stock_status,
@@ -173,6 +178,11 @@ def tasks_for_movement(db: Session, user: User | None, movement: StockMovement, 
                              stock_status=movement.stock_status, receipt_id=receipt_id, inspection_id=inspection_id,
                              scope={"location_id": location_id, "owner_id": owner_id, "lot_number": lot, "expiry_date": expiry}))
     return tasks
+
+
+def create_internal(db: Session, user: User | None, **kwargs) -> PutawayTask:
+    """وظیفه از مسیرهای دیگر (برگشت کالای آماده‌سازی به قفسه، تأمین مجدد محل برداشت)."""
+    return _create(db, user, **kwargs)
 
 
 def create_task(db: Session, user: User, data) -> dict:
@@ -276,7 +286,7 @@ def execute(db: Session, user: User, task_id: int, data, idempotency_key: str | 
             if inventory is None:
                 raise ConflictError("کالای این وظیفه دیگر در انبار نیست.")
             document = stock_ledger.new_document(
-                db, "putaway", organization_id=task.organization_id, user=user, warehouse_id=task.warehouse_id,
+                db, task.task_type, organization_id=task.organization_id, user=user, warehouse_id=task.warehouse_id,
                 reference_type="putaway_task", reference_id=task.id, note=f"جانمایی {task.code}",
                 idempotency_key=key, request_hash=digest,
             )
@@ -293,7 +303,8 @@ def execute(db: Session, user: User, task_id: int, data, idempotency_key: str | 
                                organization_id=task.organization_id, actor=user)
             else:
                 task.status = "partial"
-                _resuggest(db, task)
+                if task.task_type == "putaway":
+                    _resuggest(db, task)
             db.commit()
             return document
         except ConflictError as error:
@@ -379,6 +390,7 @@ def _serialize(task: PutawayTask, warehouse_code: str | None = None) -> dict:
         return loc.code if loc else None
     return {
         "id": task.id, "code": task.code, "status": task.status, "status_label": PUTAWAY_STATUS_LABELS[task.status],
+        "task_type": task.task_type, "task_type_label": TASK_TYPE_LABELS[task.task_type],
         "warehouse_id": task.warehouse_id, "warehouse_code": warehouse_code, "product_id": task.product_id,
         "product_name": task.product.name, "product_sku": task.product.sku, "product_barcode": task.product.barcode,
         "unit": task.product.unit or "عدد", "stock_status": task.stock_status,
@@ -411,9 +423,11 @@ def get_task(db: Session, user: User, task_id: int) -> dict:
 
 
 def list_tasks(db: Session, user: User, *, status: str | None = None, warehouse_id: int | None = None,
-               receipt_id: int | None = None, limit: int = 200) -> list[dict]:
+               receipt_id: int | None = None, task_type: str | None = None, limit: int = 200) -> list[dict]:
     warehouse_id = location_service.scope_warehouse(user, warehouse_id)
     query = _options(db.query(PutawayTask))
+    if task_type:
+        query = query.filter(PutawayTask.task_type == task_type)
     if warehouse_id is not None:
         query = query.filter(PutawayTask.warehouse_id == warehouse_id)
     if status == "active":

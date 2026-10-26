@@ -30,7 +30,9 @@ export function LocationTypeBadge({ type }: { type: string }) {
 export function useInvalidateOperations() {
   const queryClient = useQueryClient();
   return () => ["products", "movements", "documents", "stock-buckets", "locations", "location", "receipts", "receipt",
-    "putaway-tasks", "inspections", "positions", "balances", "stock-card", "warehouses"]
+    "putaway-tasks", "inspections", "positions", "balances", "stock-card", "warehouses", "pick-lists", "pick-list",
+    "pick-candidates", "packing-queue", "shipments", "transfer-orders", "transfer-order", "backorders",
+    "replenishment-rules", "abc", "dispositions", "orders"]
     .forEach(key => queryClient.invalidateQueries({ queryKey: [key] }));
 }
 

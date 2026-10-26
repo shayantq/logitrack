@@ -73,6 +73,8 @@ class OrderRequest(BaseModel):
     # خودروی مشخص؛ اگر نباشد و auto_assign=True خودرو خودکار انتخاب می‌شود، وگرنه سفارش «در انتظار تخصیص» می‌ماند
     vehicle_id: Optional[int] = Field(None, gt=0, examples=[1])
     auto_assign: bool = True
+    # پذیرش تأمین جزئی: آنچه موجود است ارسال و باقی‌مانده «سفارش معوق» ثبت می‌شود (به‌جای رد کل سفارش)
+    allow_backorder: bool = False
     # کرایه حمل (ریال)؛ خالی = محاسبه با فرمول سازمان (پایه + هر کیلو)
     delivery_fee: Optional[float] = Field(None, ge=0, le=10_000_000_000, examples=[750000])
 
@@ -156,6 +158,10 @@ class OrderResponse(BaseModelWithDateFormatting):
 
     warehouse_id: Optional[int] = None
     vehicle_id: Optional[int] = None
+    stock_state: Optional[str] = None
+    fulfillment_state: Optional[str] = None
+    shipment_id: Optional[int] = None
+    parent_order_id: Optional[int] = None
     items: list[OrderItemResponse] = []
     total_quantity: int = 0
     total_weight_kg: float = 0

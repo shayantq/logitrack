@@ -18,7 +18,7 @@ from sqlalchemy.orm import relationship
 from app.core.tenancy import TenantScoped
 from app.core.wms import (
     DISCREPANCY_TYPES, LOCATION_LEVELS, LOCATION_TYPES, PUTAWAY_PROBLEMS, PUTAWAY_STATUSES, RECEIPT_STATUSES,
-    RECEIPT_TYPES, STOCK_STATUSES, sql_in,
+    RECEIPT_TYPES, STOCK_STATUSES, TASK_TYPES, sql_in,
 )
 from app.database import Base
 
@@ -311,6 +311,7 @@ class PutawayTask(TenantScoped, Base):
     __table_args__ = (
         CheckConstraint("quantity > 0 AND quantity_done >= 0 AND quantity_done <= quantity", name="ck_putaway_tasks_quantity"),
         CheckConstraint(f"status IN ({sql_in(PUTAWAY_STATUSES)})", name="ck_putaway_tasks_status"),
+        CheckConstraint(f"task_type IN ({sql_in(TASK_TYPES)})", name="ck_putaway_tasks_type"),
         CheckConstraint(f"stock_status IN ({sql_in(STOCK_STATUSES)})", name="ck_putaway_tasks_stock_status"),
         CheckConstraint(f"last_problem IS NULL OR last_problem IN ({sql_in(PUTAWAY_PROBLEMS + ('scan_mismatch', 'rule_violation'))})",
                         name="ck_putaway_tasks_problem"),
@@ -319,6 +320,8 @@ class PutawayTask(TenantScoped, Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(16), nullable=False, unique=True, index=True)       # مثل PT-7K2M9QXA
     status = Column(String(16), nullable=False, default="open", index=True)
+    # جانمایی کالای رسیده، یا تأمین مجدد محل برداشت از قفسه نگهداری (فصل ۱۳) — اجرای اسکنی یکسان
+    task_type = Column(String(16), nullable=False, default="putaway", server_default="putaway")
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     stock_status = Column(String(16), nullable=False)

@@ -299,6 +299,47 @@ def recalculate_reorder_points_task():
     return {"organizations": len(org_ids), "inventories": total}
 
 
+def _each_organization(work, label: str) -> dict:
+    from app.models import Organization
+    db = SessionLocal()
+    try:
+        org_ids = [o.id for o in db.query(Organization.id).filter(Organization.is_active.is_(True)).all()]
+    finally:
+        db.close()
+    done = 0
+    for org_id in org_ids:
+        db = _tenant_session(org_id)
+        try:
+            work(db)
+            done += 1
+        except Exception:
+            db.rollback()
+            logger.exception("%s سازمان %s ناموفق بود", label, org_id)
+        finally:
+            db.close()
+    return {"organizations": done}
+
+
+@celery_app.task(name="tasks.check_replenishment_rules")
+def check_replenishment_rules_task():
+    """هر ساعت (پشتیبان بررسی پس از هر برداشت): محل‌های برداشت زیر حداقل وظیفه تأمین مجدد می‌گیرند."""
+    from app.models import ReplenishmentRule
+    from app.services import replenishment_rule_service
+
+    def work(db):
+        ids = {lid for (lid,) in db.query(ReplenishmentRule.location_id).filter(ReplenishmentRule.is_active.is_(True)).all()}
+        replenishment_rule_service.check(db, None, ids)
+        db.commit()
+    return _each_organization(work, "تأمین مجدد")
+
+
+@celery_app.task(name="tasks.classify_abc")
+def classify_abc_task():
+    """هر هفته: طبقه‌بندی ABC کالاها از ارزش مصرف یک سال اخیر (مبنای دوره شمارش)."""
+    from app.services import replenishment_rule_service
+    return _each_organization(lambda db: replenishment_rule_service.classify(db, None), "طبقه‌بندی ABC")
+
+
 # ---------------------------------------------------------------------------
 # گزارش با برند سازمان (مرحله ۱۴): موجودی، سفارش‌ها، دفتر گردش، مالی حمل‌ونقل — اکسل یا PDF
 # ---------------------------------------------------------------------------

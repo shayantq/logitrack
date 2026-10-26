@@ -16,7 +16,7 @@ from app.services.stock_ledger import LedgerViolationError
 from app.routers import (
     auth, inventory, orders, users, vehicles, reports, warehouses, notifications, platform,
     organization, organization_requests, drivers, dispatch, driver_portal, performance, tracking, routes, tickets, stocktakes, catalog, replenishment,
-    partners, wms, locations, inbound,
+    partners, wms, locations, inbound, fulfillment,
 )
 
 # ------------------------------------------------------------------------------
@@ -170,6 +170,12 @@ app.include_router(locations.router)
 app.include_router(inbound.router)
 app.include_router(inbound.quality_router)
 app.include_router(inbound.putaway_router)
+app.include_router(fulfillment.backorders)
+app.include_router(fulfillment.transfers)
+app.include_router(fulfillment.replenishment)
+app.include_router(fulfillment.picking)
+app.include_router(fulfillment.shipping)
+app.include_router(fulfillment.dispositions)
 
 
 # محافظ‌های لایه داده آخرین سدند (سرویس‌ها پیش از آن خطای خوانا می‌دهند)؛ اگر کدی از آن‌ها رد شود،

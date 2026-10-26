@@ -27,7 +27,7 @@ from app.models import (
 )
 from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
-from app.core.wms import AVAILABLE
+from app.core.wms import AVAILABLE, PENDING
 from app.services import (
     allocation_service, audit_service, catalog_service, commission_service, dispatch_service, messaging,
     notification_service, stock_document_service, stock_ledger, warehouse_service,
@@ -95,10 +95,12 @@ def _upsert_customer(db: Session, organization_id: int, data: CustomerIn) -> Cus
 # ثبت سفارش
 # ---------------------------------------------------------------------------
 def _lock_inventories(db: Session, products: dict[int, Product], quantities: dict[int, int],
-                      warehouse_id: int | None) -> tuple[int | None, dict[int, Inventory]]:
+                      warehouse_id: int | None, *, partial: bool = False) -> tuple[int | None, dict[int, Inventory], dict[int, int]]:
     """
     ردیف‌های موجودی «سالم و آزاد» همه اقلام را قفل می‌کند (به ترتیب id — بدون deadlock بین درخواست‌های
     هم‌زمان) و انباری را برمی‌گرداند که برای «همه» اقلام موجودی آزاد (موجود − رزرو) کافی دارد.
+    partial (سفارش با پذیرش معوق): انباری که بیشترین مقدار را پوشش می‌دهد، حتی اگر همه اقلام کامل نباشد.
+    خروجی: (انبار، ردیف‌های موجودی هر کالا، موجودی قابل وعده هر کالا در همان انبار).
     فقط انبارهایی که سفارش ارسال می‌کنند (عمومی/محصول نهایی/توزیع و فعال) نامزدند.
     """
     shipping = warehouse_service.shipping_ids(db)
@@ -124,10 +126,21 @@ def _lock_inventories(db: Session, products: dict[int, Product], quantities: dic
         by_warehouse[inv.warehouse_id].setdefault(inv.product_id, inv)
 
     candidates = [warehouse_id] if warehouse_id is not None else sorted(by_warehouse, key=lambda w: (w is None, w or 0))
-    for candidate in candidates:
+
+    def coverage(candidate) -> dict[int, int]:
         stock = by_warehouse.get(candidate, {})
-        if all((free(stock[pid]) if pid in stock else 0) >= qty for pid, qty in quantities.items()):
-            return candidate, stock
+        return {pid: max(free(stock[pid]), 0) if pid in stock else 0 for pid in quantities}
+
+    for candidate in candidates:
+        available = coverage(candidate)
+        if all(available[pid] >= qty for pid, qty in quantities.items()):
+            return candidate, by_warehouse.get(candidate, {}), available
+    if partial and candidates:
+        # بیشترین پوشش (اولویت با انبار با شناسه کمتر در تساوی)
+        best = max(candidates, key=lambda c: (sum(min(q, coverage(c)[p]) for p, q in quantities.items()), -(c or 0)))
+        available = coverage(best)
+        if any(available.values()):
+            return best, by_warehouse.get(best, {}), available
 
     # پیام دقیق: کدام کالا کم است (بر اساس بیشترین موجودی آزاد یک انبار)
     shortages = []
@@ -200,7 +213,11 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
             raise NotFoundError('کالای انتخاب‌شده یافت نشد.')
 
         # 🔒 قفل ردیف‌های موجودی (SELECT ... FOR UPDATE)
-        warehouse_id, inventories = _lock_inventories(db, products, quantities, source_warehouse_id)
+        warehouse_id, inventories, available = _lock_inventories(
+            db, products, quantities, source_warehouse_id, partial=order_request.allow_backorder)
+        # تأمین جزئی: آنچه موجود است رزرو و ارسال می‌شود، باقی‌مانده «سفارش معوق» ثبت می‌شود (دور ریخته نمی‌شود)
+        backordered = {pid: qty - min(qty, available.get(pid, 0)) for pid, qty in quantities.items()}
+        quantities = {pid: qty - backordered[pid] for pid, qty in quantities.items() if qty - backordered[pid] > 0}
 
         total_weight = sum((products[pid].weight_kg or 0) * qty for pid, qty in quantities.items())
         dispatch = _dispatch_args(total_weight, order_request.delivery_window_start, order_request.delivery_window_end,
@@ -216,6 +233,8 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
         # قیمت کالا در «روز تحویل» از تاریخچه قیمت (مرحله ۱۳)؛ روی اقلام ثبت می‌شود و بعداً تغییر نمی‌کند
         delivery_day = dispatch_service.to_local(dispatch_service.to_utc_naive(order_request.delivery_window_start)).date()
         unit_prices = {pid: catalog_service.unit_price_for_order(db, products[pid], delivery_day) for pid in quantities}
+        if not quantities:
+            raise ConflictError("هیچ‌کدام از اقلام این سفارش موجودی قابل وعده ندارد.")
         order = Order(
             organization_id=user.organization_id,
             tracking_code=_new_tracking_code(db),
@@ -244,18 +263,25 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
         )
         db.add(order)
         for item in order_request.items:
+            if item.product_id not in quantities:
+                continue
             product = products[item.product_id]
             order.items.append(OrderItem(
                 organization_id=user.organization_id, product_id=product.id, product_name=product.name,
-                product_sku=product.sku, quantity=item.quantity,
+                product_sku=product.sku, quantity=quantities[product.id],
                 unit_price=unit_prices[product.id], unit_weight_kg=product.weight_kg or 0,
             ))
         db.flush()  # گرفتن شناسه سفارش برای مرجع رزرو
 
         # رزرو (نه خروج): کالا تا بارگیری در انبار می‌ماند ولی برای سفارش دیگری آزاد نیست
-        for item in order_request.items:
-            allocation_service.reserve(db, inventories[item.product_id], item.quantity,
+        for product_id, quantity in quantities.items():
+            allocation_service.reserve(db, inventories[product_id], quantity,
                                        reference_type="order", reference_id=order.id, user=user)
+        from app.services import backorder_service
+        for product_id, quantity in backordered.items():
+            if quantity > 0:
+                backorder_service.open_backorder(db, user, order, products[product_id], quantity,
+                                                 catalog_service.unit_price_for_order(db, products[product_id], delivery_day))
         _add_history(db, order, None, status, user,
                      "ثبت سفارش" + (f" و تخصیص خودرو {vehicle.license_plate or vehicle.id}" if vehicle else ""))
         notification_service.order_assigned(db, order)
@@ -265,6 +291,14 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
     except Exception:
         db.rollback()
         raise
+
+
+def new_tracking_code(db: Session) -> str:
+    return _new_tracking_code(db)
+
+
+def record_history(db: Session, order: Order, from_status: str | None, to_status: str, user: User | None, note: str | None) -> None:
+    _add_history(db, order, from_status, to_status, user, note)
 
 
 def _organization_name(db: Session, order: Order) -> str:
@@ -424,24 +458,32 @@ def _issue_stock(db: Session, order: Order, user: User | None) -> None:
     if order.stock_state != "reserved":
         return          # سفارش‌های قدیمی که موجودی‌شان هنگام ثبت کم شده بود
     reservations = allocation_service.active_for(db, "order", order.id)
+    from app.services import picking_service
+    picked = picking_service.issue_lines(db, order, reservations)
     if reservations:
         document = stock_ledger.new_document(
             db, "order_issue", organization_id=order.organization_id, user=user, warehouse_id=order.warehouse_id,
             reference_type="order", reference_id=order.id, note=f"حواله خروج سفارش {order.tracking_code}",
         )
         for reservation in reservations:
-            allocation_service.consume(db, reservation, document, user=user, reason=f"خروج بابت سفارش {order.tracking_code}")
+            allocation_service.consume(db, reservation, document, user=user, reason=f"خروج بابت سفارش {order.tracking_code}",
+                                       lines=picked.get(reservation.id))
+    picking_service.mark_issued(db, order)
     order.stock_state = "issued"
+    order.fulfillment_state = "shipped"
 
 
 def _restore_stock(db: Session, order: Order, user: User | None, reason: str) -> None:
     """
-    کالای سفارشی که تحویل نشد: اگر هنوز بارگیری نشده، رزروش آزاد می‌شود؛ اگر از انبار خارج شده بود،
-    با «سند برگشت از سفارش» به ردیف سالم همان انبار مبدأ برمی‌گردد.
+    کالای سفارشی که تحویل نشد: اگر هنوز بارگیری نشده، رزروش آزاد می‌شود (و کالای برداشت‌شده به قفسه برمی‌گردد)؛
+    اگر از انبار خارج شده بود، با «سند برگشت از سفارش» و وضعیت «در انتظار بازرسی» به انبار مبدأ برمی‌گردد —
+    کالای برگشتی پیش از بازرسی کیفی قابل تخصیص نیست (فصل ۱۵).
     """
     if order.stock_state == "reserved":
         for reservation in allocation_service.active_for(db, "order", order.id):
             allocation_service.release(db, reservation, user=user, reason=reason)
+        from app.services import picking_service
+        picking_service.cancel_for_order(db, user, order)
         order.stock_state = "released"
         return
     if order.stock_state != "issued":
@@ -455,7 +497,7 @@ def _restore_stock(db: Session, order: Order, user: User | None, reason: str) ->
     for item in sorted(items, key=lambda i: i.product_id):
         if order.warehouse_id is None:
             break
-        inventory = stock_ledger.lock_bucket(db, item.product_id, order.warehouse_id, organization_id=order.organization_id)
+        inventory = stock_ledger.lock_bucket(db, item.product_id, order.warehouse_id, PENDING, organization_id=order.organization_id)
         if document is None:
             document = stock_ledger.new_document(
                 db, "order_return", organization_id=order.organization_id, user=user, warehouse_id=order.warehouse_id,
@@ -492,6 +534,9 @@ def _apply_status(db: Session, order: Order, new_status: str, user: User | None,
         _issue_stock(db, order, user)
     if new_status in RESTOCK_STATUSES:
         _restore_stock(db, order, user, f"برگشت به انبار: سفارش {order.tracking_code} {STATUS_LABELS[new_status]}")
+    if new_status in ('canceled', 'expired'):
+        from app.services import backorder_service
+        backorder_service.cancel_for_order(db, user, order, f"سفارش {order.tracking_code} {STATUS_LABELS[new_status]}")
     if new_status in RELEASE_VEHICLE_STATUSES:
         _release_vehicle(db, order)
     if new_status == 'delivered':
@@ -502,6 +547,11 @@ def _apply_status(db: Session, order: Order, new_status: str, user: User | None,
         route_service.freeze_route(db, order)
     _add_history(db, order, old_status, new_status, user, note)
     notification_service.order_event(db, order, new_status, user, note)
+
+
+def apply_status(db: Session, order: Order, new_status: str, user: User | None, note: str | None) -> None:
+    """تغییر وضعیت از مسیرهای داخلی (مثلاً تحویل محموله به راننده) با همان اثرهای انبار، خودرو و اعلان."""
+    _apply_status(db, order, new_status, user, note)
 
 
 def update_order_status(db: Session, user: User, order_id: int, status_request: OrderStatusRequest) -> Order:

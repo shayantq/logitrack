@@ -3,7 +3,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query, status
 
-from app.core.wms import PUTAWAY_STATUSES, RECEIPT_STATUSES, RECEIPT_TYPES
+from app.core.wms import PUTAWAY_STATUSES, RECEIPT_STATUSES, RECEIPT_TYPES, TASK_TYPES
 from app.database import db_dependency
 from app.dependencies import IdempotencyKey, user_dependency
 from app.schemas.operations import (
@@ -101,8 +101,10 @@ def transitions(user: user_dependency):
 @putaway_router.get("/tasks", response_model=list[PutawayTaskOut], summary="📋 وظایف جانمایی")
 def list_tasks(db: db_dependency, user: user_dependency,
                status_: Optional[Literal[PUTAWAY_STATUSES + ("active",)]] = Query(None, alias="status"),
-               warehouse_id: Optional[int] = Query(None, gt=0), receipt_id: Optional[int] = Query(None, gt=0)):
-    return _call(putaway_service.list_tasks, db, user, status=status_, warehouse_id=warehouse_id, receipt_id=receipt_id)
+               warehouse_id: Optional[int] = Query(None, gt=0), receipt_id: Optional[int] = Query(None, gt=0),
+               task_type: Optional[Literal[TASK_TYPES]] = Query(None, description="جانمایی یا تأمین مجدد")):
+    return _call(putaway_service.list_tasks, db, user, status=status_, warehouse_id=warehouse_id, receipt_id=receipt_id,
+                 task_type=task_type)
 
 
 @putaway_router.post("/tasks", response_model=PutawayTaskOut, status_code=status.HTTP_201_CREATED,

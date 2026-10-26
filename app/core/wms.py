@@ -32,12 +32,16 @@ STOCK_STATUSES = (
     "rejected",      # مردود: در بازرسی رد شد (برگشت به تأمین‌کننده یا امحا)
     "defective",     # معیوب: نقص فنی/کارکردی (قابل تعمیر یا مرجوع)
     "damaged",       # آسیب‌دیده: آسیب فیزیکی (شکستگی، خیسی، بسته‌بندی)
+    "repair",        # در تعمیر: کالای معیوب/آسیب‌دیده که برای تعمیر کنار رفته؛ پس از تعمیر دوباره بازرسی می‌شود
+    "in_transit",    # در راه: کالای سفارش انتقال که از مبدأ خارج شده و هنوز در مقصد دریافت نشده
 )
 STOCK_STATUS_LABELS = {
     "available": "تأییدشده (سالم)", "pending": "در انتظار بازرسی", "quarantine": "قرنطینه", "blocked": "توقیف",
-    "rejected": "مردود", "defective": "معیوب", "damaged": "آسیب‌دیده",
+    "rejected": "مردود", "defective": "معیوب", "damaged": "آسیب‌دیده", "repair": "در تعمیر", "in_transit": "در راه",
 }
-HELD_STATUSES = tuple(s for s in STOCK_STATUSES if s not in (AVAILABLE, PENDING))
+IN_TRANSIT = "in_transit"
+# نگه‌داشته (غیرقابل‌استفاده تا تصمیم کیفی): همه جز تأییدشده، در انتظار بازرسی و در راه
+HELD_STATUSES = tuple(s for s in STOCK_STATUSES if s not in (AVAILABLE, PENDING, IN_TRANSIT))
 
 # چه کسی می‌تواند وضعیت کیفی را از کجا به کجا ببرد (بازرسی و تغییر وضعیت دستی هر دو از همین جدول)
 _STAFF = ("org_admin", "warehouse_manager")
@@ -49,8 +53,10 @@ QUALITY_TRANSITIONS: dict[str, dict[str, tuple[str, ...]]] = {
                    "damaged": _STAFF},
     AVAILABLE: {"quarantine": _STAFF, "blocked": _STAFF, "defective": _STAFF, "damaged": _STAFF},
     "blocked": {AVAILABLE: _ADMIN, "quarantine": _ADMIN, "rejected": _ADMIN, "defective": _ADMIN, "damaged": _ADMIN},
-    "defective": {"rejected": _STAFF, "damaged": _STAFF, "quarantine": _STAFF, AVAILABLE: _ADMIN},
-    "damaged": {"rejected": _STAFF, "defective": _STAFF, "quarantine": _STAFF, AVAILABLE: _ADMIN},
+    "defective": {"rejected": _STAFF, "damaged": _STAFF, "quarantine": _STAFF, "repair": _STAFF, AVAILABLE: _ADMIN},
+    "damaged": {"rejected": _STAFF, "defective": _STAFF, "quarantine": _STAFF, "repair": _STAFF, AVAILABLE: _ADMIN},
+    # پس از تعمیر کالا مستقیم قابل فروش نمی‌شود: دوباره «در انتظار بازرسی»
+    "repair": {PENDING: _STAFF, "rejected": _STAFF, "defective": _STAFF},
     "rejected": {"quarantine": _ADMIN, AVAILABLE: _ADMIN},
 }
 
@@ -113,6 +119,14 @@ DOCUMENT_TYPES = {d.code: d for d in (
     DocumentType("inspection", "QI", "بازرسی کیفی", False),
     DocumentType("putaway", "PA", "جانمایی", False),
     DocumentType("location_move", "MV", "جابه‌جایی بین محل‌ها", True),
+    # فصل‌های ۱۱ تا ۱۵ — از مسیر عملیات خودشان (سفارش انتقال، پیکینگ، تأمین مجدد، تعیین تکلیف) اصلاح می‌شوند
+    DocumentType("transfer_ship", "TS", "ارسال سفارش انتقال", False),
+    DocumentType("transfer_receive", "TV", "دریافت سفارش انتقال", False),
+    DocumentType("pick", "PK", "برداشت (پیکینگ)", False),
+    DocumentType("replenishment", "RP", "تأمین مجدد محل برداشت", False),
+    DocumentType("scrap", "SC", "امحا / ضایعات کیفی", False),
+    DocumentType("supplier_return", "SR", "برگشت به تأمین‌کننده", False),
+    DocumentType("disposition", "DP", "تعیین تکلیف کیفی", False),
 )}
 
 # نوع سند پیش‌فرض برای هر نوع گردش (وقتی فراخواننده سند را صریح نمی‌سازد)
@@ -120,7 +134,7 @@ MOVEMENT_DOCUMENT_TYPE = {
     "initial": "opening", "receipt": "receipt", "order_out": "order_issue", "order_return": "order_return",
     "adjustment": "adjustment", "damage": "write_off", "transfer_out": "transfer", "transfer_in": "transfer",
     "status_out": "status_change", "status_in": "status_change", "stocktake": "stocktake",
-    "move_out": "location_move", "move_in": "location_move",
+    "move_out": "location_move", "move_in": "location_move", "supplier_return": "supplier_return",
 }
 # گردش‌های داخلی که موجودی انبار را عوض نمی‌کنند (در کاردکس انبار خالص صفرند)
 INTERNAL_MOVEMENT_TYPES = ("move_out", "move_in", "status_out", "status_in")
@@ -172,6 +186,53 @@ PUTAWAY_STATUS_LABELS = {"open": "باز", "partial": "نیمه‌انجام", "
 PUTAWAY_PROBLEMS = ("destination_full", "destination_blocked", "item_damaged", "item_missing")
 PUTAWAY_PROBLEM_LABELS = {"destination_full": "محل مقصد پر است", "destination_blocked": "محل مقصد مسدود/خراب است",
                           "item_damaged": "کالا آسیب دیده است", "item_missing": "کالا در محل مبدأ نیست"}
+# وظیفه انبار: جانمایی کالای رسیده، یا تأمین مجدد محل برداشت از قفسه نگهداری (همان اجرای اسکنی)
+TASK_TYPES = ("putaway", "replenishment")
+TASK_TYPE_LABELS = {"putaway": "جانمایی", "replenishment": "تأمین مجدد"}
+
+# ---------------------------------------------------------------------------
+# فصل ۱۱ — سفارش معوق (Backorder)
+# ---------------------------------------------------------------------------
+BACKORDER_STATUSES = ("open", "allocated", "fulfilled", "canceled")
+BACKORDER_STATUS_LABELS = {"open": "در انتظار موجودی", "allocated": "تخصیص‌یافته", "fulfilled": "ارسال‌شده",
+                           "canceled": "لغوشده"}
+
+# ---------------------------------------------------------------------------
+# فصل ۱۲ — سفارش انتقال
+# ---------------------------------------------------------------------------
+TRANSFER_STATUSES = ("open", "in_transit", "received", "closed", "canceled")
+TRANSFER_STATUS_LABELS = {"open": "آماده ارسال", "in_transit": "در راه", "received": "دریافت کامل",
+                          "closed": "بسته‌شده", "canceled": "لغوشده"}
+TRANSFER_RESOLUTIONS = ("write_off", "return")      # تکلیف کسری در راه هنگام بستن
+
+# ---------------------------------------------------------------------------
+# فصل ۱۳ — طبقه‌بندی ABC و دوره شمارش
+# ---------------------------------------------------------------------------
+ABC_CLASSES = ("A", "B", "C")
+ABC_THRESHOLDS = (0.80, 0.95)                        # سهم تجمعی ارزش مصرف: تا ۸۰٪ = A، تا ۹۵٪ = B
+ABC_COUNT_DAYS = {"A": 30, "B": 90, "C": 180}        # فاصله شمارش دوره‌ای هر کلاس
+
+# ---------------------------------------------------------------------------
+# فصل ۱۴ — پیکینگ، بسته‌بندی و ارسال
+# ---------------------------------------------------------------------------
+PICK_STRATEGIES = ("single", "batch", "wave", "zone")
+PICK_STRATEGY_LABELS = {"single": "تک‌سفارشی", "batch": "دسته‌ای", "wave": "موجی (بازه تحویل)", "zone": "منطقه‌ای"}
+PICK_LIST_STATUSES = ("open", "in_progress", "picked", "canceled")
+PICK_LIST_STATUS_LABELS = {"open": "باز", "in_progress": "در حال برداشت", "picked": "برداشت‌شده", "canceled": "لغوشده"}
+PICK_LINE_STATUSES = ("open", "picked", "short", "canceled")
+# وضعیت آماده‌سازی سفارش در انبار (مستقل از وضعیت حمل و وضعیت موجودی)
+FULFILLMENT_STATES = ("open", "picking", "picked", "packed", "shipped")
+FULFILLMENT_LABELS = {"open": "آماده‌نشده", "picking": "در حال برداشت", "picked": "برداشت‌شده", "packed": "بسته‌بندی‌شده",
+                      "shipped": "ارسال‌شده"}
+SHIPMENT_STATUSES = ("open", "dispatched", "canceled")
+SHIPMENT_STATUS_LABELS = {"open": "در حال بارگیری", "dispatched": "تحویل راننده شد", "canceled": "لغوشده"}
+
+# ---------------------------------------------------------------------------
+# فصل ۱۵ — تعیین تکلیف کالای مرجوعی/معیوب
+# ---------------------------------------------------------------------------
+DISPOSITION_ACTIONS = ("scrap", "repair", "return_to_supplier", "reinspect")
+DISPOSITION_LABELS = {"scrap": "امحا (ضایعات)", "repair": "ارسال به تعمیر", "return_to_supplier": "برگشت به تأمین‌کننده",
+                      "reinspect": "بازرسی دوباره"}
 
 # ---------------------------------------------------------------------------
 # انواع انبار (Warehouse Types)
@@ -222,6 +283,11 @@ EVENT_TYPES = (
     "inbound.receipt.created", "inbound.receipt.received", "inbound.receipt.closed", "inbound.receipt.canceled",
     "quality.inspected",
     "putaway.task.created", "putaway.task.completed", "putaway.task.failed", "putaway.task.canceled",
+    "backorder.created", "backorder.allocated", "backorder.fulfilled", "backorder.canceled",
+    "transfer.created", "transfer.shipped", "transfer.received", "transfer.closed", "transfer.canceled",
+    "pick.list.created", "pick.line.picked", "pick.line.short", "pick.list.completed",
+    "order.packed", "shipment.created", "shipment.dispatched",
+    "replenishment.triggered", "abc.classified", "disposition.recorded",
 )
 
 # ---------------------------------------------------------------------------
@@ -251,6 +317,14 @@ GLOSSARY = (
     ("Inspection", "بازرسی کیفی", "تعیین وضعیت کالای در انتظار بازرسی یا قرنطینه، با ثبت نتیجه و بازرس."),
     ("FEFO", "اول‌منقضی، اول‌خروج", "برداشت خودکار از بچی که زودتر منقضی می‌شود."),
     ("Kardex / Stock card", "کاردکس", "کارت گردش یک کالا با مانده اول دوره، ورود، خروج و مانده پس از هر سند."),
+    ("Backorder", "سفارش معوق", "مقدار سفارش که موجودی نداشت؛ ثبت می‌ماند و به ترتیب اولویت به موجودی جدید تخصیص می‌یابد."),
+    ("Transfer order", "سفارش انتقال", "انتقال دومرحله‌ای: ارسال از مبدأ (کالا «در راه») و دریافت در مقصد با ثبت کسری و آسیب."),
+    ("Replenishment", "تأمین مجدد", "پر کردن محل برداشت از قفسه نگهداری وقتی موجودی آن به حداقل رسید."),
+    ("ABC", "طبقه‌بندی ABC", "دسته‌بندی کالا با سهم ارزش مصرف؛ کلاس A بیشتر کنترل و زودتر شمارش می‌شود."),
+    ("Pick list / Wave", "فهرست برداشت / موج", "برداشت کالای یک یا چند سفارش با مسیر محل‌ها؛ موج = سفارش‌های یک بازه تحویل."),
+    ("Packing slip", "برگه بسته‌بندی", "فهرست محتوای هر بسته سفارش با ابعاد و وزن."),
+    ("Shipment", "محموله", "بسته‌های چند سفارش روی یک خودرو با کنترل ظرفیت وزنی و حجمی و تحویل به راننده."),
+    ("Disposition", "تعیین تکلیف", "تصمیم درباره کالای مردود/معیوب: امحا، تعمیر، برگشت به تأمین‌کننده یا بازرسی دوباره."),
     ("Inventory document", "سند انبار", "رسید، حواله، اصلاحیه، انتقال و…؛ تنها راه تغییر موجودی."),
     ("Ledger", "دفتر گردش کالا", "فهرست غیرقابل‌تغییر گردش‌ها؛ موجودی هر ردیف = مجموع گردش‌هایش."),
     ("Reversal", "سند برگشت", "سندی که اثر یک سند قطعی را خنثی می‌کند؛ هیچ سندی حذف یا بازنویسی نمی‌شود."),
@@ -281,6 +355,11 @@ def vocabulary() -> dict:
         "discrepancy_types": [{"code": c, "label": DISCREPANCY_LABELS[c]} for c in DISCREPANCY_TYPES],
         "putaway_statuses": [{"code": c, "label": PUTAWAY_STATUS_LABELS[c]} for c in PUTAWAY_STATUSES],
         "putaway_problems": [{"code": c, "label": PUTAWAY_PROBLEM_LABELS[c]} for c in PUTAWAY_PROBLEMS],
+        "pick_strategies": [{"code": c, "label": PICK_STRATEGY_LABELS[c]} for c in PICK_STRATEGIES],
+        "fulfillment_states": [{"code": c, "label": FULFILLMENT_LABELS[c]} for c in FULFILLMENT_STATES],
+        "transfer_statuses": [{"code": c, "label": TRANSFER_STATUS_LABELS[c]} for c in TRANSFER_STATUSES],
+        "disposition_actions": [{"code": c, "label": DISPOSITION_LABELS[c]} for c in DISPOSITION_ACTIONS],
+        "abc_count_days": ABC_COUNT_DAYS,
         "partner_roles": [{"code": c, "label": PARTNER_ROLE_LABELS[c]} for c in PARTNER_ROLES],
         "carrier_services": [{"code": c, "label": CARRIER_SERVICE_LABELS[c]} for c in CARRIER_SERVICES],
         "event_types": list(EVENT_TYPES),

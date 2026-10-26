@@ -19,7 +19,7 @@ const EMPTY = {
   customerName: "", customerMobile: "", recipientName: "", recipientMobile: "",
   province: "", city: "", address: "", postal: "",
   date: tomorrowIsoDate(), from: "09:00", to: "13:00",
-  size: "m" as Schemas["OrderRequest"]["size"], priority: false, warehouse: "", vehicle: "auto", notes: "", fee: "",
+  size: "m" as Schemas["OrderRequest"]["size"], priority: false, backorder: false, warehouse: "", vehicle: "auto", notes: "", fee: "",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -113,7 +113,7 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
       warehouse_id: form.warehouse ? Number(form.warehouse) : null,
       vehicle_id: /^\d+$/.test(form.vehicle) ? Number(form.vehicle) : null,
       delivery_fee: form.fee.trim() ? Number(normalizeDigits(form.fee)) : null,
-      auto_assign: form.vehicle === "auto",
+      auto_assign: form.vehicle === "auto", allow_backorder: form.backorder,
     });
   }
 
@@ -186,13 +186,14 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
                   <option value="">خودکار{chosen.length && fulfilling.length ? ` (${warehouses.find(w => w.id === fulfilling[0])?.name ?? ""})` : ""}</option>
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}{chosen.length ? (fulfilling.includes(w.id) ? " — موجودی کافی" : " — موجودی ناکافی") : ""}</option>)}
                 </Select>
-                {chosen.length > 0 && fulfilling.length === 0 && <p className="mt-1 text-xs text-danger">هیچ انباری به‌تنهایی موجودی کافی برای همه اقلام ندارد.</p>}
+                {chosen.length > 0 && fulfilling.length === 0 && <p className={`mt-1 text-xs ${form.backorder ? "text-warning" : "text-danger"}`}>{form.backorder ? "موجودی کامل نیست؛ آنچه هست ارسال و باقی‌مانده «سفارش معوق» ثبت می‌شود." : "هیچ انباری به‌تنهایی موجودی کافی برای همه اقلام ندارد."}</p>}
               </Field>
             )}
             <Field label="کرایه حمل (ریال)" hint={plan ? `خالی = ${faNumber(defaultFee)} ریال طبق قانون سازمان` : undefined}>
               <Input inputMode="numeric" className="ltr" placeholder={plan ? faNumber(defaultFee) : ""} value={form.fee} onChange={e => set("fee", e.target.value)} data-testid="order-fee" />
             </Field>
-            <div className="sm:col-span-3"><Checkbox label="فوری / اورژانسی" checked={form.priority} onChange={e => set("priority", e.target.checked)} /></div>
+            <div className="sm:col-span-3 flex flex-wrap gap-x-6 gap-y-2"><Checkbox label="فوری / اورژانسی" checked={form.priority} onChange={e => set("priority", e.target.checked)} />
+              <Checkbox label="پذیرش تأمین جزئی: کمبود موجودی «سفارش معوق» شود" checked={form.backorder} onChange={e => set("backorder", e.target.checked)} data-testid="order-backorder" /></div>
             <Field label="توضیحات" className="sm:col-span-3"><Input maxLength={1000} value={form.notes} onChange={e => set("notes", e.target.value)} /></Field>
           </div>
         </Section>

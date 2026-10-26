@@ -93,7 +93,8 @@ def test_full_order_lifecycle_is_recorded(world):
     assert (out.movement_type, out.quantity_change, out.balance_after) == ("order_out", -5, 15)
     assert (out.reference_type, out.reference_id) == ("order", order.id)
     assert out.document.doc_type == "order_issue"
-    assert (back.movement_type, back.quantity_change, back.balance_after) == ("order_return", 5, 20)
+    # کالای برگشتی «در انتظار بازرسی» برمی‌گردد (ردیف جدا با مانده ۵) و تا بازرسی قابل تخصیص نیست
+    assert (back.movement_type, back.quantity_change, back.balance_after, back.stock_status) == ("order_return", 5, 5, "pending")
     assert back.document.doc_type == "order_return"
     assert back.created_by_id == driver.id
     [reservation] = db.query(StockReservation).filter(StockReservation.reference_id == order.id).all()

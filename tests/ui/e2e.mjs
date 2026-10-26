@@ -1348,6 +1348,82 @@ await session("wms-ops", "qazvin_manager", "manager123", async page => {
   check("wms-ops", "ledger and detail balances stay consistent", ledger.ok === true, JSON.stringify(ledger.mismatches?.slice(0, 2)));
 });
 
+// ---------------- اجرای سفارش: پیکینگ با اسکن ← بسته‌بندی ← محموله ← تحویل به راننده؛ سفارش انتقال ----------------
+const stgCode = `STG-${runId}`;
+await apiCall(opsToken, "POST", `/warehouses/${opsWarehouse}/locations`, { code: stgCode, level: "bin", location_type: "staging" });
+const fulfilOrder = await apiCall(adminToken, "POST", "/orders/", {
+  items: [{ product_id: opsProduct.id, quantity: 2 }], customer: { name: "مشتری پیکینگ", mobile: "09121112233" },
+  destination_province: "قزوین", destination_city: "قزوین", destination_address: "خیابان بسته‌بندی، پلاک ۳", size: "m", priority: false,
+  delivery_window_start: `${iranDate(0)}T00:00:00+03:30`, delivery_window_end: `${iranDate(0)}T23:59:00+03:30`,
+  warehouse_id: opsWarehouse, auto_assign: false,
+});
+// خودروی فعال سازمان برای محموله (خودروی رانندهٔ آزمون در جریان تعویض خودرو غیرفعال شده است)
+const shipVehicle = (await apiCall(adminToken, "GET", "/vehicles/")).find(v => v.status !== "inactive" && v.status !== "maintenance");
+await session("wms-fulfill", "qazvin_manager", "manager123", async page => {
+  await page.click("[data-testid=app-nav] >> text=پیکینگ");
+  await page.click("[data-testid=pick-new]");
+  await choose(page, "[data-testid=pick-staging]", String((await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`)).find(l => l.code === stgCode).id));
+  await page.click(`[data-testid=pick-candidate][data-id="${fulfilOrder.id}"] input`);
+  await page.click("[data-testid=pick-create]");
+  await page.waitForSelector("[data-testid=pick-list-detail] [data-testid=pick-line]");
+  const lines = (await apiCall(opsToken, "GET", "/picking/lists?status=active")).find(pl => pl.orders.includes(fulfilOrder.tracking_code)).lines;
+  check("wms-fulfill", "pick list planned FEFO lines for the order", lines.reduce((s, l) => s + l.quantity, 0) === 2, JSON.stringify(lines.map(l => [l.location_code, l.quantity])));
+  for (let i = 0; i < lines.length; i++) {
+    await page.locator("[data-testid=pick-list-detail] [data-testid=pick-line][data-status=open] [data-testid=pick-line-scan]").first().click();
+    const line = lines[i];
+    await page.fill("[data-testid=pick-scan-source]", line.location_code ?? "WH-01");
+    await page.keyboard.press("Enter");
+    await page.fill("[data-testid=pick-scan-product]", opsProduct.sku);
+    await page.click("[data-testid=pick-confirm]");
+    await page.waitForSelector("[data-testid=pick-scan-modal]", { state: "detached", timeout: 10000 });
+  }
+  await page.waitForSelector("[data-testid=pick-list-detail] [data-testid=pick-line][data-status=picked]");
+  check("wms-fulfill", "order picked with location and product scans", (await page.locator("[data-testid=pick-list-detail] [data-testid=pick-line][data-status=open]").count()) === 0);
+  await page.keyboard.press("Escape");
+
+  await page.click("[data-testid=app-nav] >> text=بسته‌بندی و ارسال");
+  const row = page.locator(`[data-testid=queue-row][data-code="${fulfilOrder.tracking_code}"]`);
+  await row.locator("[data-testid=queue-pack]").click();
+  await page.click("[data-testid=pack-save]");
+  await page.waitForSelector("[data-testid=packing-slip] [data-testid=slip-package]");
+  check("wms-fulfill", "packing slip lists the package contents", true);
+  await page.keyboard.press("Escape");
+  await page.locator(`[data-testid=queue-row][data-code="${fulfilOrder.tracking_code}"][data-state=packed] [data-testid=queue-select]`).check();
+  await choose(page, "[data-testid=shipment-vehicle]", String(shipVehicle.id));
+  await page.click("[data-testid=shipment-create]");
+  const shipmentRow = page.locator("[data-testid=shipment-row][data-status=open]").first();
+  await shipmentRow.locator("[data-testid=shipment-dispatch]").click();
+  await page.click("[data-testid=confirm-dialog] [data-testid=dialog-ok]");
+  await page.waitForSelector("[data-testid=toast]:has-text('به راننده تحویل شد')", { timeout: 10000 });
+  const shipped = await apiCall(opsToken, "GET", `/orders/${fulfilOrder.id}`);
+  check("wms-fulfill", "shipment handoff issues stock and marks the order picked up",
+    shipped.status === "picked_up" && shipped.fulfillment_state === "shipped", `${shipped.status}/${shipped.fulfillment_state}`);
+
+  // انتقال داخلی دومرحله‌ای: ارسال (در راه) و دریافت در صفحه سفارش انتقال
+  const locs = await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`);
+  const transfer = await apiCall(opsToken, "POST", "/transfer-orders/", {
+    from_warehouse_id: opsWarehouse, to_warehouse_id: opsWarehouse, from_location_id: locs.find(l => l.code === binCode).id,
+    to_location_id: locs.find(l => l.code === stgCode).id, lines: [{ product_id: opsProduct.id, quantity: 1 }] });
+  await page.click("[data-testid=app-nav] >> text=سفارش انتقال");
+  await page.locator(`[data-testid=transfer-row][data-code="${transfer.code}"]`).click();
+  await page.click("[data-testid=transfer-ship]");
+  await page.click("[data-testid=confirm-dialog] [data-testid=dialog-ok]");
+  await page.waitForSelector("[data-testid=transfer-receive]");
+  await page.click("[data-testid=transfer-receive]");
+  await page.click("[data-testid=transfer-receive-save]");
+  await page.waitForSelector(`[data-testid=transfer-row][data-code="${transfer.code}"][data-status=received]`, { timeout: 10000 });
+  check("wms-fulfill", "two-step transfer shipped in transit and received", true);
+  await page.keyboard.press("Escape");
+
+  for (const [nav, table] of [["سفارش‌های معوق", "backorders-allocate"], ["تأمین مجدد و ABC", "rule-new"], ["تعیین تکلیف معیوب", "warehouse-picker"]]) {
+    await page.click(`[data-testid=app-nav] >> text=${nav}`);
+    await page.waitForSelector(`[data-testid=${table}]`);
+  }
+  check("wms-fulfill", "backorder, replenishment/ABC and disposition pages open", true);
+  const ledger = await apiCall(await apiToken("qazvin_admin", "admin123"), "GET", "/inventory/ledger-check");
+  check("wms-fulfill", "ledger stays consistent after picking, shipping and transfer", ledger.ok === true, JSON.stringify(ledger.mismatches?.slice(0, 2)));
+});
+
 // ---------------- کنترل‌های سفارشی به‌جای ظاهر پیش‌فرض کروم ----------------
 await session("native-ui-public", null, null, async page => {
   await page.goto(`${BASE}/request`);
@@ -1749,7 +1825,12 @@ await session("tour", "qazvin_manager", "manager123", async page => {
     if (label === "متوجه شدم") break;
   }
   await page.waitForSelector("[data-testid=tour]", { state: "detached" });
-  const state = await page.evaluate(async () => (await (await fetch("/users/me", { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } })).json()).tour_state);
+  // ذخیره «انجام شد» پس از بسته شدن راهنما ناهمگام است؛ تا چند ثانیه منتظر وضعیت سرور می‌مانیم
+  let state = {};
+  for (let i = 0; i < 20 && state["page-reorder"] !== "done"; i++) {
+    state = await page.evaluate(async () => (await (await fetch("/users/me", { headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` } })).json()).tour_state);
+    if (state["page-reorder"] !== "done") await page.waitForTimeout(250);
+  }
   check("tour", "state saved on server", state["main-manager"] === "skipped" && state["page-reorder"] === "done", JSON.stringify(state));
   // دوباره دیدن از منوی کاربر
   await page.click("[data-testid=user-menu]");

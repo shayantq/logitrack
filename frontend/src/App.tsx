@@ -32,6 +32,12 @@ const LocationsPage = lazy(() => import("./pages/warehouse/LocationsPage"));
 const ReceiptsPage = lazy(() => import("./pages/warehouse/ReceiptsPage"));
 const QualityPage = lazy(() => import("./pages/warehouse/QualityPage"));
 const PutawayPage = lazy(() => import("./pages/warehouse/PutawayPage"));
+const PickingPage = lazy(() => import("./pages/warehouse/PickingPage"));
+const ShippingPage = lazy(() => import("./pages/warehouse/ShippingPage"));
+const TransfersPage = lazy(() => import("./pages/warehouse/TransfersPage"));
+const BackordersPage = lazy(() => import("./pages/warehouse/BackordersPage"));
+const ReplenishmentRulesPage = lazy(() => import("./pages/warehouse/ReplenishmentRulesPage"));
+const DispositionsPage = lazy(() => import("./pages/warehouse/DispositionsPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
 const UserDetailPage = lazy(() => import("./pages/users/UserDetailPage"));
@@ -162,6 +168,12 @@ export function App() {
             <Route path="receipts" element={guard(ORG_STAFF, <ReceiptsPage />)} />
             <Route path="quality" element={guard(ORG_STAFF, <QualityPage />)} />
             <Route path="putaway" element={guard(ORG_STAFF, <PutawayPage />)} />
+            <Route path="picking" element={guard(ORG_STAFF, <PickingPage />)} />
+            <Route path="shipping" element={guard(ORG_STAFF, <ShippingPage />)} />
+            <Route path="transfers" element={guard(ORG_STAFF, <TransfersPage />)} />
+            <Route path="backorders" element={guard(ORG_STAFF, <BackordersPage />)} />
+            <Route path="replenishment" element={guard(ORG_STAFF, <ReplenishmentRulesPage />)} />
+            <Route path="dispositions" element={guard(ORG_STAFF, <DispositionsPage />)} />
             <Route path="partners" element={guard(ORG_STAFF, <PartnersPage />)} />
             <Route path="reports" element={guard(ORG_STAFF, <ReportsPage />)} />
             <Route path="finance" element={guard(["org_admin"], <FinancePage />)} />

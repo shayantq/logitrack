@@ -5,7 +5,7 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.core.tenancy import TenantScoped
-from app.core.wms import AVAILABLE, ORDER_STOCK_STATES, STOCK_STATUSES, WAREHOUSE_TYPES, sql_in
+from app.core.wms import AVAILABLE, FULFILLMENT_STATES, ORDER_STOCK_STATES, STOCK_STATUSES, WAREHOUSE_TYPES, sql_in
 
 
 class RoleEnum(str, enum.Enum):
@@ -288,6 +288,10 @@ class Product(TenantScoped, Base):
     inspection_required = Column(Boolean, nullable=False, default=False, server_default="false")
     # تعداد واحد پایه در یک پالت کامل (مبنای ظرفیت پالتی محل‌ها)
     units_per_pallet = Column(Integer, nullable=True)
+    # طبقه‌بندی ABC (فصل ۱۳): بر اساس سهم ارزش مصرف؛ دوره شمارش از app/core/wms.ABC_COUNT_DAYS
+    abc_class = Column(String(1), nullable=True)
+    abc_value = Column(Float, nullable=True)
+    abc_updated_at = Column(DateTime, nullable=True)
     # آستانه‌ها (پیش‌فرض ردیف‌های موجودی جدید؛ هر انبار می‌تواند نقطه سفارش خودش را داشته باشد)
     min_stock = Column(Integer, nullable=True)
     max_stock = Column(Integer, nullable=True)
@@ -396,6 +400,7 @@ MOVEMENT_TYPES = (
     "status_in",      # تغییر وضعیت کیفی: ورود به وضعیت جدید (مثلاً سالم و آزاد)
     "move_out",       # جابه‌جایی/جانمایی داخل انبار: خروج از محل مبدأ
     "move_in",        # جابه‌جایی/جانمایی داخل انبار: ورود به محل مقصد
+    "supplier_return",  # برگشت کالای مردود/معیوب به تأمین‌کننده (خروج)
 )
 
 
@@ -458,6 +463,7 @@ class Order(TenantScoped, Base):
     __table_args__ = (
         CheckConstraint("status IN (" + ", ".join(f"'{s}'" for s in ORDER_STATUSES) + ")", name="ck_orders_status"),
         CheckConstraint(f"stock_state IN ({sql_in(ORDER_STOCK_STATES)})", name="ck_orders_stock_state"),
+        CheckConstraint(f"fulfillment_state IN ({sql_in(FULFILLMENT_STATES)})", name="ck_orders_fulfillment_state"),
         UniqueConstraint("organization_id", "idempotency_key", name="uq_orders_idempotency"),
     )
 
@@ -486,6 +492,11 @@ class Order(TenantScoped, Base):
     warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
     # وضعیت کالای سفارش در انبار، جدا از وضعیت حمل: رزرو ← خروج (بارگیری) ← برگشت؛ یا رزرو ← آزادسازی
     stock_state = Column(String(16), nullable=False, default="reserved")
+    # آماده‌سازی در انبار (فصل ۱۴): آماده‌نشده ← در حال برداشت ← برداشت‌شده ← بسته‌بندی‌شده ← ارسال‌شده
+    fulfillment_state = Column(String(16), nullable=False, default="open", server_default="open")
+    shipment_id = Column(Integer, ForeignKey("shipments.id", ondelete="SET NULL"), nullable=True, index=True)
+    # سفارش تکمیلی که از سفارش‌های معوق یک سفارش دیگر ساخته شد
+    parent_order_id = Column(Integer, ForeignKey("orders.id", ondelete="SET NULL"), nullable=True)
     # تکرار همین درخواست با همین کلید، سفارش دوم نمی‌سازد
     idempotency_key = Column(String(64), nullable=True)
     request_hash = Column(String(64), nullable=True)
@@ -968,6 +979,11 @@ from app.models_wms import (  # noqa: E402,F401
 from app.models_operations import (  # noqa: E402,F401
     InboundReceipt, InboundReceiptLine, Location, PutawayTask, QualityInspection, QualityInspectionResult,
     StockBalance, StockMovementLine,
+)
+# اجرای سفارش و جابه‌جایی: سفارش معوق، انتقال، برداشت، بسته، محموله، تأمین مجدد، تعیین تکلیف
+from app.models_fulfillment import (  # noqa: E402,F401
+    Backorder, Disposition, Package, PackageItem, PickLine, PickList, ReplenishmentRule, Shipment, TransferOrder,
+    TransferOrderLine,
 )
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401

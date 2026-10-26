@@ -77,7 +77,7 @@ export default function PutawayPage() {
             <tbody>
               {tasks.map(t => (
                 <tr key={t.id} data-testid="putaway-row" data-code={t.code} data-status={t.status}>
-                  <td className="whitespace-nowrap"><div className="font-mono text-xs font-semibold ltr text-start">{t.code}</div><Badge tone={PUTAWAY_STATUS[t.status]?.tone ?? "muted"}>{PUTAWAY_STATUS[t.status]?.label}</Badge></td>
+                  <td className="whitespace-nowrap"><div className="font-mono text-xs font-semibold ltr text-start">{t.code}</div><Badge tone={PUTAWAY_STATUS[t.status]?.tone ?? "muted"}>{PUTAWAY_STATUS[t.status]?.label}</Badge>{t.task_type === "replenishment" && <Badge tone="brand" className="ms-1">تأمین مجدد</Badge>}</td>
                   <td className="min-w-40"><div className="font-medium">{t.product_name}</div><div className="font-mono text-xs text-muted">{t.product_sku}{t.lot_number ? ` · بچ ${t.lot_number}` : ""}{t.expiry_date ? ` · ${faDate(t.expiry_date)}` : ""}</div></td>
                   <td><StatusBadge status={t.stock_status} /></td>
                   <td className="whitespace-nowrap tnum">{faNumber(t.quantity_done)} / {faNumber(t.quantity)}</td>

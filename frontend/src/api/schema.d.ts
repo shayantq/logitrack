@@ -3282,10 +3282,559 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/backorders/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 سفارش‌های معوق (به ترتیب اولویت تخصیص) */
+        get: operations["list_backorders_backorders__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backorders/allocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ⚖️ تخصیص موجودی به سفارش‌های معوق با اولویت */
+        post: operations["allocate_backorders_allocate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backorders/orders/{order_id}/fulfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🚀 سفارش تکمیلی از معوق‌های تخصیص‌یافته یک سفارش */
+        post: operations["fulfill_backorders_orders__order_id__fulfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backorders/{backorder_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✖️ لغو سفارش معوق */
+        post: operations["cancel_backorder_backorders__backorder_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfer-orders/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 سفارش‌های انتقال */
+        get: operations["list_transfers_transfer_orders__get"];
+        put?: never;
+        /** ➕ سفارش انتقال دومرحله‌ای */
+        post: operations["create_transfer_transfer_orders__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfer-orders/{transfer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📄 جزئیات سفارش انتقال */
+        get: operations["get_transfer_transfer_orders__transfer_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfer-orders/{transfer_id}/ship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🚚 ارسال: کالا از مبدأ خارج و «در راه» می‌شود */
+        post: operations["ship_transfer_transfer_orders__transfer_id__ship_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfer-orders/{transfer_id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 📥 دریافت در مقصد (سالم و آسیب‌دیده) */
+        post: operations["receive_transfer_transfer_orders__transfer_id__receive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfer-orders/{transfer_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✅ بستن و تکلیف کسری در راه */
+        post: operations["close_transfer_transfer_orders__transfer_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transfer-orders/{transfer_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✖️ لغو پیش از ارسال */
+        post: operations["cancel_transfer_transfer_orders__transfer_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/replenishment-rules/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 قواعد حداقل/حداکثر محل‌های برداشت */
+        get: operations["list_rules_replenishment_rules__get"];
+        put?: never;
+        /** ➕ قاعده تأمین مجدد */
+        post: operations["create_rule_replenishment_rules__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/replenishment-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** ✏️ ویرایش قاعده */
+        put: operations["update_rule_replenishment_rules__rule_id__put"];
+        post?: never;
+        /** 🗑️ حذف قاعده */
+        delete: operations["delete_rule_replenishment_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/replenishment-rules/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ⚙️ ساخت وظایف تأمین مجدد برای محل‌های زیر حداقل */
+        post: operations["generate_replenishment_rules_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/replenishment-rules/abc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔤 طبقه‌بندی ABC و سررسید شمارش */
+        get: operations["abc_report_replenishment_rules_abc_get"];
+        put?: never;
+        /** 🔄 محاسبه دوباره ABC از ارزش مصرف */
+        post: operations["abc_classify_replenishment_rules_abc_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🧾 سفارش‌های آماده برداشت */
+        get: operations["pick_candidates_picking_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 فهرست‌های برداشت */
+        get: operations["list_pick_lists_picking_lists_get"];
+        put?: never;
+        /** ➕ فهرست برداشت (تک‌سفارشی، دسته‌ای، موجی، منطقه‌ای) */
+        post: operations["create_pick_list_picking_lists_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lists/{pick_list_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📄 جزئیات فهرست برداشت */
+        get: operations["get_pick_list_picking_lists__pick_list_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lines/{line_id}/pick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 📲 برداشت با اسکن محل، کالا و بچ */
+        post: operations["pick_line_picking_lines__line_id__pick_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lines/{line_id}/short": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ⚠️ کمبود در محل و برنامه‌ریزی دوباره */
+        post: operations["short_line_picking_lines__line_id__short_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lists/{pick_list_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✖️ لغو فهرست برداشت */
+        post: operations["cancel_pick_list_picking_lists__pick_list_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🧾 سفارش‌های آماده بسته‌بندی و ارسال */
+        get: operations["packing_queue_shipping_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/orders/{order_id}/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 📦 بسته‌بندی سفارش (ابعاد، وزن، محتوا) */
+        post: operations["pack_shipping_orders__order_id__pack_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/orders/{order_id}/packing-slip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🧾 برگه بسته‌بندی */
+        get: operations["packing_slip_shipping_orders__order_id__packing_slip_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 محموله‌ها */
+        get: operations["list_shipments_shipping_shipments_get"];
+        put?: never;
+        /** 🚛 محموله با کنترل ظرفیت وزنی و حجمی خودرو */
+        post: operations["create_shipment_shipping_shipments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/shipments/{shipment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📄 جزئیات محموله */
+        get: operations["get_shipment_shipping_shipments__shipment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/shipments/{shipment_id}/orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** ➖ برداشتن سفارش از محموله */
+        delete: operations["remove_order_shipping_shipments__shipment_id__orders__order_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/shipments/{shipment_id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🤝 تحویل به راننده و خروج کالا */
+        post: operations["dispatch_shipping_shipments__shipment_id__dispatch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/shipping/shipments/{shipment_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✖️ لغو محموله پیش از تحویل */
+        post: operations["cancel_shipment_shipping_shipments__shipment_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dispositions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 سوابق تعیین تکلیف */
+        get: operations["list_dispositions_dispositions__get"];
+        put?: never;
+        /** ♻️ امحا، تعمیر، برگشت به تأمین‌کننده یا بازرسی دوباره */
+        post: operations["dispose_dispositions__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AbcRowOut */
+        AbcRowOut: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Abc Class */
+            abc_class?: string | null;
+            /** Consumption Value */
+            consumption_value: number;
+            /** Share */
+            share: number;
+            /** Count Every Days */
+            count_every_days: number;
+            /** Last Counted At */
+            last_counted_at?: string | null;
+            /**
+             * Next Count Due
+             * Format: date
+             */
+            next_count_due: string;
+            /** Count Due */
+            count_due: boolean;
+            /** Classified At */
+            classified_at?: string | null;
+        };
+        /** AbcRunIn */
+        AbcRunIn: {
+            /**
+             * Days
+             * @default 365
+             */
+            days: number;
+        };
+        /** AbcRunOut */
+        AbcRunOut: {
+            /** Days */
+            days: number;
+            /** Total Value */
+            total_value: number;
+            /** A */
+            A: number;
+            /** B */
+            B: number;
+            /** C */
+            C: number;
+        };
         /** ActivityItem */
         ActivityItem: {
             /** At */
@@ -3376,6 +3925,20 @@ export interface components {
             /** Delivered Kg */
             delivered_kg: number;
         };
+        /** AllocateIn */
+        AllocateIn: {
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Product Id */
+            product_id?: number | null;
+        };
+        /** AllocateOut */
+        AllocateOut: {
+            /** Allocated Quantity */
+            allocated_quantity: number;
+            /** Split */
+            split: number;
+        };
         /** ApplyAutoIn */
         ApplyAutoIn: {
             /** Inventory Ids */
@@ -3444,6 +4007,46 @@ export interface components {
             categories: {
                 [key: string]: string;
             };
+        };
+        /** BackorderOut */
+        BackorderOut: {
+            /** Id */
+            id: number;
+            /** Order Id */
+            order_id: number;
+            /** Order Tracking Code */
+            order_tracking_code?: string | null;
+            /** Customer Name */
+            customer_name?: string | null;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Quantity */
+            quantity: number;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /** Priority */
+            priority: boolean;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Allocated At */
+            allocated_at?: string | null;
+            /** Fulfilled Order Id */
+            fulfilled_order_id?: number | null;
+            /** Note */
+            note?: string | null;
         };
         /** Body_create_ticket_tickets__post */
         Body_create_ticket_tickets__post: {
@@ -3762,6 +4365,85 @@ export interface components {
             shifts: string[];
             /** Off */
             off: boolean;
+        };
+        /** DispatchIn */
+        DispatchIn: {
+            /** Note */
+            note?: string | null;
+        };
+        /** DispositionCreate */
+        DispositionCreate: {
+            /** Product Id */
+            product_id: number;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /**
+             * From Status
+             * @enum {string}
+             */
+            from_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "scrap" | "repair" | "return_to_supplier" | "reinspect";
+            /** Quantity */
+            quantity: number;
+            /** Location Id */
+            location_id?: number | null;
+            /** Lot Number */
+            lot_number?: string | null;
+            /** Partner Id */
+            partner_id?: number | null;
+            /** Receipt Id */
+            receipt_id?: number | null;
+            /** Reason */
+            reason: string;
+        };
+        /** DispositionOut */
+        DispositionOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Action */
+            action: string;
+            /** Action Label */
+            action_label: string;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Warehouse Name */
+            warehouse_name?: string | null;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Location Code */
+            location_code?: string | null;
+            /** Lot Number */
+            lot_number?: string | null;
+            /** From Status */
+            from_status: string;
+            /** From Status Label */
+            from_status_label: string;
+            /** Quantity */
+            quantity: number;
+            /** Partner Name */
+            partner_name?: string | null;
+            /** Receipt Id */
+            receipt_id?: number | null;
+            /** Reason */
+            reason: string;
+            /** Document Id */
+            document_id?: number | null;
+            /** Document Code */
+            document_code?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Created By Name */
+            created_by_name?: string | null;
         };
         /** DomainEventOut */
         DomainEventOut: {
@@ -4328,6 +5010,24 @@ export interface components {
             /** Details */
             details: components["schemas"]["FinanceDetail"][];
         };
+        /** FulfillIn */
+        FulfillIn: {
+            /**
+             * Delivery Window Start
+             * Format: date-time
+             */
+            delivery_window_start: string;
+            /**
+             * Delivery Window End
+             * Format: date-time
+             */
+            delivery_window_end: string;
+        };
+        /** GenerateOut */
+        GenerateOut: {
+            /** Quantity */
+            quantity: number;
+        };
         /** GeoCity */
         GeoCity: {
             /** Name */
@@ -4402,7 +5102,7 @@ export interface components {
              * @default pending
              * @enum {string}
              */
-            from_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            from_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /** Location Id */
             location_id?: number | null;
             /** Lot Number */
@@ -4466,7 +5166,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /** Quantity */
             quantity: number;
             /** Reason */
@@ -4748,7 +5448,7 @@ export interface components {
              * @default available
              * @enum {string}
              */
-            stock_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            stock_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /** Lot Number */
             lot_number?: string | null;
             /** Reason */
@@ -5079,6 +5779,14 @@ export interface components {
             warehouse_id?: number | null;
             /** Vehicle Id */
             vehicle_id?: number | null;
+            /** Stock State */
+            stock_state?: string | null;
+            /** Fulfillment State */
+            fulfillment_state?: string | null;
+            /** Shipment Id */
+            shipment_id?: number | null;
+            /** Parent Order Id */
+            parent_order_id?: number | null;
             /**
              * Items
              * @default []
@@ -5200,6 +5908,11 @@ export interface components {
              * @default true
              */
             auto_assign: boolean;
+            /**
+             * Allow Backorder
+             * @default false
+             */
+            allow_backorder: boolean;
             /** Delivery Fee */
             delivery_fee?: number | null;
         };
@@ -5248,6 +5961,14 @@ export interface components {
             warehouse_id?: number | null;
             /** Vehicle Id */
             vehicle_id?: number | null;
+            /** Stock State */
+            stock_state?: string | null;
+            /** Fulfillment State */
+            fulfillment_state?: string | null;
+            /** Shipment Id */
+            shipment_id?: number | null;
+            /** Parent Order Id */
+            parent_order_id?: number | null;
             /**
              * Items
              * @default []
@@ -5722,6 +6443,115 @@ export interface components {
             /** Is Active */
             is_active?: boolean | null;
         };
+        /** PackIn */
+        PackIn: {
+            /** Packages */
+            packages: components["schemas"]["PackageIn"][];
+        };
+        /** PackageIn */
+        PackageIn: {
+            /** Length Cm */
+            length_cm: number;
+            /** Width Cm */
+            width_cm: number;
+            /** Height Cm */
+            height_cm: number;
+            /** Weight Kg */
+            weight_kg?: number | null;
+            /** Items */
+            items: components["schemas"]["PackageItemIn"][];
+        };
+        /** PackageItemIn */
+        PackageItemIn: {
+            /** Product Id */
+            product_id: number;
+            /** Quantity */
+            quantity: number;
+        };
+        /** PackageItemOut */
+        PackageItemOut: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Quantity */
+            quantity: number;
+        };
+        /** PackageOut */
+        PackageOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Sequence */
+            sequence: number;
+            /** Length Cm */
+            length_cm: number;
+            /** Width Cm */
+            width_cm: number;
+            /** Height Cm */
+            height_cm: number;
+            /** Weight Kg */
+            weight_kg: number;
+            /** Volume M3 */
+            volume_m3: number;
+            /** Items */
+            items: components["schemas"]["PackageItemOut"][];
+        };
+        /** PackingQueueOut */
+        PackingQueueOut: {
+            /** Id */
+            id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Status */
+            status: string;
+            /** Fulfillment State */
+            fulfillment_state: string;
+            /** Fulfillment Label */
+            fulfillment_label: string;
+            /** Recipient Name */
+            recipient_name?: string | null;
+            /** Destination City */
+            destination_city?: string | null;
+            /** Delivery Window Start */
+            delivery_window_start?: string | null;
+            /** Shipment Id */
+            shipment_id?: number | null;
+            /** Packed Weight Kg */
+            packed_weight_kg: number;
+            /** Packed Volume M3 */
+            packed_volume_m3: number;
+            /** Items */
+            items: components["schemas"]["QueueItemOut"][];
+        };
+        /** PackingSlipOut */
+        PackingSlipOut: {
+            /** Order Id */
+            order_id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Fulfillment State */
+            fulfillment_state: string;
+            /** Recipient Name */
+            recipient_name?: string | null;
+            /** Recipient Mobile */
+            recipient_mobile?: string | null;
+            /** Destination */
+            destination: string;
+            /** Delivery Window Start */
+            delivery_window_start?: string | null;
+            /** Shipment Id */
+            shipment_id?: number | null;
+            /** Total Weight Kg */
+            total_weight_kg: number;
+            /** Total Volume M3 */
+            total_volume_m3: number;
+            /** Packages */
+            packages: components["schemas"]["PackageOut"][];
+        };
         /** ParamSource */
         ParamSource: {
             /**
@@ -5950,6 +6780,145 @@ export interface components {
             commission: number;
             /** Earnings */
             earnings: number;
+        };
+        /** PickCandidateOut */
+        PickCandidateOut: {
+            /** Id */
+            id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Status */
+            status: string;
+            /** Priority */
+            priority: boolean;
+            /**
+             * Delivery Day
+             * Format: date
+             */
+            delivery_day: string;
+            /** Recipient Name */
+            recipient_name?: string | null;
+            /** Destination City */
+            destination_city?: string | null;
+            /** Fulfillment State */
+            fulfillment_state: string;
+            /** Items */
+            items: number;
+        };
+        /** PickIn */
+        PickIn: {
+            /** Source Scan */
+            source_scan: string;
+            /** Product Scan */
+            product_scan: string;
+            /** Lot Scan */
+            lot_scan?: string | null;
+            /** Quantity */
+            quantity: number;
+        };
+        /** PickLineOut */
+        PickLineOut: {
+            /** Id */
+            id: number;
+            /** Sequence */
+            sequence: number;
+            /** Order Id */
+            order_id: number;
+            /** Order Tracking Code */
+            order_tracking_code?: string | null;
+            /** Order Fulfillment */
+            order_fulfillment?: string | null;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Product Barcode */
+            product_barcode?: string | null;
+            /** Location Id */
+            location_id?: number | null;
+            /** Location Code */
+            location_code?: string | null;
+            /** Lot Number */
+            lot_number?: string | null;
+            /** Expiry Date */
+            expiry_date?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Picked Quantity */
+            picked_quantity: number;
+            /** Status */
+            status: string;
+            /** Short Reason */
+            short_reason?: string | null;
+        };
+        /** PickListCreate */
+        PickListCreate: {
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /**
+             * Strategy
+             * @default single
+             * @enum {string}
+             */
+            strategy: "single" | "batch" | "wave" | "zone";
+            /** Order Ids */
+            order_ids?: number[] | null;
+            /** Wave Date */
+            wave_date?: string | null;
+            /** Zone Location Id */
+            zone_location_id?: number | null;
+            /** Staging Location Id */
+            staging_location_id?: number | null;
+        };
+        /** PickListOut */
+        PickListOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Strategy */
+            strategy: string;
+            /** Strategy Label */
+            strategy_label: string;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Warehouse Code */
+            warehouse_code?: string | null;
+            /** Zone Code */
+            zone_code?: string | null;
+            /** Staging Location Id */
+            staging_location_id?: number | null;
+            /** Staging Code */
+            staging_code?: string | null;
+            /** Wave Date */
+            wave_date?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Orders */
+            orders: string[];
+            /** Total Quantity */
+            total_quantity: number;
+            /** Picked Quantity */
+            picked_quantity: number;
+            /** Lines */
+            lines: components["schemas"]["PickLineOut"][];
+            /**
+             * Skipped Orders
+             * @default []
+             */
+            skipped_orders: string[];
+            /** Replanned */
+            replanned?: number | null;
+            /** Unresolved */
+            unresolved?: number | null;
         };
         /** PlanAssumptions */
         PlanAssumptions: {
@@ -6653,7 +7622,7 @@ export interface components {
              * @default available
              * @enum {string}
              */
-            stock_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            stock_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /** Source Location Id */
             source_location_id?: number | null;
             /** Lot Number */
@@ -6675,6 +7644,16 @@ export interface components {
             status: string;
             /** Status Label */
             status_label: string;
+            /**
+             * Task Type
+             * @default putaway
+             */
+            task_type: string;
+            /**
+             * Task Type Label
+             * @default جانمایی
+             */
+            task_type_label: string;
             /** Warehouse Id */
             warehouse_id: number;
             /** Warehouse Code */
@@ -6747,6 +7726,19 @@ export interface components {
             /** Allowed */
             allowed: boolean;
         };
+        /** QueueItemOut */
+        QueueItemOut: {
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Unit Weight Kg */
+            unit_weight_kg: number;
+        };
         /** RatingIn */
         RatingIn: {
             /** Score */
@@ -6777,11 +7769,6 @@ export interface components {
             order_id?: number | null;
             /** Tracking Code */
             tracking_code?: string | null;
-        };
-        /** ReasonIn */
-        ReasonIn: {
-            /** Reason */
-            reason: string;
         };
         /** ReceiptCloseIn */
         ReceiptCloseIn: {
@@ -7053,6 +8040,51 @@ export interface components {
             line_ids: number[];
             /** Note */
             note?: string | null;
+        };
+        /** ReplenishmentRuleIn */
+        ReplenishmentRuleIn: {
+            /** Location Id */
+            location_id: number;
+            /** Product Id */
+            product_id: number;
+            /** Min Quantity */
+            min_quantity: number;
+            /** Max Quantity */
+            max_quantity: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ReplenishmentRuleOut */
+        ReplenishmentRuleOut: {
+            /** Id */
+            id: number;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Location Id */
+            location_id: number;
+            /** Location Code */
+            location_code: string;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Min Quantity */
+            min_quantity: number;
+            /** Max Quantity */
+            max_quantity: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Current Quantity */
+            current_quantity: number;
+            /** Pending Quantity */
+            pending_quantity: number;
+            /** Needs Replenishment */
+            needs_replenishment: boolean;
         };
         /** ReplyOption */
         ReplyOption: {
@@ -7389,6 +8421,72 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** ShipmentCreate */
+        ShipmentCreate: {
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Vehicle Id */
+            vehicle_id: number;
+            /** Order Ids */
+            order_ids: number[];
+            /** Note */
+            note?: string | null;
+        };
+        /** ShipmentOrderOut */
+        ShipmentOrderOut: {
+            /** Id */
+            id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Status */
+            status: string;
+            /** Recipient Name */
+            recipient_name?: string | null;
+            /** Destination City */
+            destination_city?: string | null;
+            /** Fulfillment State */
+            fulfillment_state: string;
+        };
+        /** ShipmentOut */
+        ShipmentOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /** Warehouse Id */
+            warehouse_id: number;
+            /** Vehicle Id */
+            vehicle_id?: number | null;
+            /** Vehicle Plate */
+            vehicle_plate?: string | null;
+            /** Driver Name */
+            driver_name?: string | null;
+            /** Weight Kg */
+            weight_kg: number;
+            /** Volume M3 */
+            volume_m3: number;
+            /** Max Weight Kg */
+            max_weight_kg?: number | null;
+            /** Max Volume M3 */
+            max_volume_m3?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Dispatched At */
+            dispatched_at?: string | null;
+            /** Orders */
+            orders: components["schemas"]["ShipmentOrderOut"][];
+        };
+        /** ShortIn */
+        ShortIn: {
+            /** Reason */
+            reason: string;
+        };
         /**
          * StatusChangeCreate
          * @description تغییر وضعیت کیفی (مثلاً قرنطینه ← سالم و آزاد پس از بازرسی) — یک سند با دو گردش.
@@ -7402,12 +8500,12 @@ export interface components {
              * From Status
              * @enum {string}
              */
-            from_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            from_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /**
              * To Status
              * @enum {string}
              */
-            to_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            to_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /** Quantity */
             quantity: number;
             /** Uom */
@@ -7662,7 +8760,7 @@ export interface components {
             /** Reason */
             reason?: string | null;
             /** Stock Status */
-            stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged") | null;
+            stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit") | null;
             /** Uom */
             uom?: string | null;
             /**
@@ -7766,6 +8864,11 @@ export interface components {
             quarantine: number;
             /** Not Put Away */
             not_put_away: number;
+            /**
+             * Picked
+             * @default 0
+             */
+            picked: number;
             /** Expired */
             expired: number;
             /** Consigned */
@@ -7825,7 +8928,7 @@ export interface components {
              * @default available
              * @enum {string}
              */
-            stock_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged";
+            stock_status: "available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit";
             /** Uom */
             uom?: string | null;
             /** From Location Id */
@@ -8357,6 +9460,139 @@ export interface components {
             /** At */
             at?: string | null;
         };
+        /** TransferCloseIn */
+        TransferCloseIn: {
+            /**
+             * Resolution
+             * @default write_off
+             * @enum {string}
+             */
+            resolution: "write_off" | "return";
+            /** Reason */
+            reason?: string | null;
+        };
+        /** TransferCreate */
+        TransferCreate: {
+            /** From Warehouse Id */
+            from_warehouse_id: number;
+            /** To Warehouse Id */
+            to_warehouse_id: number;
+            /** From Location Id */
+            from_location_id?: number | null;
+            /** To Location Id */
+            to_location_id?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Lines */
+            lines: components["schemas"]["TransferLineIn"][];
+        };
+        /** TransferLineIn */
+        TransferLineIn: {
+            /** Product Id */
+            product_id: number;
+            /** Quantity */
+            quantity: number;
+            /** Uom */
+            uom?: string | null;
+            /** Lot Number */
+            lot_number?: string | null;
+        };
+        /** TransferLineOut */
+        TransferLineOut: {
+            /** Id */
+            id: number;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Product Sku */
+            product_sku: string;
+            /** Lot Number */
+            lot_number?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Shipped Quantity */
+            shipped_quantity: number;
+            /** Received Quantity */
+            received_quantity: number;
+            /** Damaged Quantity */
+            damaged_quantity: number;
+            /** Resolved Quantity */
+            resolved_quantity: number;
+            /** In Transit */
+            in_transit: number;
+            /** Discrepancy Reason */
+            discrepancy_reason?: string | null;
+        };
+        /** TransferOut */
+        TransferOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /** From Warehouse Id */
+            from_warehouse_id: number;
+            /** From Warehouse Name */
+            from_warehouse_name: string;
+            /** To Warehouse Id */
+            to_warehouse_id: number;
+            /** To Warehouse Name */
+            to_warehouse_name: string;
+            /** From Location Code */
+            from_location_code?: string | null;
+            /** To Location Id */
+            to_location_id?: number | null;
+            /** To Location Code */
+            to_location_code?: string | null;
+            /** Internal */
+            internal: boolean;
+            /** Note */
+            note?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Shipped At */
+            shipped_at?: string | null;
+            /** Received At */
+            received_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Close Note */
+            close_note?: string | null;
+            /** Resolution */
+            resolution?: string | null;
+            /** Lines */
+            lines: components["schemas"]["TransferLineOut"][];
+        };
+        /** TransferReceiveIn */
+        TransferReceiveIn: {
+            /** Location Id */
+            location_id?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Lines */
+            lines: components["schemas"]["TransferReceiveLineIn"][];
+        };
+        /** TransferReceiveLineIn */
+        TransferReceiveLineIn: {
+            /** Line Id */
+            line_id: number;
+            /**
+             * Received Quantity
+             * @default 0
+             */
+            received_quantity: number;
+            /**
+             * Damaged Quantity
+             * @default 0
+             */
+            damaged_quantity: number;
+            /** Reason */
+            reason?: string | null;
+        };
         /** UomIn */
         UomIn: {
             /** Name */
@@ -8765,6 +10001,16 @@ export interface components {
             active?: components["schemas"]["StocktakeSummary"] | null;
             /** Items */
             items: number;
+        };
+        /** ReasonIn */
+        app__schemas__fulfillment__ReasonIn: {
+            /** Reason */
+            reason: string;
+        };
+        /** ReasonIn */
+        app__schemas__operations__ReasonIn: {
+            /** Reason */
+            reason: string;
         };
     };
     responses: never;
@@ -9473,7 +10719,7 @@ export interface operations {
                 /** @description فقط این انبار (مدیر انبار همیشه انبار خودش) */
                 warehouse_id?: number | null;
                 /** @description نوع گردش */
-                movement_type?: ("initial" | "receipt" | "order_out" | "order_return" | "adjustment" | "damage" | "transfer_out" | "transfer_in" | "stocktake" | "status_out" | "status_in" | "move_out" | "move_in") | null;
+                movement_type?: ("initial" | "receipt" | "order_out" | "order_return" | "adjustment" | "damage" | "transfer_out" | "transfer_in" | "stocktake" | "status_out" | "status_in" | "move_out" | "move_in" | "supplier_return") | null;
                 /** @description از تاریخ (شامل) */
                 date_from?: string | null;
                 /** @description تا تاریخ (بدون شامل) */
@@ -9481,7 +10727,7 @@ export interface operations {
                 /** @description فقط گردش‌های این سند */
                 document_id?: number | null;
                 /** @description وضعیت کیفی */
-                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged") | null;
+                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit") | null;
                 skip?: number;
                 limit?: number;
             };
@@ -9622,7 +10868,7 @@ export interface operations {
     list_documents_inventory_documents_get: {
         parameters: {
             query?: {
-                doc_type?: ("opening" | "receipt" | "order_issue" | "order_return" | "adjustment" | "write_off" | "transfer" | "status_change" | "stocktake" | "reversal" | "inbound_receipt" | "inspection" | "putaway" | "location_move") | null;
+                doc_type?: ("opening" | "receipt" | "order_issue" | "order_return" | "adjustment" | "write_off" | "transfer" | "status_change" | "stocktake" | "reversal" | "inbound_receipt" | "inspection" | "putaway" | "location_move" | "transfer_ship" | "transfer_receive" | "pick" | "replenishment" | "scrap" | "supplier_return" | "disposition") | null;
                 status?: ("draft" | "posted" | "reversed" | "canceled") | null;
                 warehouse_id?: number | null;
                 product_id?: number | null;
@@ -9733,7 +10979,7 @@ export interface operations {
             query?: {
                 product_id?: number | null;
                 warehouse_id?: number | null;
-                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged") | null;
+                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit") | null;
                 include_empty?: boolean;
             };
             header?: never;
@@ -9869,7 +11115,7 @@ export interface operations {
                 product_id?: number | null;
                 warehouse_id?: number | null;
                 location_id?: number | null;
-                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged") | null;
+                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit") | null;
                 lot_number?: string | null;
                 limit?: number;
             };
@@ -9906,7 +11152,7 @@ export interface operations {
                 warehouse_id?: number | null;
                 location_id?: number | null;
                 lot_number?: string | null;
-                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged") | null;
+                stock_status?: ("available" | "pending" | "quarantine" | "blocked" | "rejected" | "defective" | "damaged" | "repair" | "in_transit") | null;
                 /** @description از تاریخ (شامل، به وقت ایران) */
                 date_from?: string | null;
                 /** @description تا تاریخ (بدون شامل) */
@@ -15414,7 +16660,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReasonIn"];
+                "application/json": components["schemas"]["app__schemas__operations__ReasonIn"];
             };
         };
         responses: {
@@ -15564,6 +16810,8 @@ export interface operations {
                 status?: ("open" | "partial" | "done" | "canceled" | "active") | null;
                 warehouse_id?: number | null;
                 receipt_id?: number | null;
+                /** @description جانمایی یا تأمین مجدد */
+                task_type?: ("putaway" | "replenishment") | null;
             };
             header?: never;
             path?: never;
@@ -15770,7 +17018,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReasonIn"];
+                "application/json": components["schemas"]["app__schemas__operations__ReasonIn"];
             };
         };
         responses: {
@@ -15781,6 +17029,1192 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PutawayTaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_backorders_backorders__get: {
+        parameters: {
+            query?: {
+                status?: ("open" | "allocated" | "fulfilled" | "canceled" | "active") | null;
+                order_id?: number | null;
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackorderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    allocate_backorders_allocate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AllocateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllocateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fulfill_backorders_orders__order_id__fulfill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FulfillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_backorder_backorders__backorder_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backorder_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__fulfillment__ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackorderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_transfers_transfer_orders__get: {
+        parameters: {
+            query?: {
+                status?: ("open" | "in_transit" | "received" | "closed" | "canceled") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_transfer_transfer_orders__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_transfer_transfer_orders__transfer_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ship_transfer_transfer_orders__transfer_id__ship_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                transfer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_transfer_transfer_orders__transfer_id__receive_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                transfer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferReceiveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_transfer_transfer_orders__transfer_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferCloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_transfer_transfer_orders__transfer_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                transfer_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rules_replenishment_rules__get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplenishmentRuleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_rule_replenishment_rules__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplenishmentRuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplenishmentRuleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_rule_replenishment_rules__rule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplenishmentRuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplenishmentRuleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rule_replenishment_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_replenishment_rules_generate_post: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    abc_report_replenishment_rules_abc_get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbcRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    abc_classify_replenishment_rules_abc_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AbcRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbcRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pick_candidates_picking_candidates_get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickCandidateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pick_lists_picking_lists_get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+                status?: ("open" | "in_progress" | "picked" | "canceled" | "active") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pick_list_picking_lists_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PickListCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pick_list_picking_lists__pick_list_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pick_list_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pick_line_picking_lines__line_id__pick_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description کلید یکتای کلاینت برای هر عملیات ثبت (۸ تا ۶۴ نویسه)؛ تکرار درخواست با همین کلید نتیجه قبلی را برمی‌گرداند. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                line_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PickIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    short_line_picking_lines__line_id__short_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                line_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShortIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_pick_list_picking_lists__pick_list_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pick_list_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__fulfillment__ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PickListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    packing_queue_shipping_queue_get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackingQueueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pack_shipping_orders__order_id__pack_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackingSlipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    packing_slip_shipping_orders__order_id__packing_slip_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackingSlipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shipments_shipping_shipments_get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+                status?: ("open" | "dispatched" | "canceled") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_shipment_shipping_shipments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_shipment_shipping_shipments__shipment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_order_shipping_shipments__shipment_id__orders__order_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: number;
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dispatch_shipping_shipments__shipment_id__dispatch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_shipment_shipping_shipments__shipment_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dispositions_dispositions__get: {
+        parameters: {
+            query?: {
+                warehouse_id?: number | null;
+                action?: ("scrap" | "repair" | "return_to_supplier" | "reinspect") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispositionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dispose_dispositions__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispositionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispositionOut"];
                 };
             };
             /** @description Validation Error */

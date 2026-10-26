@@ -385,8 +385,19 @@ def move(db: Session, source: Inventory, quantity: int, *, document: StockDocume
     برای تغییر وضعیت کیفی (محل و بچ ثابت می‌ماند)، یا ردیف انبار دیگر برای انتقال.
     """
     common = {"document": document, "user": user, "reason": reason, "reference_type": reference_type, "reference_id": reference_id}
+    if target is None or target is source:
+        # جابه‌جایی داخل همان ردیف (جانمایی، برداشت، محل به محل): اول ورود و بعد خروج، تا مانده ردیف حتی لحظه‌ای
+        # کمتر از رزرو نشود — کالای رزروشده هم می‌تواند جابه‌جا شود.
+        if lines is None:
+            lines = pick_lines(db, source, quantity, match=match, policy=pick)
+        inn = record(db, source, quantity, in_type, lines=[(key.with_(**(overrides or {})), qty) for key, qty in lines], **common)
+        out = record(db, source, -quantity, out_type, lines=lines, **common)
+        if (source.stock_status or AVAILABLE) == AVAILABLE and source.reserved_quantity:
+            from app.services import allocation_service
+            allocation_service.ensure_covered(db, source)
+        return out, inn
     out = record(db, source, -quantity, out_type, match=match, lines=lines, pick=pick, **common)
-    inn = record(db, target or source, quantity, in_type, lines=mirror(out, **(overrides or {})), **common)
+    inn = record(db, target, quantity, in_type, lines=mirror(out, **(overrides or {})), **common)
     if (source.stock_status or AVAILABLE) == AVAILABLE and source.reserved_quantity:
         from app.services import allocation_service
         allocation_service.ensure_covered(db, source)

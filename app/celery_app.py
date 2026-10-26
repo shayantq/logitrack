@@ -47,6 +47,14 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.recalculate_reorder_points",
         "schedule": crontab(hour=20, minute=45),  # ۰۰:۱۵ به وقت ایران — بعد از تکمیل تقاضای روز قبل
     },
+    "check-replenishment-rules-hourly": {
+        "task": "tasks.check_replenishment_rules",
+        "schedule": crontab(minute=20),
+    },
+    "classify-abc-weekly": {
+        "task": "tasks.classify_abc",
+        "schedule": crontab(hour=21, minute=0, day_of_week=5),  # بامداد شنبه به وقت ایران
+    },
 }
 
 # اطمینان از این‌که Celery ماژول تسک‌ها را پیدا می‌کند

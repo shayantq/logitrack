@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import {
   BarChart3, BookOpen, Building2, ChevronsLeft, ChevronsRight, Inbox, LogOut, Menu as MenuIcon,
   Package, Route, Truck, Users, Warehouse, type LucideIcon, Building, Factory, Map as MapIcon, LifeBuoy, ClipboardCheck, UserRound, ShieldCheck, IdCard, CalendarClock, CalendarDays, Send, Mail, Trophy, Percent, FileBarChart, Wallet, History, KeyRound, ShoppingCart, PiggyBank, Compass, MapPinned, FileStack, Handshake, PackageOpen, ScanLine, FlaskConical, ClipboardList,
+  ListChecks, PackageCheck, ArrowLeftRight, Repeat, Recycle, Hourglass,
 } from "lucide-react";
 import { api, authFetch, unwrap } from "@/api/client";
 import { isApprovedDriver, useAuth, useMe } from "@/auth/AuthContext";
@@ -27,6 +28,7 @@ type NavItem = {
 const NAV: NavItem[] = [
   { to: "/app", label: "نمای کلی", icon: BarChart3, roles: ["org_admin", "warehouse_manager"], end: true, group: "عملیات" },
   { to: "/app/orders", label: "سفارش‌ها", icon: Package, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
+  { to: "/app/backorders", label: "سفارش‌های معوق", icon: Hourglass, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
   { to: "/app/map", label: "نقشه ارسال‌ها", icon: MapIcon, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
   { to: "/app/schedules", label: "برنامه رانندگان", icon: CalendarClock, roles: ["org_admin", "warehouse_manager"], group: "عملیات" },
   { to: "/app/warehouses", label: "انبارها", icon: Factory, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
@@ -35,6 +37,11 @@ const NAV: NavItem[] = [
   { to: "/app/receipts", label: "رسید و دریافت", icon: PackageOpen, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/quality", label: "بازرسی کیفی", icon: FlaskConical, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/putaway", label: "جانمایی", icon: ScanLine, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/picking", label: "پیکینگ", icon: ListChecks, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/shipping", label: "بسته‌بندی و ارسال", icon: PackageCheck, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/transfers", label: "سفارش انتقال", icon: ArrowLeftRight, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/replenishment", label: "تأمین مجدد و ABC", icon: Repeat, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
+  { to: "/app/dispositions", label: "تعیین تکلیف معیوب", icon: Recycle, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/stocktakes", label: "انبارگردانی", icon: ClipboardCheck, roles: ["org_admin", "warehouse_manager"], group: "انبار", badge: "stocktakes" },
   { to: "/app/ledger", label: "دفتر گردش کالا", icon: BookOpen, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
   { to: "/app/stock-card", label: "کاردکس کالا", icon: ClipboardList, roles: ["org_admin", "warehouse_manager"], group: "انبار" },
