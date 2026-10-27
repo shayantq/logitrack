@@ -31,18 +31,18 @@ from app.database import Base, SessionLocal
 from app.models import (
     Customer, CutoverCheck, DriverDocument, DriverInvite, DriverProfile, DriverRating, DriverRequest, DriverShift,
     DriverTimeOff, Location, Order, OrderCheckpoint, OrderItem, OrderStatusHistory, Organization, Package, PackageItem,
-    Partner, PickLine, PickList, Product, RoleEnum, Shipment, StockMovement, StockMovementLine, Ticket, TicketMessage,
+    Partner, PickLine, PickList, Product, PutawayTask, RoleEnum, Shipment, StockMovement, StockMovementLine, Ticket, TicketMessage,
     User, Vehicle, Warehouse,
 )
 from app.schemas.fulfillment import (
     DispositionCreate, PackIn, PickIn, PickListCreate, ReplenishmentRuleIn, ShipmentCreate, TransferCreate, TransferReceiveIn,
 )
-from app.schemas.operations import ReceiptCloseIn, ReceiptCreate, ReceiveIn
+from app.schemas.operations import InspectionCreate, ReceiptCloseIn, ReceiptCreate, ReceiveIn
 from app.schemas.order import OrderRequest
 from app.schemas.product import StatusChangeCreate
 from app.services import (
     allocation_service, catalog_service, commission_service, disposition_service, dispatch_service, inventory_service,
-    label_service, messaging, permission_service, picking_service, putaway_service, receiving_service,
+    label_service, messaging, permission_service, picking_service, putaway_service, quality_service, receiving_service,
     replenishment_rule_service, replenishment_service, route_service, shipping_service, stock_ledger, stocktake_service,
     transfer_order_service, order_service,
 )
@@ -468,12 +468,33 @@ def build(db) -> None:
         receiving_service.close(db, managers[city], r["id"], ReceiptCloseIn(reasons={l["id"]: "کسری تحویل تأمین‌کننده" for l in r["lines"]}))
         shift(db, O, m0, local_dt(day, 8.5))
         m1 = marks(db, O)
+        inspect_receipt(city, r["id"], lines, need)
         for task in putaway_service.list_tasks(db, managers[city], status="active", receipt_id=r["id"]):
             if task["stock_status"] != AVAILABLE or not task["suggested_location_code"]:
                 continue
             putaway_service.execute(db, managers[city], task["id"], putaway_service_scan(task))
-        shift(db, O, m1, local_dt(day, 8.5 + rng.uniform(2, 20)))
+        stored_at = local_dt(day, 8.5 + rng.uniform(2, 20))
+        # وظیفه جانمایی هنگام دریافت ساخته شده (پیش از m1)؛ زمان پایانش هم به همان روز برود
+        db.query(PutawayTask).filter(PutawayTask.receipt_id == r["id"], PutawayTask.status == "done").update(
+            {PutawayTask.completed_at: stored_at}, synchronize_session=False)
+        shift(db, O, m1, stored_at)
         counts["receipts"] += 1
+
+    def inspect_receipt(city, receipt_id, lines, need, reject=True):
+        """بازرسی کیفی کالای رسیده: بیشتر سالم و قابل تخصیص، گاهی چند واحد مردود یا معیوب."""
+        for entry, (p, _) in zip(lines, need, strict=True):
+            qty = entry["quantity"]
+            held = stock_ledger.lock_bucket(db, p.id, whs[city].id, PENDING, create=False)
+            if held is None or held.free_quantity < qty:
+                continue                     # این کالا مستقیم «قابل فروش» دریافت شده است
+            bad =rng.randint(1, 3) if reject and qty > 10 and rng.random() < 0.1 else 0
+            results = [{"status": AVAILABLE, "quantity": qty - bad}]
+            if bad:
+                results.append({"status": rng.choice(["rejected", "defective", "damaged"]), "quantity": bad,
+                                "reason": rng.choice(["بسته‌بندی پاره", "تاریخ تولید نامعتبر", "آسیب در حمل"])})
+            quality_service.inspect(db, managers[city], InspectionCreate(
+                product_id=p.id, warehouse_id=whs[city].id, from_status=PENDING, location_id=special[city]["rcv"].id,
+                lot_number=entry.get("lot_number"), receipt_id=receipt_id, results=results))
 
     from app.schemas.operations import PutawayExecute
 
@@ -636,6 +657,8 @@ def build(db) -> None:
     receiving_service.receive(db, mgr, r3["id"], ReceiveIn(location_id=special["تهران"]["rcv"].id, lines=[
         ({"line_id": ln["id"], "quantity": 30, "lot_number": f"PT{ln['product_id']}", "expiry_date": today + timedelta(days=200)}
          if db.get(Product, ln["product_id"]).lot_tracked else {"line_id": ln["id"], "quantity": 30}) for ln in r3["lines"]]))
+    inspect_receipt("تهران", r3["id"], [{"quantity": 30, "lot_number": f"PT{p.id}" if p.lot_tracked else None} for p in pool[20:23]],
+                    [(p, 30) for p in pool[20:23]], reject=False)
     lines = [{"product_id": p.id, "quantity": 4} for p in pool[30:33] if stock_of("تهران", p)[1] > 10]
     if lines:
         t = transfer_order_service.create(db, admin, TransferCreate(from_warehouse_id=tehran.id, to_warehouse_id=whs["مشهد"].id, lines=lines,
