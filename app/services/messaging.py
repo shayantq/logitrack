@@ -148,15 +148,21 @@ def organization_request_rejected(request) -> None:
                 f"برای پرسش‌ها با پشتیبانی {BRAND_FA} تماس بگیرید.")
 
 
+def _demo(order) -> bool:
+    """سفارش‌های نسخه نمایشی هیچ پیامکی نمی‌فرستند."""
+    from sqlalchemy.orm import object_session
+    return bool((session := object_session(order)) is not None and session.info.get("demo"))
+
+
 def order_created(order, organization_name: str) -> None:
-    if not order_sms_enabled():
+    if not order_sms_enabled() or _demo(order):
         return
     queue_sms(order.recipient_mobile,
               f"{organization_name}: سفارش شما ثبت شد. کد پیگیری {order.tracking_code}\n{base_url()}/track/{order.tracking_code}")
 
 
 def order_delivered(order, organization_name: str) -> None:
-    if not order_sms_enabled() or not order.rating_token:
+    if not order_sms_enabled() or not order.rating_token or _demo(order):
         return
     queue_sms(order.recipient_mobile,
               f"{organization_name}: سفارش {order.tracking_code} تحویل داده شد. نظرتان درباره ارسال:\n{base_url()}/rate/{order.rating_token}")

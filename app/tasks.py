@@ -389,3 +389,14 @@ def send_sms_task(mobile: str, text: str):
 def send_email_task(to: str, subject: str, text: str):
     from app.services import messaging
     return messaging.deliver_email(to, subject, text)
+
+
+@celery_app.task(name="tasks.reset_demo")
+def reset_demo_task():
+    """نسخه نمایشی خصوصی هر ۳۰ دقیقه از روی قالب از نو ساخته می‌شود (تا DEMO_ACCESS_TOKEN تنظیم نشود، کاری نمی‌کند)."""
+    from app import demo_db
+    from app.core import demo
+    if not demo.enabled():
+        return {"demo": "disabled"}
+    demo_db.reset()
+    return {"demo": "reset"}

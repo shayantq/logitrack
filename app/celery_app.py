@@ -55,6 +55,10 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.classify_abc",
         "schedule": crontab(hour=21, minute=0, day_of_week=5),  # بامداد شنبه به وقت ایران
     },
+    "reset-demo-half-hourly": {
+        "task": "tasks.reset_demo",
+        "schedule": crontab(minute="0,30"),  # نسخه نمایشی خصوصی به حالت اولیه
+    },
 }
 
 # اطمینان از این‌که Celery ماژول تسک‌ها را پیدا می‌کند

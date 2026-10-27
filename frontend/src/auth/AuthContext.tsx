@@ -16,6 +16,12 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** لینک نسخه نمایشی خصوصی (pages/public/DemoEntryPage) — با انقضای نشست یا ریست، دوباره از همین لینک وارد می‌شود */
+export const DEMO_LINK_KEY = "demo-link";
+function demoLink(): string | null {
+  try { return localStorage.getItem(DEMO_LINK_KEY); } catch { return null; }
+}
+
 /** صفحه اول هر کاربر بعد از ورود (راننده تأییدنشده ← فرم احراز هویت) */
 export function homePathFor(user: { role: Role | string; driver_status?: string | null; must_change_password?: boolean }): string {
   // ورود با رمز موقت ادمین ← اول تغییر رمز
@@ -45,12 +51,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const logout = useCallback(() => {
+    const demo = demoLink();
     tokenStore.clear();
     queryClient.clear();
-    navigate("/app/login", { replace: true });
+    try { localStorage.removeItem(DEMO_LINK_KEY); } catch { /* */ }
+    navigate(demo ? "/" : "/app/login", { replace: true });
   }, [navigate, queryClient]);
 
-  useEffect(() => setUnauthorizedHandler(logout), [logout]);
+  useEffect(() => setUnauthorizedHandler(() => {
+    const demo = demoLink();
+    if (!demo) return logout();
+    tokenStore.clear();
+    queryClient.clear();
+    navigate(`/app/d/${demo}`, { replace: true });
+  }), [logout, navigate, queryClient]);
 
   const login = useCallback(async (username: string, password: string) => {
     const response = await fetch("/auth/token", {
@@ -61,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new ApiError(errorMessage(body, "نام کاربری یا رمز عبور نامعتبر است."), response.status);
     tokenStore.set(body.access_token);
+    try { localStorage.removeItem(DEMO_LINK_KEY); } catch { /* */ }
     queryClient.clear();
     const me = (await unwrap(api.GET("/users/me"))) as Me;
     queryClient.setQueryData(["me"], me);

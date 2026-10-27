@@ -104,11 +104,21 @@ export const NAV: NavItem[] = [
   { to: "/app/platform/requests", label: "درخواست‌های ثبت سازمان", icon: Inbox, roles: PLATFORM, group: "platform" },
 ];
 
+/** نسخه نمایشی خصوصی فقط بخش‌های اصلی را دارد (سرور هم بقیه را رد می‌کند — app/core/demo.py) */
+const DEMO_PATHS = ["/app", "/app/analytics", "/app/map", "/app/receipts", "/app/quality", "/app/putaway", "/app/picking", "/app/shipping",
+  "/app/stocktakes", "/app/inventory", "/app/orders", "/app/backorders", "/app/schedules", "/app/drivers", "/app/driver-requests", "/app/tickets"];
+
+export function demoAllows(path: string): boolean {
+  const clean = path.replace(/\/+$/, "") || "/app";
+  return DEMO_PATHS.some(p => clean === p || (p !== "/app" && clean.startsWith(`${p}/`)));
+}
+
 export function navItemsFor(me: Me): NavItem[] {
   const perms = new Set(me.permissions ?? []);
   return NAV.filter(item => item.roles.includes(me.role)
     && (item.approvedDriver === undefined || item.approvedDriver === isApprovedDriver(me))
-    && (!item.perm || perms.has(item.perm)));
+    && (!item.perm || perms.has(item.perm))
+    && (!me.is_demo || demoAllows(item.to)));
 }
 
 /** مسیر فعلی در کدام مورد منوست (طولانی‌ترین تطبیق) */

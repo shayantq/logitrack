@@ -142,6 +142,8 @@ class MeResponse(UserResponse):
     tour_state: Optional[dict[str, str]] = None
     # مجوزهای ریز فعال این کاربر (app/core/permissions.py) — رابط کاربری دکمه‌ها را با آن نشان/پنهان می‌کند
     permissions: list[str] = []
+    # نسخه نمایشی خصوصی (app/core/demo.py): رابط کاربری منو را کوچک و نوار محدودیت‌ها را نشان می‌دهد
+    is_demo: bool = False
 
 
 class TourStateIn(BaseModel):

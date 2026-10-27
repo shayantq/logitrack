@@ -22,6 +22,7 @@ const PrivacyPage = lazy(() => import("./pages/public/PrivacyPage"));
 const PricingPage = lazy(() => import("./pages/public/PricingPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
+const DemoEntryPage = lazy(() => import("./pages/public/DemoEntryPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const OrdersPage = lazy(() => import("./pages/orders/OrdersPage"));
 const InventoryPage = lazy(() => import("./pages/inventory/InventoryPage"));
@@ -156,6 +157,7 @@ export function App() {
           <Route path="/pricing" element={fade(<PricingPage />)} />
           <Route path="/support/:token" element={fade(<SupportPage />)} />
           <Route path="/app/login" element={fade(<LoginPage />)} />
+          <Route path="/app/d/:token" element={<DemoEntryPage />} />
           <Route path="/app/forgot-password" element={fade(<ForgotPasswordPage />)} />
           <Route path="/app/change-password" element={<RequireLogin>{fade(<ChangePasswordPage />)}</RequireLogin>} />
           <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>

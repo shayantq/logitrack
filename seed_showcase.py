@@ -51,6 +51,8 @@ from app.services.stock_ledger import StockKey
 SLUG, NAME, PASSWORD = "arya-demo", "پخش سراسری آریا", "Arya@1405"
 DAYS = int(os.getenv("SHOWCASE_DAYS", "120"))
 SCALE = float(os.getenv("SHOWCASE_SCALE", "1"))
+# نسخه نمایشی خصوصی دیتابیس جدا دارد؛ فایل‌هایش هم جدا تا با فایل سازمان‌های دیتابیس اصلی قاطی نشود
+MEDIA_PREFIX = os.getenv("SHOWCASE_MEDIA_PREFIX", "")
 rng = random.Random(1405)
 
 # پیامک/ایمیل به شماره‌های ساختگی فرستاده نشود
@@ -297,7 +299,7 @@ def build(db) -> None:
             for kind, color in (("national_card", "#1e3a8a"), ("selfie", "#0f766e"), ("driving_license", "#7c2d12"),
                                 ("vehicle_photo", "#334155"), ("vehicle_card", "#6d28d9"), ("technical_inspection", "#9a3412")):
                 data = jpeg(kind, color)
-                path = storage.save(f"drivers/{O}/{d.id}/{kind}.jpg", data)
+                path = storage.save(f"{MEDIA_PREFIX}drivers/{O}/{d.id}/{kind}.jpg", data)
                 db.add(DriverDocument(user_id=d.id, kind=kind, file_path=path, content_type="image/jpeg", size_bytes=len(data)))
         invite.uses += 1
     db.commit()

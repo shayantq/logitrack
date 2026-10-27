@@ -6254,6 +6254,11 @@ export interface components {
              * @default []
              */
             permissions: string[];
+            /**
+             * Is Demo
+             * @default false
+             */
+            is_demo: boolean;
         };
         /** MessageResponse */
         MessageResponse: {

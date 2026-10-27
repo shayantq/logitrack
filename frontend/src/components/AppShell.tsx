@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -7,7 +7,7 @@ import { api, authFetch, unwrap } from "@/api/client";
 import { useAuth, useMe } from "@/auth/AuthContext";
 import { TourProvider, useTour } from "@/components/tour/TourProvider";
 import { NotificationCenter } from "@/components/NotificationCenter";
-import { NavLinks, navItemsFor } from "@/components/navigation";
+import { demoAllows, NavLinks, navItemsFor } from "@/components/navigation";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { ScanButton } from "@/components/ScanDialog";
 import { ROLE_LABELS } from "@/lib/labels";
@@ -15,6 +15,9 @@ import { Logo, LogoMark, ThemeToggle } from "@/ui/brand";
 import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "@/ui/overlays";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { Button, cn } from "@/ui/primitives";
+
+// فقط برای نسخه نمایشی خصوصی بارگذاری می‌شود
+const DemoChrome = lazy(() => import("@/components/demo/DemoChrome"));
 
 function useOrgLogo(enabled: boolean) {
   const { data: profile } = useQuery({
@@ -73,6 +76,8 @@ function Shell() {
 
   useEffect(() => { try { localStorage.setItem("sidebar", collapsed ? "collapsed" : "open"); } catch { /* */ } }, [collapsed]);
   useEffect(() => setMobileOpen(false), [location.pathname]);
+  // نسخه نمایشی: صفحه‌های خارج از بخش‌های اصلی به داشبورد برمی‌گردند
+  useEffect(() => { if (me.is_demo && !demoAllows(location.pathname)) navigate("/app", { replace: true }); }, [me.is_demo, location.pathname, navigate]);
 
   return (
     <div className="flex min-h-dvh bg-bg">
@@ -109,6 +114,7 @@ function Shell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <OfflineBanner />
+        {me.is_demo && <Suspense fallback={null}><DemoChrome /></Suspense>}
         <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-xl md:px-6">
           <Button variant="ghost" size="icon" className="size-11 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="منو" data-testid="mobile-nav-open"><MenuIcon className="size-5" /></Button>
           <div className="flex min-w-0 items-center gap-3">
@@ -129,8 +135,8 @@ function Shell() {
               </button>
             }>
               <MenuLabel>{me.full_name || me.username}{me.driver_code ? ` — ${me.driver_code}` : ""}</MenuLabel>
-              {me.role === "org_admin" && <MenuItem onSelect={() => navigate("/app/organization")} icon={<Building2 className="size-4" />}>پروفایل سازمان</MenuItem>}
-              <MenuItem onSelect={() => setPasswordOpen(true)} icon={<KeyRound className="size-4" />}><span data-testid="menu-change-password">تغییر رمز عبور</span></MenuItem>
+              {me.role === "org_admin" && !me.is_demo && <MenuItem onSelect={() => navigate("/app/organization")} icon={<Building2 className="size-4" />}>پروفایل سازمان</MenuItem>}
+              {!me.is_demo && <MenuItem onSelect={() => setPasswordOpen(true)} icon={<KeyRound className="size-4" />}><span data-testid="menu-change-password">تغییر رمز عبور</span></MenuItem>}
               <MenuSeparator />
               {tour.mainTour && <MenuItem onSelect={() => tour.start(tour.mainTour!)} icon={<Compass className="size-4" />}><span data-testid="menu-tour">راهنمای استفاده</span></MenuItem>}
               {tour.pageTour && <MenuItem onSelect={() => tour.start(tour.pageTour!)} icon={<MapPinned className="size-4" />}><span data-testid="menu-page-tour">راهنمای این صفحه</span></MenuItem>}
