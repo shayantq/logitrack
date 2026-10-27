@@ -25,7 +25,8 @@ const browser = await chromium.launch({ args: [
 
 async function session(scope, username, password, scenario, contextOptions = {}) {
   const { tours = false, ...options } = contextOptions;
-  const context = await browser.newContext({ locale: "fa-IR", ...options });
+  // مرورگر مثل کاربر واقعی به وقت تهران؛ بین ۰۰:۰۰ تا ۰۳:۳۰ بامداد تاریخ UTC با «امروز» سرور فرق دارد
+  const context = await browser.newContext({ locale: "fa-IR", timezoneId: "Asia/Tehran", ...options });
   // راهنمای تعاملی (فقط بار اول کاربر) جلوی کلیک‌های جریان‌های دیگر را می‌گیرد؛ فقط نشست «tour» آن را می‌بیند
   if (!tours) await context.addInitScript(() => { try { localStorage.setItem("tours-off", "1"); } catch { /* */ } });
   const page = await context.newPage();
