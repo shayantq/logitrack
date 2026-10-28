@@ -15,7 +15,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.database import db_dependency
+from app.core.http_security import SecurityHeadersMiddleware, build_csp, install_access_log_redaction
 from app.core.request_context import RequestContextMiddleware, request_id
+from app.core.security import enforce_production_settings, is_production
 from app.core.tenancy import TenantIsolationError
 from app.services.stock_ledger import LedgerViolationError
 
@@ -41,16 +43,25 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# سرور اصلی با کلید JWT یا رمز دیتابیس ناامن بالا نمی‌آید (app/core/security.py)
+enforce_production_settings()
+install_access_log_redaction()
+
+# مستندات API فقط در توسعه و تست؛ در سرور اصلی نقشه کامل API در دسترس عموم نیست
+_PRODUCTION = is_production()
 app = FastAPI(
     title="🏢 Pasineh API",
     version="2.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _PRODUCTION else "/docs",
+    redoc_url=None if _PRODUCTION else "/redoc",
+    openapi_url=None if _PRODUCTION else "/openapi.json",
     lifespan=lifespan
 )
 
 # IP و مرورگر هر درخواست برای گزارش فعالیت (app/services/audit_service.py)
 app.add_middleware(RequestContextMiddleware)
+# هدرهای امنیتی، no-store برای پاسخ‌های حساس و CSP در حالت گزارش (app/core/http_security.py)
+app.add_middleware(SecurityHeadersMiddleware, csp=build_csp(SPA_INDEX))
 
 # فرانت‌اند از همین سرور سرو می‌شود (same-origin) و به CORS نیازی ندارد.
 # اگر کلاینت دیگری روی دامنه جدا دارید، آدرس‌هایش را با کاما در CORS_ORIGINS بنویسید.

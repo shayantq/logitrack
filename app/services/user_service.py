@@ -11,7 +11,7 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core import storage
@@ -273,10 +273,22 @@ def delete_user(db: Session, user: User, user_id: int) -> None:
 # ---------------------------------------------------------------------------
 # ورود و تغییر رمز
 # ---------------------------------------------------------------------------
+_timing_hash: str | None = None
+
+
+def _equalize_timing(password: str) -> None:
+    """برای نام کاربری ناموجود هم یک بررسی bcrypt انجام می‌شود تا زمان پاسخ، وجود حساب را لو ندهد."""
+    global _timing_hash
+    if _timing_hash is None:
+        _timing_hash = bcrypt_context.hash(secrets.token_urlsafe(16))
+    bcrypt_context.verify(password, _timing_hash)
+
+
 def authenticate(db: Session, username: str, password: str) -> User:
     """ورود با قفل موقت: پس از ۵ تلاش ناموفق پشت‌سرهم، ۱۵ دقیقه ورود بسته است (حتی با رمز درست)."""
     user = db.query(User).filter(User.username == username).execution_options(**SKIP_TENANT_FILTER).first()
     if user is None:
+        _equalize_timing(password)
         raise DomainError(GENERIC_LOGIN_ERROR, 401)
     now = _now()
     if user.locked_until and user.locked_until > now:
@@ -284,12 +296,20 @@ def authenticate(db: Session, username: str, password: str) -> User:
         raise DomainError(f"به دلیل چند تلاش ناموفق، ورود این حساب تا {fa_digits(str(minutes))} دقیقه دیگر بسته است. "
                           "اگر رمز را فراموش کرده‌اید، از ادمین سازمان بخواهید آن را بازنشانی کند.", 429)
     if not bcrypt_context.verify(password, user.hashed_password):
-        user.failed_logins = (user.failed_logins or 0) + 1
+        # شمارش و قفل با UPDATE شرطی در خود دیتابیس تا تلاش‌های هم‌زمان هیچ‌کدام گم نشوند
+        attempts = db.execute(
+            update(User).where(User.id == user.id)
+            .values(failed_logins=func.coalesce(User.failed_logins, 0) + 1)
+            .returning(User.failed_logins).execution_options(**SKIP_TENANT_FILTER)
+        ).scalar_one()
         audit_service.log(db, None, "auth.login_failed", f"ورود ناموفق با نام کاربری «{user.username}»", target=user,
-                          organization_id=user.organization_id, details={"attempt": user.failed_logins})
-        if user.failed_logins >= LOCK_AFTER:
-            user.locked_until = now + timedelta(minutes=LOCK_MINUTES)
-            user.failed_logins = 0
+                          organization_id=user.organization_id, details={"attempt": attempts})
+        locked = attempts >= LOCK_AFTER and db.execute(
+            update(User).where(User.id == user.id, User.failed_logins >= LOCK_AFTER)
+            .values(failed_logins=0, locked_until=now + timedelta(minutes=LOCK_MINUTES))
+            .execution_options(**SKIP_TENANT_FILTER)
+        ).rowcount
+        if locked:
             audit_service.log(db, None, "auth.locked",
                               f"ورود «{user.username}» پس از {fa_digits(str(LOCK_AFTER))} تلاش ناموفق "
                               f"{fa_digits(str(LOCK_MINUTES))} دقیقه قفل شد", target=user, organization_id=user.organization_id)
@@ -420,15 +440,23 @@ def confirm_password_reset(db: Session, identifier: str, code: str, new_password
     if reset is None or reset.attempts >= RESET_MAX_ATTEMPTS:
         raise ConflictError(INVALID_RESET)
     if not hmac.compare_digest(reset.code_hash, _reset_hash(user.id, latin_digits((code or "").strip()))):
-        reset.attempts += 1
+        # شمارش اتمی تا تلاش‌های هم‌زمان سقف را دور نزنند
+        attempts = db.execute(update(PasswordReset).where(PasswordReset.id == reset.id)
+                              .values(attempts=PasswordReset.attempts + 1).returning(PasswordReset.attempts)
+                              .execution_options(**SKIP_TENANT_FILTER)).scalar_one()
         db.commit()
-        left = RESET_MAX_ATTEMPTS - reset.attempts
+        left = RESET_MAX_ATTEMPTS - attempts
         raise ConflictError(f"کد واردشده درست نیست. {fa_digits(str(left))} بار دیگر می‌توانید امتحان کنید." if left > 0
                             else INVALID_RESET)
+    # مصرف یک‌باره و اتمی: از دو درخواست هم‌زمان با همین کد فقط یکی موفق می‌شود
+    consumed = db.execute(update(PasswordReset).where(PasswordReset.id == reset.id, PasswordReset.used_at.is_(None))
+                          .values(used_at=now).execution_options(**SKIP_TENANT_FILTER)).rowcount
+    if consumed != 1:
+        db.rollback()
+        raise ConflictError(INVALID_RESET)
     user.hashed_password = bcrypt_context.hash(new_password)
     user.must_change_password = False
     user.token_version = (user.token_version or 0) + 1          # خروج از همه دستگاه‌ها
     user.failed_logins, user.locked_until = 0, None
-    reset.used_at = now
     audit_service.log(db, user, "auth.password_reset", "رمز عبور را با کد بازیابی تغییر داد")
     db.commit()

@@ -19,7 +19,7 @@ staff = require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER])
 org_admin = require_role([RoleEnum.ORG_ADMIN])
 driver_only = require_role([RoleEnum.DRIVER])
 platform_staff = require_role([RoleEnum.PLATFORM_ADMIN, RoleEnum.PLATFORM_SUPPORT])
-public_rating_limiter = RateLimiter(max_requests=30, window_seconds=3600)
+public_rating_limiter = RateLimiter("public-rating", max_requests=30, window_seconds=3600)
 
 
 def _call(fn, *args, **kwargs):

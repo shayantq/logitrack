@@ -18,7 +18,8 @@ WORKDIR /code
 
 # نصب وابستگی‌ها در لایه جدا تا با هر تغییر کد دوباره نصب نشوند
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+# pip بعد از نصب حذف می‌شود: در اجرا لازم نیست و کتابخانه‌های قدیمیِ داخلش (msgpack، urllib3، setuptools) در اسکن امنیتی image آسیب‌پذیر شناخته می‌شوند
+RUN pip install -r requirements.txt && pip uninstall -y pip
 
 # اجرای برنامه با کاربر غیر root
 # پوشه media (لوگوها و فایل‌های آپلودی) از قبل با مالکیت app ساخته می‌شود تا volume داکر همین مالکیت را بگیرد

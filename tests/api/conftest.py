@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Query
 from sqlalchemy.pool import StaticPool
 
+from app.core.rate_limit import login_failure_limiter
 from app.database import Base, get_db
 from app.main import app
 
@@ -28,6 +29,7 @@ def api_env(monkeypatch):
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    login_failure_limiter.reset()
     try:
         yield TestClient(app), TestingSession
     finally:

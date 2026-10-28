@@ -18,6 +18,8 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from PIL import Image as PILImage
+
+from app.services.spreadsheet_safety import csv_cell, neutralize_workbook
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import cm
@@ -211,6 +213,7 @@ def to_excel(report: Report, b: Branding, now_local: datetime) -> bytes:
             ws.auto_filter.ref = f"A{header_row}:{get_column_letter(len(section.columns))}{header_row + len(section.rows)}"
         ws.cell(row=row + 2, column=1, value="تولیدشده با پسینه").font = Font(size=8, color="9CA3AF")
         ws.oddFooter.center.text = "صفحه &P از &N"
+    neutralize_workbook(wb)
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -239,7 +242,7 @@ def to_csv(report: Report, b: Branding, now_local: datetime) -> bytes:
         writer.writerow([section.title])
         writer.writerow([c.title for c in section.columns])
         for row in section.rows:
-            writer.writerow(["" if row.get(c.key) is None else row.get(c.key) for c in section.columns])
+            writer.writerow(["" if row.get(c.key) is None else csv_cell(row.get(c.key)) for c in section.columns])
     return ("﻿" + out.getvalue()).encode("utf-8")
 
 

@@ -34,7 +34,10 @@ async function session(scope, username, password, scenario, contextOptions = {})
   page.on("pageerror", e => errors.push(`pageerror: ${e.message}`));
   // پاسخ‌های 4xx سناریوهای خطای عمدی (رمز اشتباه و ...) را مرورگر به‌صورت «Failed to load resource» لاگ می‌کند؛
   // درستی آن جریان‌ها با assertion خودشان بررسی می‌شود
-  page.on("console", m => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource")) errors.push(`console: ${m.text()}`); });
+  // waitForFunction خود Playwright کد آزمون را با new Function در صفحه اجرا می‌کند؛ CSP (حالت گزارش) آن را گزارش می‌دهد.
+  // اپ هیچ eval ندارد، پس فقط همین گزارش نادیده گرفته می‌شود و هر تخطی دیگر CSP همچنان خطاست
+  const harnessEval = text => text.startsWith("[Report Only]") && text.includes("'unsafe-eval'");
+  page.on("console", m => { if (m.type() === "error" && !m.text().startsWith("Failed to load resource") && !harnessEval(m.text())) errors.push(`console: ${m.text()}`); });
   try {
     if (username) {
       await page.goto(`${BASE}/app/login`);

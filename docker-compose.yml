@@ -6,6 +6,8 @@ x-app-env: &app-env
   REDIS_URL: redis://redis:6379/0
   # کلید امضای JWT — اگر خالی باشد هر بار کلید موقت ساخته می‌شود و با ری‌استارت همه باید دوباره وارد شوند
   SECRET_KEY: ${SECRET_KEY:-}
+  # فقط روی سرور اصلی production: کلید و رمز ناامن پذیرفته نمی‌شود و مستندات API بسته است (app/core/security.py)
+  APP_ENV: ${APP_ENV:-development}
   # نسخه نمایشی خصوصی (app/core/demo.py): تا DEMO_ACCESS_TOKEN خالی است، وجود ندارد
   DEMO_ACCESS_TOKEN: ${DEMO_ACCESS_TOKEN:-}
   DEMO_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/pasineh_demo

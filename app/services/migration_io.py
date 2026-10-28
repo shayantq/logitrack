@@ -22,6 +22,7 @@ from app.core.iran import normalize_persian_text
 from app.core.wms import LOCATION_LEVEL_LABELS, LOCATION_LEVELS, LOCATION_TYPES, STOCK_STATUS_LABELS, STOCK_STATUSES
 from app.models import Location, Product, StockDocument, User, Warehouse
 from app.services import audit_service, location_service, permission_service, stock_ledger
+from app.services.spreadsheet_safety import neutralize_workbook
 from app.services.catalog_io import _date, _number, _text
 from app.services.exceptions import ConflictError, DomainError
 
@@ -90,6 +91,7 @@ def template(db: Session, user: User, kind: str) -> bytes:
             if isinstance(v, str):
                 v = v.replace("{wh}", warehouses[0] if warehouses else "").replace("{sku}", product.sku if product else "")
             ws.cell(row=r, column=c, value=v)
+    neutralize_workbook(wb)
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

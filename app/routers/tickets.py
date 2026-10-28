@@ -14,8 +14,8 @@ from app.services.exceptions import DomainError
 
 platform_staff = require_role([RoleEnum.PLATFORM_ADMIN, RoleEnum.PLATFORM_SUPPORT])
 # فرم عمومی: ۱۰ تیکت جدید و ۶۰ پیام در ساعت از هر IP
-public_create_limiter = RateLimiter(max_requests=10, window_seconds=3600)
-public_message_limiter = RateLimiter(max_requests=60, window_seconds=3600)
+public_create_limiter = RateLimiter("ticket-create", max_requests=10, window_seconds=3600)
+public_message_limiter = RateLimiter("ticket-message", max_requests=60, window_seconds=3600)
 MAX_UPLOAD = ticket_service.MAX_IMAGE + 1
 
 Status = Literal["open", "resolved", "closed"]

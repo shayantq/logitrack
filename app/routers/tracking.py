@@ -13,7 +13,7 @@ from app.services.exceptions import DomainError
 
 router = APIRouter(prefix="/public/track", tags=["📍 پیگیری عمومی سفارش"])
 # جلوی حدس زدن انبوه کدها از یک IP را می‌گیرد (کاربر عادی با به‌روزرسانی هر ۱۵ ثانیه به این سقف نمی‌رسد)
-track_limiter = RateLimiter(max_requests=120, window_seconds=600)
+track_limiter = RateLimiter("track", max_requests=120, window_seconds=600)
 
 
 class TrackStep(BaseModel):

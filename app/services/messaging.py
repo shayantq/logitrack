@@ -1,7 +1,7 @@
 """
 پیامک و ایمیل خودکار (اطلاع‌رسانی به متقاضی سازمان، مشتری سفارش، کد بازیابی رمز)
 
-تنظیمات فقط از .env خوانده می‌شود؛ تا وقتی سرویسی تنظیم نشده، پیام فقط در لاگ ثبت می‌شود و هیچ
+تنظیمات فقط از .env خوانده می‌شود؛ تا وقتی سرویسی تنظیم نشده، پیام ارسال نمی‌شود (فقط گیرنده نیمه‌پنهان و طول پیام در لاگ می‌آید، نه متن) و هیچ
 عملیاتی به‌خاطر نبودِ پیامک یا ایمیل خطا نمی‌دهد.
 
   پیامک (کاوه‌نگار):  SMS_PROVIDER=kavenegar  SMS_API_KEY=...  SMS_SENDER=شماره خط ارسال
@@ -46,12 +46,25 @@ def order_sms_enabled() -> bool:
     return sms_enabled() and _env("ORDER_SMS_ENABLED").lower() in ("1", "true", "yes")
 
 
+def _mask(recipient: str) -> str:
+    """گیرنده در لاگ نیمه‌پنهان: 0912***1087 یا a***@example.com"""
+    if "@" in recipient:
+        name, _, domain = recipient.partition("@")
+        return f"{name[:1]}***@{domain}"
+    return f"{recipient[:4]}***{recipient[-4:]}" if len(recipient) > 8 else "***"
+
+
+def _skipped(channel: str, recipient: str, text: str) -> None:
+    # متن پیام هرگز در لاگ نمی‌آید: ممکن است رمز موقت یا کد بازیابی داشته باشد
+    logger.info("%s not configured; message to %s skipped (%d chars)", channel, _mask(recipient), len(text))
+
+
 # ---------------------------------------------------------------------------
 # ارسال واقعی (داخل worker)
 # ---------------------------------------------------------------------------
 def deliver_sms(mobile: str, text: str) -> bool:
     if not sms_enabled():
-        logger.info("SMS (not configured) to %s: %s", mobile, text)
+        _skipped("SMS", mobile, text)
         return False
     url = f"https://api.kavenegar.com/v1/{_env('SMS_API_KEY')}/sms/send.json"
     data = {"receptor": mobile, "message": text}
@@ -68,7 +81,7 @@ def deliver_sms(mobile: str, text: str) -> bool:
 
 def deliver_email(to: str, subject: str, text: str) -> bool:
     if not email_enabled():
-        logger.info("Email (not configured) to %s: %s — %s", to, subject, text)
+        _skipped("Email", to, text)
         return False
     msg = EmailMessage()
     sender = _env("SMTP_FROM") or _env("SMTP_USER")
@@ -99,7 +112,7 @@ def queue_sms(mobile: str | None, text: str) -> bool:
     if not mobile:
         return False
     if not sms_enabled():
-        logger.info("SMS (not configured) to %s: %s", mobile, text)
+        _skipped("SMS", mobile, text)
         return False
     from app.tasks import send_sms_task          # جلوگیری از import چرخه‌ای
     send_sms_task.delay(mobile, text)
@@ -110,7 +123,7 @@ def queue_email(to: str | None, subject: str, text: str) -> bool:
     if not to:
         return False
     if not email_enabled():
-        logger.info("Email (not configured) to %s: %s — %s", to, subject, text)
+        _skipped("Email", to, text)
         return False
     from app.tasks import send_email_task
     send_email_task.delay(to, subject, f"{text}\n\n—\n{BRAND_FA} | {base_url()}")

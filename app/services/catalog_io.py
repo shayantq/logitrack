@@ -21,6 +21,7 @@ from app.core.iran import gregorian_to_jalali, jalali_to_gregorian, normalize_pe
 from app.models import Product, ProductUom, User, Warehouse
 from app.services import catalog_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError
+from app.services.spreadsheet_safety import neutralize_workbook
 
 MAX_ROWS = 5000
 UNITS = ["عدد", "کیلوگرم", "گرم", "لیتر", "متر", "بسته", "کارتن", "جفت", "دستگاه"]
@@ -140,6 +141,7 @@ def _workbook(warehouses: list[str]) -> tuple[Workbook, object]:
 
 
 def _bytes(wb: Workbook) -> bytes:
+    neutralize_workbook(wb)
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

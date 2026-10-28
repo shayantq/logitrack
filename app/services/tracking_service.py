@@ -17,7 +17,7 @@ from app.services import commission_service, route_service
 from app.services.exceptions import ConflictError, NotFoundError
 
 # ۵ تلاش اشتباه ۴ رقم موبایل برای هر کد در ساعت — حدس زدن ۱۰٬۰۰۰ حالت عملاً ممکن نیست
-phone_attempts = RateLimiter(max_requests=5, window_seconds=3600)
+phone_attempts = RateLimiter("track-phone", max_requests=5, window_seconds=3600)
 RATING_LINK_DAYS = 14
 
 STEPS = [

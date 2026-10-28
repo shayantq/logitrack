@@ -33,6 +33,7 @@ from app.database import SessionLocal
 from app.models import Product, Order, Inventory
 from app.services import notification_service
 from app.services.order_service import STATUS_LABELS, expire_overdue_orders
+from app.services.spreadsheet_safety import neutralize_workbook
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ def _dataframe_to_base64_xlsx(df: pd.DataFrame, sheet_name: str) -> str:
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
+        neutralize_workbook(writer.book)
         worksheet = writer.sheets[sheet_name]
         for col in worksheet.columns:
             max_len = max((len(str(cell.value or "")) for cell in col), default=10)

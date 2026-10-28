@@ -10,7 +10,7 @@ from starlette import status
 from app.dependencies import user_dependency
 from app.services import user_service
 from app.services.exceptions import DomainError
-from app.core.rate_limit import password_reset_confirm_limiter, password_reset_request_limiter
+from app.core.rate_limit import login_failure_limiter, password_reset_confirm_limiter, password_reset_request_limiter
 
 router = APIRouter(
     prefix='/auth',
@@ -30,11 +30,18 @@ def create_user(db: db_dependency, create_user_request: CreateUserRequest, curre
 
 
 @router.post('/token', summary="🔑 ورود و دریافت توکن دسترسی JWT")
-def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+def login_for_access_token(request: Request, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
     # قفل موقت پس از تلاش‌های ناموفق، حساب غیرفعال و ثبت در گزارش فعالیت — app/services/user_service.authenticate
+    # جدا از قفل هر حساب، تلاش ناموفق زیاد از یک IP (روی نام‌های کاربری مختلف) هم موقتاً بسته می‌شود
+    ip = request.client.host if request.client else "unknown"
+    if login_failure_limiter.blocked(ip):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="تلاش ناموفق ورود از این شبکه زیاد بوده است؛ چند دقیقه دیگر دوباره امتحان کنید.")
     try:
         user = user_service.authenticate(db, form_data.username, form_data.password)
     except DomainError as e:
+        if e.status_code == 401:
+            login_failure_limiter.allow(ip)
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
     token = create_access_token(user.username, user.id, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES), user.token_version or 0)
