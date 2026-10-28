@@ -10,7 +10,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    JSON, Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text,
+    JSON, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text,
     UniqueConstraint, event,
 )
 from sqlalchemy.orm import relationship
@@ -19,7 +19,7 @@ from app.core.tenancy import TenantScoped
 from app.core.wms import (
     CARRIER_SERVICES, DOCUMENT_STATUSES, DOCUMENT_TYPES, PARTNER_KINDS, RESERVATION_STATUSES, sql_in,
 )
-from app.database import Base
+from app.database import Base, Money
 
 
 def _now():
@@ -207,7 +207,7 @@ class ProductSupplier(TenantScoped, Base):
     supplier_sku = Column(String(64), nullable=True)
     lead_time_days = Column(Integer, nullable=True)
     min_order_qty = Column(Integer, nullable=True)
-    last_price = Column(Float, nullable=True)
+    last_price = Column(Money, nullable=True)
     is_preferred = Column(Boolean, nullable=False, default=False, server_default="false")
 
     product = relationship("Product", back_populates="suppliers")

@@ -3,12 +3,12 @@ from app.schemas.user import CreateUserRequest, MessageResponse, PasswordResetCh
 from app.models import User
 from app.database import db_dependency
 from fastapi.security import OAuth2PasswordRequestForm
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Cookie, Depends, Form, HTTPException, Path, Request, Response
 from typing import Annotated
 from datetime import timedelta
 from starlette import status
-from app.dependencies import user_dependency
-from app.services import user_service
+from app.dependencies import current_user_dependency, user_dependency
+from app.services import session_service, user_service
 from app.services.exceptions import DomainError
 from app.core.rate_limit import login_failure_limiter, password_reset_confirm_limiter, password_reset_request_limiter
 
@@ -30,7 +30,8 @@ def create_user(db: db_dependency, create_user_request: CreateUserRequest, curre
 
 
 @router.post('/token', summary="🔑 ورود و دریافت توکن دسترسی JWT")
-def login_for_access_token(request: Request, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: db_dependency):
+def login_for_access_token(request: Request, response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+                           db: db_dependency, remember: Annotated[bool, Form()] = False):
     # قفل موقت پس از تلاش‌های ناموفق، حساب غیرفعال و ثبت در گزارش فعالیت — app/services/user_service.authenticate
     # جدا از قفل هر حساب، تلاش ناموفق زیاد از یک IP (روی نام‌های کاربری مختلف) هم موقتاً بسته می‌شود
     ip = request.client.host if request.client else "unknown"
@@ -44,8 +45,62 @@ def login_for_access_token(request: Request, form_data: Annotated[OAuth2Password
             login_failure_limiter.allow(ip)
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
+    session_service.set_cookie(request, response, session_service.start(db, user, remember))
+    return _access(user)
+
+
+# ---------------------------------------------------------------------------
+# نشست ماندگار: تمدید توکن کوتاه با کوکی HttpOnly، خروج، فهرست و بستن نشست‌ها (app/services/session_service.py)
+# ---------------------------------------------------------------------------
+def _access(user: User) -> dict:
     token = create_access_token(user.username, user.id, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES), user.token_version or 0)
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": token, "token_type": "bearer", "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60}
+
+
+def _same_site_request(request: Request) -> None:
+    """کوکی SameSite=Strict است؛ این هدر سفارشی هم فقط از خود سایت فرستاده می‌شود (سد دوم CSRF)."""
+    origin = request.headers.get("origin")
+    if request.headers.get("x-requested-with") != "pasineh" or (origin and origin.split("://", 1)[-1] != request.headers.get("host")):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="درخواست از مبدأ نامعتبر است.")
+
+
+@router.post('/refresh', summary="🔄 تمدید توکن دسترسی با نشست ماندگار (کوکی)")
+def refresh_access_token(request: Request, response: Response, db: db_dependency,
+                         refresh_token: Annotated[str | None, Cookie(alias=session_service.COOKIE_NAME)] = None):
+    _same_site_request(request)
+    try:
+        issued = session_service.refresh(db, refresh_token)
+    except session_service.SessionInvalid:
+        session_service.clear_cookie(request, response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="نشست شما به پایان رسیده است؛ دوباره وارد شوید.",
+                            headers={"set-cookie": response.headers.get("set-cookie", "")})
+    session_service.set_cookie(request, response, issued)
+    return _access(issued.user)
+
+
+@router.post('/logout', status_code=status.HTTP_204_NO_CONTENT, summary="🚪 خروج و بستن نشست ماندگار این مرورگر")
+def logout(request: Request, response: Response, db: db_dependency,
+           refresh_token: Annotated[str | None, Cookie(alias=session_service.COOKIE_NAME)] = None):
+    _same_site_request(request)
+    session_service.end(db, refresh_token)
+    session_service.clear_cookie(request, response)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
+
+
+@router.get('/sessions', summary="🖥️ نشست‌های فعال من (دستگاه‌ها)")
+def my_sessions(user: current_user_dependency, db: db_dependency,
+                refresh_token: Annotated[str | None, Cookie(alias=session_service.COOKIE_NAME)] = None):
+    current = session_service.current_family(db, refresh_token)
+    return [{"id": s.id, "created_at": s.created_at, "last_used_at": s.last_used_at, "expires_at": s.expires_at,
+             "remember": s.remember, "ip": s.ip, "user_agent": s.user_agent, "current": s.family == current}
+            for s in session_service.active_for(db, user)]
+
+
+@router.delete('/sessions/{session_id}', status_code=status.HTTP_204_NO_CONTENT, summary="⛔ بستن یکی از نشست‌های من")
+def revoke_my_session(user: current_user_dependency, db: db_dependency, session_id: int = Path(gt=0)):
+    if not session_service.revoke_for(db, user, session_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="نشست پیدا نشد.")
 
 
 # ---------------------------------------------------------------------------

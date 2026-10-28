@@ -73,7 +73,8 @@ if not SECRET_KEY:
     logger.warning("SECRET_KEY تنظیم نشده است؛ یک کلید تصادفی موقت ساخته شد. توکن‌ها با ری‌استارت سرور باطل می‌شوند.")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(60 * 24)))
+# توکن دسترسی کوتاه است؛ ماندگاری ورود با کوکی HttpOnly تمدید است (app/services/session_service.py)
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 

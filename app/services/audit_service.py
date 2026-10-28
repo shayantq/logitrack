@@ -36,7 +36,7 @@ ACTION_CATEGORY = {
     "catalog.import": "catalog", "catalog.price": "catalog", "catalog.price_delete": "catalog", "catalog.update": "catalog",
     "report.generate": "reports",
     "inventory.policy": "settings", "inventory.rop": "catalog", "inventory.rop_auto": "catalog",
-    "driver.invite": "drivers", "driver.approve": "drivers", "driver.reject": "drivers",
+    "driver.invite": "drivers", "driver.approve": "drivers", "driver.reject": "drivers", "driver.document_view": "drivers",
     "catalog.delete": "catalog", "catalog.uoms": "catalog", "catalog.suppliers": "catalog", "order.delete": "orders",
     "partner.create": "partners", "partner.update": "partners", "partner.archive": "partners",
     "partner.activate": "partners", "partner.delete": "partners",

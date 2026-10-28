@@ -122,7 +122,11 @@ function ExecuteModal({ task, onClose }: { task: Task | null; onClose: () => voi
   useEffect(() => {
     if (task) {
       setScans({ product: "", source: "", lot: "", destination: "", quantity: String(task.remaining) });
-      setTimeout(() => refs.product.current?.focus(), 50);
+      // اسکنر بارکد سریع است: اگر کاربر در همین فاصله به فیلد بعدی رفته، فوکوس از زیر دستش کشیده نشود
+      setTimeout(() => {
+        const moved = [refs.source, refs.lot, refs.destination, refs.quantity].some(r => r.current && r.current === document.activeElement);
+        if (!moved) refs.product.current?.focus();
+      }, 50);
     }
   }, [task?.id]);
   const set = (k: keyof typeof scans) => (e: { target: { value: string } }) => setScans(s => ({ ...s, [k]: e.target.value }));

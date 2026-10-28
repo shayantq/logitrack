@@ -13,7 +13,7 @@ from app.schemas.driver_portal import (
 )
 from app.schemas.driver import DriverApplicationResponse
 from app.services import driver_portal_service as portal
-from app.services import driver_service
+from app.services import audit_service, driver_service
 from app.services.exceptions import DomainError
 from app.services.schedule_service import today_local
 
@@ -127,4 +127,7 @@ def reject(data: ReviewDecision, db: db_dependency, request_id: int = Path(gt=0)
 
 @admin_router.get("/{request_id}/documents/{kind}", summary="📎 مدرک درخواست تغییر خودرو")
 def request_document(kind: VehicleDocument, db: db_dependency, request_id: int = Path(gt=0), user=Depends(org_admin)):
-    return _file(_call(portal.request_document_file, db, user, request_id, kind))
+    response = _file(_call(portal.request_document_file, db, user, request_id, kind))
+    audit_service.record(db, user, "driver.document_view", f"مدرک «{kind}» درخواست تغییر خودروی شماره {request_id} مشاهده شد",
+                         target_type="driver_request", target_id=request_id, details={"kind": kind})
+    return response

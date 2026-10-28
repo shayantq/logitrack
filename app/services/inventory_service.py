@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.wms import AVAILABLE, STOCK_STATUS_LABELS
 from app.models import (
-    ACTIVE_ORDER_STATUSES, Inventory, Order, OrderItem, Partner, Product, StockDocument, StockMovement, StockReservation,
+    ACTIVE_ORDER_STATUSES, Inventory, Order, OrderItem, Partner, Product, StockDocument, StockMovement, StockReservation, StocktakeLine,
     User, Warehouse,
 )
 from app.schemas.product import (
@@ -155,6 +155,7 @@ def _has_history(db: Session, product_id: int) -> bool:
         db.query(StockMovement.id).filter(StockMovement.product_id == product_id),
         db.query(OrderItem.id).filter(OrderItem.product_id == product_id),
         db.query(StockReservation.id).filter(StockReservation.product_id == product_id),
+        db.query(StocktakeLine.id).filter(StocktakeLine.product_id == product_id),
     ))
 
 

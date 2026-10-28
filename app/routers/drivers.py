@@ -156,4 +156,10 @@ def reject(data: DriverRejectRequest, db: db_dependency, driver_id: int = Path(g
 
 @admin_router.get("/{driver_id}/documents/{kind}", summary="📎 مشاهده مدرک راننده (فقط ادمین همان سازمان)")
 def driver_document(kind: DocumentKind, db: db_dependency, user: user_dependency, driver_id: int = Path(gt=0)):
-    return _file(_call(driver_service.document_file, db, user, driver_id, kind))
+    response = _file(_call(driver_service.document_file, db, user, driver_id, kind))
+    # مشاهده مدرک هویتی راننده توسط شخص دیگر در گزارش فعالیت می‌ماند (خود فایل یا محتوایش نه)
+    if user.id != driver_id:
+        driver = db.get(User, driver_id)
+        audit_service.record(db, user, "driver.document_view", f"مدرک «{kind}» راننده «{driver.full_name or driver.username}» مشاهده شد",
+                             target=driver, details={"kind": kind})
+    return response

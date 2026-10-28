@@ -221,7 +221,11 @@ function PickScanModal({ line, warehouseCode, onClose }: { line: Line | null; wa
   useEffect(() => {
     if (line) {
       setScans({ source: "", product: "", lot: "", quantity: String(line.quantity - line.picked_quantity) });
-      setTimeout(() => refs.source.current?.focus(), 50);
+      // اسکنر بارکد سریع است: اگر کاربر در همین فاصله به فیلد بعدی رفته، فوکوس از زیر دستش کشیده نشود
+      setTimeout(() => {
+        const moved = [refs.product, refs.lot, refs.quantity].some(r => r.current && r.current === document.activeElement);
+        if (!moved) refs.source.current?.focus();
+      }, 50);
     }
   }, [line?.id]);
   const set = (k: keyof typeof scans) => (e: { target: { value: string } }) => setScans(s => ({ ...s, [k]: e.target.value }));

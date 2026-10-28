@@ -16,15 +16,50 @@ export const tokenStore = {
   clear: () => localStorage.removeItem(TOKEN_KEY),
 };
 
-/** وقتی سرور 401 داد (توکن منقضی)، کاربر به صفحه ورود برمی‌گردد. */
+/**
+ * توکن دسترسی کوتاه است (پیش‌فرض ۳۰ دقیقه). کمی پیش از انقضا با کوکی HttpOnly نشست (که جاوااسکریپت نمی‌بیند)
+ * بی‌صدا تمدید می‌شود؛ چند درخواست هم‌زمان فقط یک تمدید می‌فرستند. نشست نمایشی کوکی ندارد و تمدید نمی‌شود.
+ */
+let refreshing: Promise<boolean> | null = null;
+
+export function refreshSession(): Promise<boolean> {
+  if (!refreshing) {
+    refreshing = fetch("/auth/refresh", { method: "POST", credentials: "same-origin", headers: { "X-Requested-With": "pasineh" } })
+      .then(async response => {
+        if (!response.ok) return false;
+        tokenStore.set((await response.json()).access_token);
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => { refreshing = null; });
+  }
+  return refreshing;
+}
+
+function expiresSoon(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload.exp === "number" && payload.exp * 1000 - Date.now() < 60_000;
+  } catch {
+    return false;
+  }
+}
+
+async function currentToken(): Promise<string | null> {
+  const token = tokenStore.get();
+  if (token && expiresSoon(token)) await refreshSession();
+  return tokenStore.get();
+}
+
+/** وقتی سرور 401 داد (توکن منقضی و تمدید هم ممکن نبود)، کاربر به صفحه ورود برمی‌گردد. */
 let onUnauthorized: () => void = () => {};
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler;
 }
 
 const authMiddleware: Middleware = {
-  onRequest({ request }) {
-    const token = tokenStore.get();
+  async onRequest({ request }) {
+    const token = await currentToken();
     if (token) request.headers.set("Authorization", `Bearer ${token}`);
     return request;
   },
@@ -40,7 +75,7 @@ api.use(authMiddleware);
 /** درخواست خام با توکن (برای فایل، FormData و endpointهایی که پاسخ تایپ‌شده ندارند). */
 export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  const token = tokenStore.get();
+  const token = await currentToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(input, { ...init, headers });
   if (response.status === 401) onUnauthorized();

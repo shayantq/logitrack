@@ -9,7 +9,7 @@ export type Me = Schemas["MeResponse"] & { role: Role };
 interface AuthState {
   me: Me | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<Me>;
+  login: (username: string, password: string, remember?: boolean) => Promise<Me>;
   logout: () => void;
   isPlatform: boolean;
 }
@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     const demo = demoLink();
+    // نشست ماندگار (کوکی) سمت سرور هم بسته می‌شود؛ نتیجه‌اش منتظر نمی‌ماند
+    fetch("/auth/logout", { method: "POST", credentials: "same-origin", headers: { "X-Requested-With": "pasineh" } }).catch(() => {});
     tokenStore.clear();
     queryClient.clear();
     try { localStorage.removeItem(DEMO_LINK_KEY); } catch { /* */ }
@@ -66,11 +68,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate(`/app/d/${demo}`, { replace: true });
   }), [logout, navigate, queryClient]);
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string, remember = false) => {
     const response = await fetch("/auth/token", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username, password }),
+      body: new URLSearchParams({ username, password, remember: remember ? "true" : "false" }),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new ApiError(errorMessage(body, "نام کاربری یا رمز عبور نامعتبر است."), response.status);

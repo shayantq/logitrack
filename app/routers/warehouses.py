@@ -8,7 +8,7 @@ from sqlalchemy import func
 from app.core import geo
 from app.database import db_dependency
 from app.dependencies import require_role, user_dependency
-from app.models import Inventory, Order, RoleEnum, StockMovement, User, Warehouse
+from app.models import Inventory, Order, RoleEnum, StockMovement, Stocktake, User, Warehouse
 from app.schemas.route import GeoCity, WarehouseIn, WarehouseOut
 from app.services import audit_service, warehouse_service
 from app.services.exceptions import DomainError
@@ -103,6 +103,8 @@ def delete_warehouse(db: db_dependency, warehouse_id: int = Path(gt=0), user=Dep
     if db.query(Inventory.id).filter(Inventory.warehouse_id == warehouse.id).first() or \
             db.query(StockMovement.id).filter(StockMovement.warehouse_id == warehouse.id).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "این انبار کالا یا سابقه گردش دارد؛ به‌جای حذف، آن را غیرفعال کنید.")
+    if db.query(Stocktake.id).filter(Stocktake.warehouse_id == warehouse.id).first():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "این انبار سابقه انبارگردانی دارد؛ برای حفظ سوابق، به‌جای حذف آن را غیرفعال کنید.")
     if db.query(Order.id).filter(Order.warehouse_id == warehouse.id).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "از این انبار سفارش ارسال شده است؛ برای حفظ سوابق قابل حذف نیست.")
     if db.query(User.id).filter(User.warehouse_id == warehouse.id).first():

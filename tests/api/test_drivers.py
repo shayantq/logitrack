@@ -383,3 +383,13 @@ def test_video_duration_and_size_limits(env):
     assert long.status_code == 400 and "ثانیه" in long.json()["detail"]
     huge = up(_mp4(5) + b"\0" * (30 * 1024 * 1024))
     assert huge.status_code == 400 and "مگابایت" in huge.json()["detail"]
+
+
+def test_admin_document_views_are_audited(env):
+    client, db, _, orgs = env
+    admin = orgs["alpha"]["admin"]
+    _, driver_id = _submitted_driver(client, admin)
+    assert client.get(f"/drivers/{driver_id}/documents/national_card", headers=_auth(admin)).status_code == 200
+    items = client.get("/users/activity-log", headers=_auth(admin)).json()["items"]
+    views = [i for i in items if i["action"] == "driver.document_view"]
+    assert len(views) == 1 and views[0]["target_id"] == driver_id and "national_card" in views[0]["summary"]

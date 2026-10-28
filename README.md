@@ -226,7 +226,7 @@ docker compose exec web alembic upgrade head
 | متغیر | توضیح | پیش‌فرض |
 |---|---|---|
 | `SECRET_KEY` | کلید امضای توکن ورود — **در محیط واقعی الزامی** | کلید تصادفی موقت |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | مدت اعتبار توکن | 1440 (یک روز) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | مدت اعتبار توکن دسترسی (با کوکی امن نشست خودکار تمدید می‌شود) | 30 |
 | `WEB_PORT` / `DB_PORT` | پورت‌های روی کامپیوتر میزبان (دیتابیس داکر روی 5433 چون 5432 دست PostgreSQL ویندوز است) | 8001 / 5433 |
 | `POSTGRES_PASSWORD` | رمز دیتابیس داکر | `your_secure_password` |
 | `MEDIA_ROOT` | محل ذخیره فایل‌های آپلودی (لوگوها) — در داکر volume دائمی `media_data` | `./media` |

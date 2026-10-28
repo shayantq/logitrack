@@ -1,6 +1,8 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from typing import Annotated
+
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Path, Query, Request, Response
 from starlette import status
 from app.database import db_dependency
 from app.dependencies import current_user_dependency, require_role, user_dependency
@@ -10,7 +12,7 @@ from app.schemas.user import (
     ActivityItem, AuditLogPage, MeResponse, PasswordResetResponse, TokenResponse, TourStateIn, UpdateUserRequest,
     UserDetailResponse, UserResponse, UserUpdateRequest,
 )
-from app.services import audit_service, permission_service, user_service
+from app.services import audit_service, permission_service, session_service, user_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -47,8 +49,12 @@ def reset_tours(db: db_dependency, user: current_user_dependency):
 
 
 @router.put('/me/password', response_model=TokenResponse, summary="🔑 تغییر رمز عبور خودم (نشست‌های دیگر بسته می‌شوند؛ توکن تازه برمی‌گردد)")
-def change_my_password(data: UpdateUserRequest, db: db_dependency, user: current_user_dependency):
+def change_my_password(data: UpdateUserRequest, db: db_dependency, user: current_user_dependency, request: Request,
+                       response: Response, refresh_token: Annotated[str | None, Cookie(alias=session_service.COOKIE_NAME)] = None):
+    remember = session_service.remembered(db, refresh_token)
     user = _call(user_service.change_own_password, db, user, data.old_password, data.new_password)
+    # نشست‌های قبلی (همه دستگاه‌ها) با token_version باطل شده‌اند؛ همین مرورگر نشست تازه می‌گیرد
+    session_service.set_cookie(request, response, session_service.start(db, user, remember))
     token = create_access_token(user.username, user.id, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES), user.token_version)
     return {"access_token": token, "token_type": "bearer"}
 

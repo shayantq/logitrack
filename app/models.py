@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import secrets
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, Boolean, Date, DateTime, Time, UniqueConstraint, CheckConstraint, Text, JSON, Index, and_
 from sqlalchemy.orm import relationship
-from app.database import Base
+from app.database import Base, Money
 from app.core.tenancy import TenantScoped
 from app.core.wms import AVAILABLE, FULFILLMENT_STATES, ORDER_STOCK_STATES, STOCK_STATUSES, WAREHOUSE_TYPES, sql_in
 
@@ -297,7 +297,7 @@ class Product(TenantScoped, Base):
     max_stock = Column(Integer, nullable=True)
     reorder_point = Column(Integer, nullable=True)
     # قیمت نهایی «امروز» (کش) — منبع اصلی تاریخچه product_prices است (مرحله ۱۳)
-    price = Column(Float, default=0.0, nullable=False)
+    price = Column(Money, default=0.0, nullable=False)
     # مشخصات تکمیلی کاتالوگ (مرحله ۱۳)
     updated_at = Column(DateTime, nullable=True)
     category = Column(String(100), nullable=True, index=True)
@@ -505,18 +505,18 @@ class Order(TenantScoped, Base):
     # جمع‌ها هنگام ثبت محاسبه و ذخیره می‌شوند (برای گزارش سریع)
     total_quantity = Column(Integer, nullable=False, default=0)
     total_weight_kg = Column(Float, nullable=False, default=0)
-    total_price = Column(Float, nullable=False, default=0)
+    total_price = Column(Money, nullable=False, default=0)
 
     # مرحله ۸: راننده‌ای که سفارش به او سپرده شد (مستقل از اینکه خودرو بعداً به چه کسی برسد)
     driver_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
-    delivery_fee = Column(Float, nullable=True)            # کرایه حمل (ریال)
+    delivery_fee = Column(Money, nullable=True)            # کرایه حمل (ریال)
     delivered_at = Column(DateTime, nullable=True, index=True)
     # تسویه در لحظه تحویل محاسبه و «منجمد» می‌شود؛ تغییر بعدی قوانین سفارش‌های گذشته را عوض نمی‌کند
     commission_level = Column(String(32), nullable=True)   # کد سطح راننده در لحظه تحویل
     day_trip_number = Column(Integer, nullable=True)        # چندمین سفر تحویل‌شده راننده در آن روز
     commission_percent = Column(Float, nullable=True)       # درصد مؤثر (سطح × پله روزانه)
-    commission_amount = Column(Float, nullable=True)        # سهم سازمان از کرایه
-    driver_earning = Column(Float, nullable=True)           # سهم راننده از کرایه
+    commission_amount = Column(Money, nullable=True)        # سهم سازمان از کرایه
+    driver_earning = Column(Money, nullable=True)           # سهم راننده از کرایه
     rating_token = Column(String(32), nullable=True, unique=True, index=True)   # لینک نظرسنجی مشتری
     # مسیر شهربه‌شهر (مرحله ۱۰): با شروع حرکت ثابت می‌شود تا تغییرات بعدی انبار/گراف، مسیر در حال اجرا را عوض نکند
     route = Column(JSON, nullable=True)
@@ -543,7 +543,7 @@ class OrderItem(TenantScoped, Base):
     product_name = Column(String(200), nullable=False)
     product_sku = Column(String(64), nullable=True)
     quantity = Column(Integer, nullable=False)
-    unit_price = Column(Float, nullable=False, default=0)
+    unit_price = Column(Money, nullable=False, default=0)
     unit_weight_kg = Column(Float, nullable=False, default=0)
 
     order = relationship("Order", back_populates="items")
@@ -721,8 +721,8 @@ class CommissionPlan(TenantScoped, Base):
     __table_args__ = (UniqueConstraint("organization_id", name="uq_commission_plans_org"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    base_fare = Column(Float, nullable=False, default=0)
-    fare_per_kg = Column(Float, nullable=False, default=0)
+    base_fare = Column(Money, nullable=False, default=0)
+    fare_per_kg = Column(Money, nullable=False, default=0)
     levels = Column(JSON, nullable=False)
     tiers = Column(JSON, nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -864,7 +864,7 @@ class Stocktake(TenantScoped, Base):
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(16), nullable=False, unique=True, index=True)           # ST-XXXXXX
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False, index=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="RESTRICT"), nullable=False, index=True)
     title = Column(String(200), nullable=True)
     scope = Column(String(16), nullable=False, default="full")
     status = Column(String(16), nullable=False, default="counting", index=True)
@@ -899,14 +899,14 @@ class StocktakeLine(TenantScoped, Base):
 
     id = Column(Integer, primary_key=True, index=True)
     stocktake_id = Column(Integer, ForeignKey("stocktakes.id", ondelete="CASCADE"), nullable=False, index=True)
-    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="RESTRICT"), nullable=False)
     # شمارش در سطح محل (by_location): هر کالا × محل یک سطر؛ محل خالی = موجودی «بدون محل» همان انبار
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     location_code = Column(String(32), nullable=True)
     inventory_id = Column(Integer, ForeignKey("inventories.id", ondelete="SET NULL"), nullable=True)
     product_name = Column(String(200), nullable=False)
     product_sku = Column(String(64), nullable=True)
-    unit_price = Column(Float, nullable=False, default=0)
+    unit_price = Column(Money, nullable=False, default=0)
     added_during_count = Column(Boolean, nullable=False, default=False)     # کالایی که در فهرست نبود و پیدا شد
     counted_qty = Column(Integer, nullable=True)
     expected_qty = Column(Integer, nullable=True)                           # برای شمارنده نمایش داده نمی‌شود
@@ -935,10 +935,10 @@ class ProductPrice(TenantScoped, Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
     effective_from = Column(Date, nullable=False)                 # روز محلی ایران
-    base_price = Column(Float, nullable=False)                    # قیمت پایه (ریال)
+    base_price = Column(Money, nullable=False)                    # قیمت پایه (ریال)
     subsidy_percent = Column(Float, nullable=False, default=0)
-    final_price = Column(Float, nullable=False)                   # قیمت فروش پس از یارانه
-    cost_price = Column(Float, nullable=True)                     # بهای تمام‌شده (اختیاری)
+    final_price = Column(Money, nullable=False)                   # قیمت فروش پس از یارانه
+    cost_price = Column(Money, nullable=True)                     # بهای تمام‌شده (اختیاری)
     note = Column(String(300), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -958,6 +958,29 @@ class PasswordReset(Base):
     expires_at = Column(DateTime, nullable=False)
     attempts = Column(Integer, nullable=False, default=0, server_default="0")
     used_at = Column(DateTime, nullable=True)
+
+
+class AuthSession(Base):
+    """
+    نشست ماندگار ورود (کوکی HttpOnly «تمدید»). خود توکن ذخیره نمی‌شود، فقط هش آن.
+    هر تمدید ردیف تازه‌ای در همان «خانواده» می‌سازد و ردیف قبلی جایگزین‌شده علامت می‌خورد؛
+    استفاده دوباره از توکن جایگزین‌شده یعنی سرقت ← کل خانواده باطل می‌شود.
+    """
+    __tablename__ = "auth_sessions"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    family = Column(String(32), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    remember = Column(Boolean, nullable=False, default=False, server_default="false")
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime, nullable=False)
+    last_used_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)              # سقف مطلق، با استفاده تمدید نمی‌شود
+    replaced_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    ip = Column(String(64), nullable=True)
+    user_agent = Column(String(255), nullable=True)
 
 
 class AuditLog(TenantScoped, Base):

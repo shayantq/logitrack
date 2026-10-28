@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import Numeric, create_engine
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from typing import Annotated
 from fastapi import Depends, Request
@@ -16,6 +16,9 @@ if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# مبلغ‌ها (ریال) در دیتابیس دقیق و بدون خطای اعشار شناور ذخیره می‌شوند؛ در پایتون همچنان عدد معمولی برمی‌گردند
+Money = Numeric(18, 2, asdecimal=False)
 
 def get_db(request: Request = None) -> Session:
     # درخواست‌های نسخه نمایشی خصوصی به دیتابیس جدای دمو می‌روند و فقط کارهای مجاز را دارند (app/core/demo.py)

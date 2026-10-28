@@ -66,6 +66,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // لینک «فراموشی رمز» فقط وقتی پیامک یا ایمیل خودکار فعال است
@@ -78,7 +79,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const user = await login(username.trim(), password);
+      const user = await login(username.trim(), password, remember);
       navigate(homePathFor(user), { replace: true });
     } catch (err) {
       setError(errorMessage(err));
@@ -109,6 +110,11 @@ export default function LoginPage() {
             <Link to="/app/forgot-password" state={{ identifier: username.trim() }} className="text-sm font-medium text-brand hover:underline" data-testid="forgot-password-link">رمز را فراموش کرده‌اید؟</Link>
           </div>
         )}
+        {/* ماندگاری ۳۰ روزه با کوکی امن؛ بدون آن، با بستن مرورگر خارج می‌شوید */}
+        <label className="-mt-1 flex cursor-pointer items-start gap-2.5 text-sm text-text-2">
+          <input type="checkbox" className="mt-0.5 size-4" checked={remember} onChange={e => setRemember(e.target.checked)} data-testid="login-remember" />
+          <span>مرا به خاطر بسپار<span className="mt-0.5 block text-xs text-muted">روی دستگاه شخصی؛ روی رایانه مشترک تیک نزنید.</span></span>
+        </label>
         {error && <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger" data-testid="login-error">{error}</div>}
         <Button type="submit" size="lg" className="w-full" loading={submitting}>ورود <ArrowLeft className="size-4" /></Button>
       </form>

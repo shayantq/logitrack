@@ -15,7 +15,7 @@ from app.core.wms import (
     BACKORDER_STATUSES, DISPOSITION_ACTIONS, PICK_LINE_STATUSES, PICK_LIST_STATUSES, PICK_STRATEGIES,
     SHIPMENT_STATUSES, STOCK_STATUSES, TRANSFER_STATUSES, sql_in,
 )
-from app.database import Base
+from app.database import Base, Money
 
 
 def _now():
@@ -43,7 +43,7 @@ class Backorder(TenantScoped, Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit_price = Column(Float, nullable=False, default=0)
+    unit_price = Column(Money, nullable=False, default=0)
     status = Column(String(16), nullable=False, default="open")
     priority = Column(Boolean, nullable=False, default=False)
     due_at = Column(DateTime, nullable=False)                 # تاریخ تحویل درخواستی سفارش اصلی
