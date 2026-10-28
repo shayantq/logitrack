@@ -5,7 +5,7 @@
  *   platform: تیکت‌های ارجاعی همه سازمان‌ها
  * فهرست و گفت‌وگو کنار هم (روی موبایل جدا)؛ هر ۱۵ ثانیه به‌روز می‌شود.
  */
-import { useMemo, useState, type FormEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Clock, Inbox, LifeBuoy, Lock, MessageSquarePlus, Package, Search, Share2, Truck, UserRound } from "lucide-react";
@@ -25,16 +25,42 @@ import { FileField } from "@/ui/file";
 type Mode = "org" | "driver" | "platform";
 type Tab = "waiting" | "open" | "resolved" | "all";
 
-const CONFIG: Record<Mode, { api: string; route: string; side: Side; title: string; subtitle: string; eyebrow: string }> = {
-  org: { api: "/tickets", route: "/app/tickets", side: "org", eyebrow: "ارتباط", title: "پشتیبانی و تیکت‌ها",
-    subtitle: "درخواست‌های مشتریان و رانندگان، و تیکت‌های سازمان به پشتیبانی پسینه" },
+const CONFIG: Record<Mode, { api: string; route: string; side: Side; title: string; subtitle?: string; eyebrow: string }> = {
+  // میزهای سازمان و پلتفرم زیرعنوان ندارند تا گفت‌وگو جای بیشتری بگیرد
+  org: { api: "/tickets", route: "/app/tickets", side: "org", eyebrow: "ارتباط", title: "پشتیبانی و تیکت‌ها" },
   driver: { api: "/tickets", route: "/app/driver/support", side: "requester", eyebrow: "راننده", title: "پشتیبانی",
     subtitle: "مشکل یا سؤالتان را برای سازمان بفرستید و پاسخ را همین‌جا ببینید" },
-  platform: { api: "/platform/tickets", route: "/app/platform/tickets", side: "platform", eyebrow: "پلتفرم", title: "تیکت‌های پشتیبانی",
-    subtitle: "تیکت‌هایی که سازمان‌ها باز کرده یا به پشتیبانی پسینه ارجاع داده‌اند" },
+  platform: { api: "/platform/tickets", route: "/app/platform/tickets", side: "platform", eyebrow: "پلتفرم", title: "تیکت‌های پشتیبانی" },
 };
 
 const SOURCE_ICON = { customer: UserRound, driver: Truck, org: Building2 } as const;
+
+/** فهرست و گفت‌وگو تا پایین صفحه کشیده می‌شوند و فقط خودشان اسکرول می‌خورند، نه کل صفحه. */
+function useFillViewport<T extends HTMLElement>(min = 420) {
+  const ref = useRef<T>(null);
+  const [style, setStyle] = useState<{ height: number; marginBottom: number }>();
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = ref.current;
+      if (!el) return;
+      let top = 0;
+      for (let n: HTMLElement | null = el; n; n = n.offsetParent as HTMLElement | null) top += n.offsetTop;
+      const main = el.closest("main");
+      // فاصله پایین کمتر از بقیه صفحه‌ها تا گفت‌وگو جای بیشتری داشته باشد
+      const padding = main ? parseFloat(getComputedStyle(main).paddingBottom) : 0;
+      const bottom = Math.min(16, padding);
+      setStyle({ height: Math.max(min, Math.floor(window.innerHeight - top - bottom)), marginBottom: bottom - padding });
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(document.body);
+    // مخفی شدن سربرگ صفحه روی موبایل (با باز شدن تیکت) جای فهرست را جابه‌جا می‌کند
+    if (ref.current?.parentElement) observer.observe(ref.current.parentElement);
+    window.addEventListener("resize", fit);
+    return () => { observer.disconnect(); window.removeEventListener("resize", fit); };
+  }, [min]);
+  return [ref, style] as const;
+}
 
 export function TicketsWorkspace({ mode }: { mode: Mode }) {
   const cfg = CONFIG[mode];
@@ -45,6 +71,7 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
   const [source, setSource] = useState<string>("");
   const [q, setQ] = useState("");
   const [newOpen, setNewOpen] = useState(false);
+  const [frame, frameStyle] = useFillViewport<HTMLDivElement>();
 
   const params = { waiting: tab === "waiting" || undefined, status: tab === "open" || tab === "resolved" ? tab : undefined,
     source: source || undefined, q: q.trim() || undefined } as const;
@@ -59,15 +86,18 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
 
   return (
     <>
+      {/* روی موبایل گفت‌وگوی باز تمام صفحه است؛ دکمه بازگشت داخل خود تیکت است */}
+      <div className={cn(selected != null && "hidden lg:block")}>
       <PageHeader eyebrow={cfg.eyebrow} title={cfg.title} subtitle={cfg.subtitle}
         actions={mode !== "platform" && (
           <Button icon={<MessageSquarePlus className="size-4" />} onClick={() => setNewOpen(true)} data-testid="ticket-new">
             {mode === "org" ? "تیکت به پشتیبانی پسینه" : "تیکت جدید"}
           </Button>
         )} />
+      </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        <Card className={cn("flex max-h-[78vh] flex-col overflow-hidden", selected != null && "hidden lg:flex")}>
+      <div ref={frame} style={frameStyle} className="grid gap-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+        <Card className={cn("flex min-h-0 flex-col overflow-hidden", selected != null && "hidden lg:flex")}>
           <div className="space-y-2.5 border-b border-border p-3">
             <SegmentedControl value={tab} onChange={setTab} options={[
               ...(mode === "driver" ? [] : [{ value: "waiting" as Tab, label: "منتظر من" }]),
@@ -98,9 +128,9 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
           </div>
         </Card>
 
-        <div className={cn(selected == null && "hidden lg:block")}>
+        <div className={cn("min-h-0", selected == null && "hidden lg:block")}>
           {selected ? <TicketPanel key={selected} id={selected} mode={mode} />
-            : <Card className="grid h-full min-h-80 place-items-center p-10 text-center">
+            : <Card className="grid h-full place-items-center p-10 text-center">
                 <div><LifeBuoy className="mx-auto size-10 text-muted" /><p className="mt-3 text-sm text-muted">یک تیکت را از فهرست انتخاب کنید.</p></div>
               </Card>}
         </div>
@@ -143,6 +173,7 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
   const queryClient = useQueryClient();
   const me = useMe();
   const [orderOpen, setOrderOpen] = useState(false);
+  const [reasonOpen, setReasonOpen] = useState(false);
   const detail = useQuery({
     queryKey: ["ticket", mode, id],
     queryFn: () => mode === "platform"
@@ -168,7 +199,7 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
     onError: e => toast.error(errorMessage(e)),
   });
 
-  if (detail.isLoading) return <Card className="p-6"><Skeleton className="h-96" /></Card>;
+  if (detail.isLoading) return <Card className="h-full p-6"><Skeleton className="h-full" /></Card>;
   if (detail.error || !detail.data) return <ErrorState error={detail.error} onRetry={detail.refetch} />;
   const t = detail.data;
   const waiting = waitingLabel(t, cfg.side);
@@ -177,53 +208,17 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
     : mode === "platform" && t.source !== "org" ? "پایان بررسی و برگشت به سازمان" : t.source === "org" && mode === "org" ? "مشکل حل شد" : "حل‌شده";
 
   return (
-    <Card className="flex max-h-[78vh] min-h-[60vh] flex-col overflow-hidden animate-fade" data-testid="ticket-detail" data-status={t.status}>
-      <div className="border-b border-border p-4 sm:p-5">
-        <div className="flex items-start gap-3">
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden animate-fade" data-testid="ticket-detail" data-status={t.status}>
+      <div className="border-b border-border px-4 py-3 sm:px-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Link to={cfg.route} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 lg:hidden" aria-label="بازگشت"><ArrowRight className="size-4" /></Link>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold leading-8">{t.subject}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
-              <span className="font-mono ltr">{t.code}</span>
-              <Badge tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Badge>
-              {t.priority !== "normal" && <Badge tone={TICKET_PRIORITY[t.priority].tone}>اولویت {TICKET_PRIORITY[t.priority].label}</Badge>}
-              <Badge tone="muted">{t.category_label}</Badge>
-              <Badge tone="muted">از طرف {TICKET_SOURCE[t.source]}</Badge>
-              {waiting && <Badge tone={waiting.mine ? "brand" : "muted"} dot={waiting.mine}>{waiting.label}</Badge>}
-            </div>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <h2 className="min-w-0 truncate text-base font-bold leading-8" title={t.subject}>{t.subject}</h2>
+            <Badge tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Badge>
+            {waiting && <Badge tone={waiting.mine ? "brand" : "muted"} dot={waiting.mine}>{waiting.label}</Badge>}
           </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-text-2">
-          {mode === "platform" && t.organization_name && <span className="inline-flex items-center gap-1"><Building2 className="size-3.5" />{t.organization_name}</span>}
-          {t.requester_name && cfg.side !== "requester" && <span className="inline-flex items-center gap-1"><UserRound className="size-3.5" />{t.requester_name}
-            {t.requester_mobile && <a href={`tel:${t.requester_mobile}`} className="font-mono text-brand ltr">{t.requester_mobile}</a>}</span>}
-          {t.order_tracking_code && (mode === "org"
-            ? <button type="button" onClick={() => setOrderOpen(true)} className="inline-flex items-center gap-1 font-medium text-brand hover:underline" data-testid="ticket-order">
-                <Package className="size-3.5" />سفارش <span className="font-mono ltr">{t.order_tracking_code}</span></button>
-            : <span className="inline-flex items-center gap-1"><Package className="size-3.5" />سفارش <span className="font-mono ltr">{t.order_tracking_code}</span></span>)}
-          <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{faShortDateTime(t.created_at)}</span>
-        </div>
-        {t.escalation_reason && (
-          <p className="mt-3 flex items-start gap-2 rounded-xl bg-violet-soft/50 px-3 py-2 text-xs text-text-2"><Share2 className="mt-0.5 size-3.5 shrink-0 text-violet" />
-            ارجاع به پشتیبانی پسینه: {t.escalation_reason}</p>
-        )}
-        {(t.can_escalate || t.can_resolve || t.can_close || t.can_manage) && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {t.can_manage && <>
-              <Select value={t.priority} onChange={e => action.mutate(() => unwrap(api.PATCH("/tickets/{ticket_id}", { ...path, body: { priority: e.target.value as "normal", unassign: false } })))}
-                className="h-8 w-28 text-xs" aria-label="اولویت" data-testid="ticket-priority">
-                {Object.entries(TICKET_PRIORITY).map(([k, v]) => <option key={k} value={k}>اولویت {v.label}</option>)}
-              </Select>
-              {me.role === "org_admin" && (
-                <Select value={t.assignee_id ?? ""} className="h-8 w-40 text-xs" aria-label="مسئول" data-testid="ticket-assignee"
-                  onChange={e => action.mutate(() => unwrap(api.PATCH("/tickets/{ticket_id}", { ...path, body: e.target.value ? { assignee_id: Number(e.target.value), unassign: false } : { unassign: true } })))}>
-                  <option value="">بدون مسئول</option>
-                  {(staff.data ?? []).filter(u => u.role === "org_admin" || u.role === "warehouse_manager")
-                    .map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
-                </Select>
-              )}
-            </>}
-            <div className="ms-auto flex flex-wrap gap-2">
+          {(t.can_escalate || t.can_resolve || t.can_close) && (
+            <div className="flex flex-wrap items-center gap-1.5">
               {t.can_escalate && <Button size="sm" variant="secondary" icon={<Share2 className="size-3.5" />} data-testid="ticket-escalate"
                 onClick={() => promptDialog({ title: "ارجاع به پشتیبانی پسینه", label: "چه کمکی از پشتیبانی پسینه لازم دارید؟", minLength: 5, maxLength: 1000,
                   multiline: true, confirmLabel: "ارجاع", text: "پشتیبانی پسینه گفت‌وگو را می‌بیند (به‌جز یادداشت‌های داخلی) و با شما — نه مستقیم با مشتری — صحبت می‌کند." })
@@ -237,10 +232,47 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
                   .then(ok => ok && action.mutate(() => mode === "platform"
                     ? unwrap(api.POST("/platform/tickets/{ticket_id}/close", path)) : unwrap(api.POST("/tickets/{ticket_id}/close", path))))}>بستن</Button>}
             </div>
-          </div>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-text-2">
+          <span className="font-mono text-muted ltr">{t.code}</span>
+          {t.priority !== "normal" && !t.can_manage && <Badge tone={TICKET_PRIORITY[t.priority].tone}>اولویت {TICKET_PRIORITY[t.priority].label}</Badge>}
+          <span className="text-muted">{t.category_label}</span>
+          <span className="text-muted">از طرف {TICKET_SOURCE[t.source]}</span>
+          {mode === "platform" && t.organization_name && <span className="inline-flex items-center gap-1"><Building2 className="size-3.5" />{t.organization_name}</span>}
+          {t.requester_name && cfg.side !== "requester" && <span className="inline-flex items-center gap-1"><UserRound className="size-3.5" />{t.requester_name}
+            {t.requester_mobile && <a href={`tel:${t.requester_mobile}`} className="font-mono text-brand ltr">{t.requester_mobile}</a>}</span>}
+          {t.order_tracking_code && (mode === "org"
+            ? <button type="button" onClick={() => setOrderOpen(true)} className="inline-flex items-center gap-1 font-medium text-brand hover:underline" data-testid="ticket-order">
+                <Package className="size-3.5" />سفارش <span className="font-mono ltr">{t.order_tracking_code}</span></button>
+            : <span className="inline-flex items-center gap-1"><Package className="size-3.5" />سفارش <span className="font-mono ltr">{t.order_tracking_code}</span></span>)}
+          <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{faShortDateTime(t.created_at)}</span>
+          {t.can_manage && (
+            <div className="ms-auto flex items-center gap-1.5">
+              <Select value={t.priority} onChange={e => action.mutate(() => unwrap(api.PATCH("/tickets/{ticket_id}", { ...path, body: { priority: e.target.value as "normal", unassign: false } })))}
+                className="h-8 w-24 text-xs" aria-label="اولویت" data-testid="ticket-priority">
+                {Object.entries(TICKET_PRIORITY).map(([k, v]) => <option key={k} value={k}>اولویت {v.label}</option>)}
+              </Select>
+              {me.role === "org_admin" && (
+                <Select value={t.assignee_id ?? ""} className="h-8 w-32 text-xs" aria-label="مسئول" data-testid="ticket-assignee"
+                  onChange={e => action.mutate(() => unwrap(api.PATCH("/tickets/{ticket_id}", { ...path, body: e.target.value ? { assignee_id: Number(e.target.value), unassign: false } : { unassign: true } })))}>
+                  <option value="">بدون مسئول</option>
+                  {(staff.data ?? []).filter(u => u.role === "org_admin" || u.role === "warehouse_manager")
+                    .map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
+                </Select>
+              )}
+            </div>
+          )}
+        </div>
+        {t.escalation_reason && (
+          <button type="button" onClick={() => setReasonOpen(v => !v)} title={t.escalation_reason}
+            className="mt-2 flex w-full items-start gap-2 rounded-lg bg-violet-soft/50 px-3 py-1.5 text-start text-xs text-text-2">
+            <Share2 className="mt-0.5 size-3.5 shrink-0 text-violet" />
+            <span className={cn("min-w-0", !reasonOpen && "truncate")}>ارجاع به پشتیبانی پسینه: {t.escalation_reason}</span>
+          </button>
         )}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5">
+      <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-1 sm:px-4 sm:pb-4">
         <TicketThread ticket={t} attachmentUrl={mid => `${cfg.api}/${id}/messages/${mid}/attachment`}
           onSend={(body, visibility, file) => send.mutateAsync({ body, visibility, file })} sending={send.isPending} />
       </div>

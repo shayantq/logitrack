@@ -19,6 +19,9 @@ import { Button, cn } from "@/ui/primitives";
 // فقط برای نسخه نمایشی خصوصی بارگذاری می‌شود
 const DemoChrome = lazy(() => import("@/components/demo/DemoChrome"));
 
+// فهرست و گفت‌وگوی تیکت یک صفحه‌اند؛ باز کردن یک تیکت نباید کل صفحه (و فیلترهایش) را از نو بسازد
+const pageKey = (path: string) => path.replace(/^(\/app\/(?:platform\/tickets|tickets|driver\/support))\/\d+$/, "$1");
+
 function useOrgLogo(enabled: boolean) {
   const { data: profile } = useQuery({
     queryKey: ["organization-profile"], queryFn: () => unwrap(api.GET("/organization/profile")), enabled, staleTime: 60_000,
@@ -150,7 +153,7 @@ function Shell() {
           <PasswordChangeForm onDone={() => setPasswordOpen(false)} />
         </Modal>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div key={location.pathname} className="stagger"><Outlet /></div>
+          <div key={pageKey(location.pathname)} className="stagger"><Outlet /></div>
         </main>
       </div>
     </div>

@@ -2,7 +2,7 @@
  * گفت‌وگوی تیکت (مثل پیام‌رسان): پیام‌های من یک طرف، طرف مقابل طرف دیگر، رویدادهای سیستم وسط.
  * پیام بین سازمان و پشتیبانی و یادداشت داخلی با برچسب و رنگ جدا نشان داده می‌شوند تا اشتباهی به مشتری نرسد.
  */
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { EyeOff, ImagePlus, Lock, Send, ShieldCheck, X } from "lucide-react";
 import { authFetch } from "@/api/client";
@@ -51,12 +51,21 @@ export function TicketThread({ ticket, attachmentUrl, auth = true, onSend, sendi
   sending?: boolean;
 }) {
   const side = ticket.viewer_side as Side;
+  const box = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, [ticket.messages.length]);
+  const seen = useRef(0);
+  // با باز شدن تیکت بی‌درنگ و با پیام تازه نرم به آخرین پیام؛ وقتی رشته قاب خودش را ندارد (صفحه عمومی) خود صفحه اسکرول می‌خورد
+  useEffect(() => {
+    const el = box.current;
+    const behavior = seen.current ? "smooth" : "auto";
+    if (el && el.scrollHeight > el.clientHeight) el.scrollTo({ top: el.scrollHeight, behavior });
+    else end.current?.scrollIntoView({ block: "nearest", behavior });
+    seen.current = ticket.messages.length;
+  }, [ticket.messages.length]);
 
   return (
-    <div className="flex min-h-0 flex-col">
-      <div className="flex-1 space-y-3 overflow-y-auto px-1 py-2" data-testid="ticket-thread">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={box} className="flex-1 space-y-3 overflow-y-auto px-1 py-3" data-testid="ticket-thread">
         {ticket.messages.map(m => <Bubble key={m.id} m={m} side={side} attachment={m.has_attachment ? attachmentUrl(m.id) : null} auth={auth} />)}
         <div ref={end} />
       </div>
@@ -83,7 +92,7 @@ function Bubble({ m, side, attachment, auth }: { m: Message; side: Side; attachm
   const who = m.author_side === "platform" ? `${m.author_name ?? ""} · ${SIDE_NAME.platform}` : m.author_name || SIDE_NAME[m.author_side] || "";
   return (
     <div className={cn("flex", mine ? "justify-start" : "justify-end")} data-testid="ticket-message" data-side={m.author_side} data-visibility={m.visibility}>
-      <div className={cn("max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[75%]",
+      <div className={cn("max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm sm:max-w-[min(72%,65ch)]",
         note ? "border-2 border-dashed border-warning/50 bg-warning-soft/40" :
           staff ? "border border-violet/30 bg-violet-soft/50" :
             mine ? "rounded-ss-md bg-brand text-brand-ink" : "rounded-se-md border border-border bg-surface")}>
@@ -109,6 +118,14 @@ function Composer({ options, onSend, sending, reopen }: {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  // از یک خط شروع می‌شود و با نوشتن تا حدود شش خط بلند می‌شود؛ بعد از آن خودش اسکرول می‌خورد
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+  }, [body]);
   useEffect(() => { if (!options.some(o => o.visibility === visibility)) setVisibility(options[0].visibility); }, [options, visibility]);
   useEffect(() => {
     if (!file) { setPreview(null); return; }
@@ -137,41 +154,43 @@ function Composer({ options, onSend, sending, reopen }: {
   const staff = visibility === "staff";
 
   return (
-    <form onSubmit={submit} className={cn("mt-3 rounded-2xl border p-3 transition",
+    <form onSubmit={submit} className={cn("mt-2 rounded-2xl border p-2 transition focus-within:border-brand/60",
       note ? "border-dashed border-warning/60 bg-warning-soft/30" : staff ? "border-violet/40 bg-violet-soft/30" : "border-border bg-surface")} data-testid="ticket-composer">
-      {options.length > 1 && (
-        <div className="mb-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="نوع پیام">
-          {options.map(o => (
-            <button key={o.visibility} type="button" role="radio" aria-checked={visibility === o.visibility} data-visibility={o.visibility}
-              onClick={() => setVisibility(o.visibility)}
-              className={cn("rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                visibility === o.visibility ? (o.visibility === "side" ? "bg-warning text-white" : o.visibility === "staff" ? "bg-violet text-white" : "bg-brand text-brand-ink")
-                  : "bg-surface-2 text-text-2 hover:text-text")}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {note && <p className="mb-2 flex items-center gap-1.5 text-xs text-warning"><EyeOff className="size-3.5" />فقط همکاران شما این یادداشت را می‌بینند.</p>}
-      {staff && <p className="mb-2 flex items-center gap-1.5 text-xs text-violet"><ShieldCheck className="size-3.5" />مشتری این پیام را نمی‌بیند.</p>}
-      {reopen && !note && <p className="mb-2 text-xs text-muted">با ارسال پیام، تیکت دوباره باز می‌شود.</p>}
-      <Textarea rows={3} value={body} onChange={e => setBody(e.target.value)} maxLength={5000} data-testid="ticket-body"
-        placeholder={note ? "یادداشت داخلی..." : "پیام خود را بنویسید..."} className="resize-none border-0 bg-transparent px-1 focus:ring-0"
+      {note && <p className="mb-1 flex items-center gap-1.5 px-2 pt-1 text-xs text-warning"><EyeOff className="size-3.5" />فقط همکاران شما این یادداشت را می‌بینند.</p>}
+      {staff && <p className="mb-1 flex items-center gap-1.5 px-2 pt-1 text-xs text-violet"><ShieldCheck className="size-3.5" />مشتری این پیام را نمی‌بیند.</p>}
+      {reopen && !note && <p className="mb-1 px-2 pt-1 text-xs text-muted">با ارسال پیام، تیکت دوباره باز می‌شود.</p>}
+      <Textarea ref={field} rows={1} value={body} onChange={e => setBody(e.target.value)} maxLength={5000} data-testid="ticket-body"
+        placeholder={note ? "یادداشت داخلی..." : "پیام خود را بنویسید..."} className="max-h-40 min-h-11 resize-none border-0 bg-transparent px-2 focus:ring-0"
         onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) submit(); }} />
       {preview && (
-        <div className="relative mt-2 inline-block">
+        <div className="relative mx-2 mt-1 inline-block">
           <img src={preview} alt="" className="h-20 rounded-lg border border-border object-cover" />
           <button type="button" onClick={() => setFile(null)} aria-label="حذف تصویر"
             className="absolute -left-2 -top-2 grid size-6 place-items-center rounded-full bg-text text-bg shadow"><X className="size-3.5" /></button>
         </div>
       )}
-      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
-      <div className="mt-2 flex items-center justify-between gap-2">
+      {error && <p className="mt-1 px-2 text-xs text-danger">{error}</p>}
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {options.length > 1 && (
+          <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="نوع پیام">
+            {options.map(o => (
+              <button key={o.visibility} type="button" role="radio" aria-checked={visibility === o.visibility} data-visibility={o.visibility}
+                onClick={() => setVisibility(o.visibility)}
+                className={cn("rounded-lg px-2.5 py-1.5 text-xs font-medium transition",
+                  visibility === o.visibility ? (o.visibility === "side" ? "bg-warning text-white" : o.visibility === "staff" ? "bg-violet text-white" : "bg-brand text-brand-ink")
+                    : "bg-surface-2 text-text-2 hover:text-text")}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" data-testid="ticket-file"
           onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ""; }} />
-        <Button type="button" variant="ghost" size="sm" icon={<ImagePlus className="size-4" />} onClick={() => input.current?.click()}>تصویر</Button>
-        <Button type="submit" size="sm" loading={sending} disabled={!body.trim() && !file} icon={<Send className="size-4" />} data-testid="ticket-send"
-          variant={note ? "secondary" : "primary"}>{note ? "ثبت یادداشت" : "ارسال"}</Button>
+        <div className="ms-auto flex items-center gap-1.5">
+          <Button type="button" variant="ghost" size="sm" icon={<ImagePlus className="size-4" />} onClick={() => input.current?.click()}>تصویر</Button>
+          <Button type="submit" size="sm" loading={sending} disabled={!body.trim() && !file} icon={<Send className="size-4" />} data-testid="ticket-send"
+            variant={note ? "secondary" : "primary"}>{note ? "ثبت یادداشت" : "ارسال"}</Button>
+        </div>
       </div>
     </form>
   );
