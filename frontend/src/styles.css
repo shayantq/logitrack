@@ -6,7 +6,7 @@
 /* ------------------------------------------------------------------
    هویت بصری: پالت آبی
    روشن: #F7FBFC · #D6E6F2 · #B9D7EA · #769FCD
-   تاریک (سرمه‌ای به‌جای سیاه خشن): #091540 · #1B2CC1 · #7692FF · #ABD2FA
+   تاریک: زمینه‌های سرمه‌ای کم‌اشباع (#0B1120 · #111A2E · #18233B) با #7692FF · #ABD2FA برای تأکید
    رنگ‌های پالت مستقیم یا با تیره/روشن‌سازی جزئی استفاده شده‌اند تا متن و دکمه‌ها
    کنتراست استاندارد WCAG AA (≥ ۴٫۵ برای متن) داشته باشند؛ مثلاً #769FCD روی سفید
    برای متن کم‌رنگ است، پس رنگ اصلی دکمه و متن نسخه تیره‌ترش (#4672AD) است و
@@ -14,15 +14,15 @@
 ------------------------------------------------------------------ */
 :root {
   color-scheme: light;
-  --bg: #f7fbfc;             /* پالت */
-  --bg-2: #ecf3f9;           /* بین #F7FBFC و #D6E6F2 */
+  --bg: #f3f6fa;             /* کمی خاکستری‌تر از کارت سفید تا کارت‌ها جدا دیده شوند */
+  --bg-2: #e9eff6;
   --surface: #ffffff;
   --surface-2: #f1f7fb;
   --border: #d6e6f2;         /* پالت */
-  --border-strong: #b9d7ea;  /* پالت */
+  --border-strong: #7790ab;  /* حاشیه فیلدها: کنتراست ≥ ۳ با زمینه‌ها (WCAG) */
   --text: #102a43;           /* جوهر سرمه‌ای به‌جای سیاه خالص */
   --text-2: #3e5871;
-  --muted: #5e7690;
+  --muted: #566e87;
   --brand: #4672ad;          /* #769FCD تیره‌شده برای کنتراست AA با سفید */
   --brand-strong: #355c93;
   --brand-soft: #e4eef8;
@@ -54,39 +54,39 @@
 
 [data-theme=dark] {
   color-scheme: dark;
-  --bg: #091540;             /* پالت — سرمه‌ای عمیق به‌جای مشکی */
-  --bg-2: #0c1a4b;
-  --surface: #0f1f52;
-  --surface-2: #14275f;
-  --border: #1e3170;
-  --border-strong: #2b4290;
-  --text: #eaf2fd;
-  --text-2: #bcd2ee;
-  --muted: #8ea3cc;
+  --bg: #0b1120;             /* سرمه‌ای کم‌اشباع؛ آبیِ پالت فقط برای تأکید */
+  --bg-2: #0e1627;
+  --surface: #111a2e;
+  --surface-2: #18233b;
+  --border: #22304d;
+  --border-strong: #5a6d94;
+  --text: #e8eef8;
+  --text-2: #b8c4d9;
+  --muted: #8d9cb8;
   --brand: #7692ff;          /* پالت */
   --brand-strong: #9db1ff;
-  --brand-soft: #111f7a;     /* #1B2CC1 ترکیب‌شده با پس‌زمینه */
-  --brand-ink: #08123a;
+  --brand-soft: #253258;     /* رنگ‌های soft: هر رنگ ترکیب‌شده با سطح کارت */
+  --brand-ink: #0b1120;
   --accent: #abd2fa;         /* پالت */
-  --accent-soft: #142d63;
-  --accent-ink: #08123a;
+  --accent-soft: #27344b;
+  --accent-ink: #0b1120;
   --mark-dot: #eaf2fd;
   --success: #43d08e;
-  --success-soft: #0c2e35;
+  --success-soft: #18323a;
   --warning: #f2b851;
-  --warning-soft: #2a2738;
+  --warning-soft: #2e2f33;
   --danger: #f2737a;
-  --danger-soft: #321a3d;
+  --danger-soft: #302639;
   --info: #5fd3e6;
-  --info-soft: #0d2c4a;
+  --info-soft: #1b3246;
   --violet: #b49cff;
-  --violet-soft: #221d5c;
+  --violet-soft: #2d3052;
   --orange: #ff9a5c;
   --chart-1: #6a86f2;
   --chart-2: #d9773a;
-  --orange-soft: #3a2230;
+  --orange-soft: #322c34;
   --pink: #f27bb0;
-  --pink-soft: #3a1d45;
+  --pink-soft: #332942;
   --shadow: 0 1px 2px rgb(2 6 23 / 0.35), 0 8px 24px -12px rgb(2 6 23 / 0.6);
   --shadow-lg: 0 24px 60px -24px rgb(2 6 23 / 0.85);
 }
@@ -270,6 +270,9 @@ input[type=checkbox]:not(.sr-only):focus-visible { outline: none; box-shadow: 0 
 
 /* نوار اسکرول باریک و هم‌رنگ */
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+/* منوی کناری: نوار اسکرول فقط وقتی نشانگر روی منوست */
+.side-scroll { scrollbar-color: transparent transparent; }
+.side-scroll:hover { scrollbar-color: var(--border) transparent; }
 
 /* انتخاب متن */
 ::selection { background: color-mix(in oklab, var(--brand) 28%, transparent); }

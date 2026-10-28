@@ -8,7 +8,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeftRight, BarChart3, BookOpen, Building, Building2, CalendarClock, CalendarDays, ChevronDown, ClipboardCheck, ClipboardList,
-  Factory, FileBarChart, FileStack, FlaskConical, Gauge, GitBranch, Handshake, Hourglass, IdCard, Inbox, KeyRound, LayoutDashboard,
+  Factory, FileBarChart, FileStack, FlaskConical, Gauge, GitBranch, Handshake, Hourglass, IdCard, Inbox, KeyRound,
   LifeBuoy, ListChecks, Mail, Map as MapIcon, MapPinned, Package, PackageCheck, PackageOpen, Percent, PiggyBank, Recycle, Repeat,
   Rocket, Route, ScanLine, Send, ShieldCheck, ShoppingCart, Tags, Trophy, Truck, UserRound, Users, Wallet, Warehouse, Gem, History,
   type LucideIcon,
@@ -29,15 +29,15 @@ export type NavItem = {
 };
 
 export type GroupId = "overview" | "operations" | "master" | "logistics" | "reports" | "system" | "driver" | "platform";
-export const GROUPS: { id: GroupId; label: string; tone: Tone; icon: LucideIcon }[] = [
-  { id: "overview", label: "داشبورد و نمای کلی", tone: "brand", icon: LayoutDashboard },
-  { id: "operations", label: "عملیات انبار", tone: "info", icon: Warehouse },
-  { id: "master", label: "اطلاعات پایه", tone: "accent", icon: Factory },
-  { id: "logistics", label: "لجستیک و ارسال", tone: "orange", icon: Truck },
-  { id: "reports", label: "گزارش و تحلیل", tone: "violet", icon: FileBarChart },
-  { id: "system", label: "سیستم و مدیریت", tone: "pink", icon: ShieldCheck },
-  { id: "driver", label: "راننده", tone: "brand", icon: Route },
-  { id: "platform", label: "پلتفرم", tone: "violet", icon: Building },
+export const GROUPS: { id: GroupId; label: string; tone: Tone }[] = [
+  { id: "overview", label: "داشبورد و نمای کلی", tone: "brand" },
+  { id: "operations", label: "عملیات انبار", tone: "info" },
+  { id: "master", label: "اطلاعات پایه", tone: "accent" },
+  { id: "logistics", label: "لجستیک و ارسال", tone: "orange" },
+  { id: "reports", label: "گزارش و تحلیل", tone: "violet" },
+  { id: "system", label: "سیستم و مدیریت", tone: "pink" },
+  { id: "driver", label: "راننده", tone: "brand" },
+  { id: "platform", label: "پلتفرم", tone: "violet" },
 ];
 
 const STAFF: Role[] = ["org_admin", "warehouse_manager"];
@@ -178,55 +178,58 @@ export function NavLinks({ items, collapsed, onNavigate }: { items: NavItem[]; c
   const current = activeItem(items, pathname);
   const groups = GROUPS.filter(g => items.some(i => i.group === g.id));
   return (
-    <nav className="flex flex-col gap-1.5" data-testid="app-nav">
-      {groups.map(group => {
+    <nav className="flex flex-col" data-testid="app-nav">
+      {groups.map((group, index) => {
         const groupItems = items.filter(i => i.group === group.id);
         const containsActive = current?.group === group.id;
         const open = collapsed || containsActive || !closed.includes(group.id);
         const total = groupItems.reduce((s, i) => s + badges.count(i.badge), 0);
-        const GroupIcon = group.icon;
         return (
-          // هر گروه رنگ خودش را دارد — آیکن‌ها، خط کنار گروه و حالت فعال با همین رنگ
+          // آیکن‌ها تک‌رنگ‌اند؛ رنگ هر گروه فقط در نقطه کوچک کنار عنوانش می‌ماند
           <div key={group.id} data-tour={`nav-${group.id}`} data-group={group.id} data-open={open}
-            style={{ "--g": toneColor(group.tone), "--g-soft": `var(--${group.tone}-soft)` } as React.CSSProperties}>
-            {collapsed ? <div className="mx-auto my-1.5 h-px w-8 bg-border" /> : (
+            className={cn(index > 0 && "mt-2 border-t border-border/70 pt-2")}>
+            {!collapsed && (
               <button type="button" onClick={() => !containsActive && toggle(group.id)} aria-expanded={open}
                 data-testid={`nav-group-${group.id}`}
-                className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold text-muted transition hover:bg-surface-2 hover:text-text",
-                  containsActive && "text-text")}>
-                <span className="grid size-6 place-items-center rounded-md bg-[var(--g-soft)] text-[var(--g)]"><GroupIcon className="size-3.5" /></span>
+                className={cn("group/head flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-muted transition-colors duration-200 hover:text-text",
+                  containsActive && "text-text-2")}>
+                <span className="size-1.5 shrink-0 rounded-full" style={{ background: toneColor(group.tone) }} />
                 <span className="truncate">{group.label}</span>
-                {!open && total > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-warning px-1.5 text-[10px] font-bold text-white">
-                  {total.toLocaleString("fa-IR")}</span>}
-                <ChevronDown className={cn("ms-auto size-3.5 shrink-0 transition-transform duration-300", !open && "rotate-90")} />
+                {!open && total > 0 && <span className="ms-auto tabular-nums">{total.toLocaleString("fa-IR")}</span>}
+                <ChevronDown className={cn("size-3.5 shrink-0 transition duration-300", !(!open && total > 0) && "ms-auto",
+                  open ? "opacity-0 group-hover/head:opacity-100" : "rotate-90")} />
               </button>
             )}
             <div className={cn("grid transition-[grid-template-rows,opacity] duration-300 ease-out", open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0")}>
-              <div className={cn("flex flex-col gap-0.5 overflow-hidden", !collapsed && "ms-3 border-s border-border/70 ps-2")}>
+              <div className={cn("flex flex-col gap-0.5 overflow-hidden", !collapsed && "pt-0.5")}>
                 {groupItems.map(({ to, label, icon: Icon, end, badge }) => {
                   const count = badges.count(badge);
                   const urgent = badge === "pending-requests" && badges.urgent;
                   const link = (
                     <NavLink key={to} to={to} end={end} onClick={onNavigate} tabIndex={open ? undefined : -1}
-                      className={({ isActive }) => cn("group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-200 lg:min-h-10",
-                        collapsed && "justify-center px-0",
-                        isActive ? "bg-[var(--g-soft)] font-semibold text-text before:absolute before:inset-y-2 before:right-0 before:w-1 before:rounded-full before:bg-[var(--g)]"
-                          : "text-text-2 hover:bg-surface-2 hover:text-text")}>
-                      <span className="relative">
-                        <Icon className="size-[18px] shrink-0 text-[var(--g)] transition-transform duration-200 group-hover:scale-110" />
-                        {collapsed && count > 0 && <span className="absolute -left-1.5 -top-1.5 size-2.5 rounded-full bg-warning" />}
-                      </span>
-                      {!collapsed && <span className="truncate">{label}</span>}
-                      {!collapsed && count > 0 && (
-                        <span className={cn("ms-auto grid min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold text-white",
-                          urgent ? "animate-pulse bg-danger" : badge === "tickets" || badge === "platform-tickets" ? "bg-brand" : "bg-warning")}
-                          data-testid={BADGE_TESTID[badge!]}>
-                          {count.toLocaleString("fa-IR")}
+                      className={({ isActive }) => cn("group relative flex h-11 shrink-0 items-center gap-3 rounded-xl border px-3 text-sm transition-[background-color,border-color,color,box-shadow] duration-200 lg:h-10",
+                        // جمع‌شده فقط باریک می‌شود و وسط‌چین نمی‌شود تا آیکن در انیمیشن عرض جابه‌جا نشود
+                        collapsed && "w-11",
+                        // آیتم فعال کارتی برجسته روی زمینه منوست
+                        isActive ? "border-border bg-surface font-semibold text-text shadow-sm dark:bg-surface-2"
+                          : "border-transparent font-medium text-text-2 hover:bg-surface/70 hover:text-text dark:hover:bg-surface-2/60")}>
+                      {({ isActive }) => <>
+                        <span className="relative">
+                          <Icon className={cn("size-[18px] shrink-0 transition-colors duration-200", isActive ? "text-brand" : "text-muted group-hover:text-text")} />
+                          {collapsed && count > 0 && <span className={cn("absolute -left-1 -top-1 size-2 rounded-full ring-2 ring-surface-2 dark:ring-surface", urgent ? "bg-danger" : "bg-warning")} />}
                         </span>
-                      )}
+                        {!collapsed && <span className="truncate">{label}</span>}
+                        {!collapsed && count > 0 && (
+                          <span className={cn("ms-auto tabular-nums", urgent ? "grid min-w-5 animate-pulse place-items-center rounded-full bg-danger px-1.5 text-[11px] font-bold text-white" : "text-xs text-muted")}
+                            data-testid={BADGE_TESTID[badge!]}>
+                            {count.toLocaleString("fa-IR")}
+                          </span>
+                        )}
+                      </>}
                     </NavLink>
                   );
-                  return collapsed ? <Tooltip key={to} content={label}>{link}</Tooltip> : link;
+                  // Tooltip کلاس‌های خودش را با className لینک ادغام می‌کند؛ ظرف جدا، className تابعی NavLink را دست‌نخورده نگه می‌دارد
+                  return collapsed ? <Tooltip key={to} content={label}><div className="flex">{link}</div></Tooltip> : link;
                 })}
               </div>
             </div>

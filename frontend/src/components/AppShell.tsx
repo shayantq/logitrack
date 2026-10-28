@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Building2, ChevronsLeft, ChevronsRight, Compass, KeyRound, LogOut, MapPinned, Menu as MenuIcon, UserRound, X } from "lucide-react";
+import { Building2, Compass, KeyRound, LogOut, MapPinned, Menu as MenuIcon, PanelRightClose, PanelRightOpen, UserRound, X } from "lucide-react";
 import { api, authFetch, unwrap } from "@/api/client";
 import { useAuth, useMe } from "@/auth/AuthContext";
 import { TourProvider, useTour } from "@/components/tour/TourProvider";
@@ -12,7 +12,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { ScanButton } from "@/components/ScanDialog";
 import { ROLE_LABELS } from "@/lib/labels";
 import { Logo, LogoMark, ThemeToggle } from "@/ui/brand";
-import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "@/ui/overlays";
+import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Tooltip } from "@/ui/overlays";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { Button, cn } from "@/ui/primitives";
 
@@ -32,6 +32,26 @@ function useOrgLogo(enabled: boolean) {
     enabled: !!profile?.has_logo, staleTime: Infinity,
   });
   return url ?? null;
+}
+
+/** کارت هویت پایین منو (فقط نمایشی؛ منوی کاربر در سربرگ است) */
+function SidebarIdentity({ collapsed = false }: { collapsed?: boolean }) {
+  const me = useMe();
+  const name = me.full_name || me.username;
+  const avatar = (
+    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand">{name.trim().charAt(0)}</span>
+  );
+  return (
+    <div className="flex shrink-0 items-center gap-3 border-t border-border py-3 pe-3 ps-[17px]">
+      {collapsed ? <Tooltip content={`${name} — ${ROLE_LABELS[me.role]}`}><span tabIndex={0} className="rounded-full">{avatar}</span></Tooltip> : <>
+        {avatar}
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-text">{name}</div>
+          <div className="truncate text-xs text-muted">{ROLE_LABELS[me.role]}</div>
+        </div>
+      </>}
+    </div>
+  );
 }
 
 /** کشیدن کشوی موبایل به سمت راست (بیرون صفحه در RTL) آن را می‌بندد */
@@ -82,20 +102,32 @@ function Shell() {
   // نسخه نمایشی: صفحه‌های خارج از بخش‌های اصلی به داشبورد برمی‌گردند
   useEffect(() => { if (me.is_demo && !demoAllows(location.pathname)) navigate("/app", { replace: true }); }, [me.is_demo, location.pathname, navigate]);
 
+  const toggle = (
+    <button onClick={() => setCollapsed(c => !c)} data-testid="sidebar-toggle" aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
+      className="grid size-9 place-items-center rounded-lg text-muted transition-colors duration-200 hover:bg-surface hover:text-text dark:hover:bg-surface-2">
+      {collapsed ? <PanelRightOpen className="size-[18px]" /> : <PanelRightClose className="size-[18px]" />}
+    </button>
+  );
+
   return (
     <div className="flex min-h-dvh bg-bg">
-      {/* سایدبار دسکتاپ */}
+      {/* سایدبار دسکتاپ: پنل شناور با فاصله از لبه‌ها */}
       <aside data-testid="sidebar" data-collapsed={collapsed}
-        className={cn("sticky top-0 hidden h-dvh shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-300 ease-out lg:flex",
-          collapsed ? "w-[76px]" : "w-[17rem]")}>
-        <div className={cn("flex h-16 items-center border-b border-border", collapsed ? "justify-center" : "px-5")}>
-          {collapsed ? <LogoMark /> : <Logo />}
+        className={cn("sticky top-0 hidden h-dvh shrink-0 py-3 ps-3 transition-[width] duration-300 ease-out lg:block",
+          collapsed ? "w-[84px]" : "w-[17.75rem]")}>
+        <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface-2 shadow-card dark:bg-surface">
+          {/* همه آیکن‌ها با فاصله ثابت از لبه راست چیده شده‌اند (نه وسط‌چین) تا هنگام جمع/باز شدن عرض تکان نخورند؛
+              فاصله‌ها طوری‌اند که در عرض جمع‌شده (۷۰ پیکسل داخلی) دقیقاً وسط بیفتند */}
+          <div className={cn("shrink-0 border-b border-border", collapsed && "pb-3")}>
+            <div className="flex h-16 items-center justify-between pe-3 ps-[19px]">
+              {collapsed ? <LogoMark /> : <Logo />}
+              {!collapsed && toggle}
+            </div>
+            {collapsed && <div className="ps-[17px]">{toggle}</div>}
+          </div>
+          <div className="side-scroll flex-1 overflow-y-auto overscroll-contain px-[13px] py-2.5"><NavLinks items={items} collapsed={collapsed} /></div>
+          <SidebarIdentity collapsed={collapsed} />
         </div>
-        <div className="flex-1 overflow-y-auto overscroll-contain p-3"><NavLinks items={items} collapsed={collapsed} /></div>
-        <button onClick={() => setCollapsed(c => !c)} data-testid="sidebar-toggle" aria-label={collapsed ? "باز کردن منو" : "جمع کردن منو"}
-          className="flex h-12 items-center justify-center gap-2 border-t border-border text-xs text-muted transition hover:bg-surface-2 hover:text-text">
-          {collapsed ? <ChevronsLeft className="size-4" /> : <><ChevronsRight className="size-4" /> جمع کردن منو</>}
-        </button>
       </aside>
 
       {/* منوی کشویی موبایل (iOS Safari / Android Chrome): کشیدن به راست یا لمس بیرون، می‌بندد */}
@@ -104,13 +136,14 @@ function Shell() {
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-fade lg:hidden" />
           <Dialog.Content dir="rtl" data-testid="mobile-nav" {...swipe.handlers}
             style={{ transform: swipe.offset ? `translateX(${swipe.offset}px)` : undefined, transition: swipe.offset ? "none" : undefined }}
-            className="fixed inset-y-0 right-0 z-50 flex w-[86vw] max-w-80 flex-col bg-surface pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-float transition-transform duration-300 data-[state=open]:animate-[drawer-in_.28s_ease-out] lg:hidden">
+            className="fixed inset-y-0 right-0 z-50 flex w-[86vw] max-w-80 flex-col bg-surface-2 dark:bg-surface pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-float transition-transform duration-300 data-[state=open]:animate-[drawer-in_.28s_ease-out] lg:hidden">
             <div className="flex h-16 items-center justify-between border-b border-border px-5">
               <Dialog.Title asChild><div><Logo /></div></Dialog.Title>
               <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="بستن منو" data-testid="mobile-nav-close"><X className="size-5" /></Button></Dialog.Close>
             </div>
             <Dialog.Description className="sr-only">منوی اصلی — برای بستن به راست بکشید</Dialog.Description>
-            <div className="flex-1 overflow-y-auto overscroll-contain p-3"><NavLinks items={items} collapsed={false} onNavigate={() => setMobileOpen(false)} /></div>
+            <div className="side-scroll flex-1 overflow-y-auto overscroll-contain p-2.5"><NavLinks items={items} collapsed={false} onNavigate={() => setMobileOpen(false)} /></div>
+            <SidebarIdentity />
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
