@@ -1029,6 +1029,8 @@ from app.models_fulfillment import (  # noqa: E402,F401
 )
 # کنترل و راه‌اندازی: مجوزهای نقش، سابقه چاپ برچسب، چک‌لیست راه‌اندازی
 from app.models_control import CutoverCheck, LabelPrint, RolePermission  # noqa: E402,F401
+# بهره‌وری عملیات: نماهای ذخیره‌شده فهرست‌ها
+from app.models_productivity import SavedView  # noqa: E402,F401
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401
 # رویدادهای دامنه (after_flush)

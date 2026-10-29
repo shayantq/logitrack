@@ -124,11 +124,13 @@ def inventory(db: Session, user: User, warehouse_id: int | None = None, **_) -> 
                   sections=[Section("موجودی کالاها", cols, rows)], kpis=kpis, landscape=True, filename="Pasineh_Inventory")
 
 
-def orders(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, status: str | None = None, **_) -> Report:
+def orders(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, status: str | None = None,
+           ids: list[int] | None = None, **_) -> Report:
     start, end = _range(date_from, date_to)
     lo, hi = _utc_bounds(start, end)
-    query = db.query(Order).options(joinedload(Order.vehicle), joinedload(Order.customer), selectinload(Order.items)) \
-        .filter(Order.delivery_window_start >= lo, Order.delivery_window_start < hi)
+    query = db.query(Order).options(joinedload(Order.vehicle), joinedload(Order.customer), selectinload(Order.items))
+    # سفارش‌های انتخاب‌شده در فهرست (عملیات گروهی) مستقل از بازه تاریخ
+    query = query.filter(Order.id.in_(ids)) if ids else query.filter(Order.delivery_window_start >= lo, Order.delivery_window_start < hi)
     if status:
         query = query.filter(Order.status == status)
     drivers = {u.id: u.full_name or u.username for u in db.query(User).all()}

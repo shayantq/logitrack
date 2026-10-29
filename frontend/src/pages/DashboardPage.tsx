@@ -1,13 +1,15 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, Boxes, Package, PackageCheck, PieChart, Truck, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Boxes, ChevronDown, Package, PackageCheck, PieChart, Truck, Zap } from "lucide-react";
 import { api, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
+import { ActionCenter } from "@/components/ActionCenter";
 import { OrderStatusBadge } from "@/components/StatusBadges";
 import { ACTIVE_ORDER_STATUSES, orderStatusLabel, orderStatusTone, VEHICLE_STATUS, VEHICLE_STATUS_TONE } from "@/lib/labels";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { BarChart, DonutChart } from "@/ui/brand";
-import { Badge, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatCard, Table, toneColor } from "@/ui/primitives";
+import { Badge, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatCard, Table, cn, toneColor } from "@/ui/primitives";
 
 interface Stats {
   orders_by_status: Record<string, number>;
@@ -23,8 +25,16 @@ function greeting() {
   return h < 12 ? "صبح بخیر" : h < 17 ? "روز بخیر" : "عصر بخیر";
 }
 
+/** نمای کلی (نمودارها) زیر مرکز اقدام است و جمع‌شدنش برای هر کاربر در همین مرورگر به یاد می‌ماند */
+function useOverviewOpen() {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("dashboard-overview") !== "closed"; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem("dashboard-overview", open ? "open" : "closed"); } catch { /* */ } }, [open]);
+  return [open, setOpen] as const;
+}
+
 export default function DashboardPage() {
   const me = useMe();
+  const [overviewOpen, setOverviewOpen] = useOverviewOpen();
   const stats = useQuery({ queryKey: ["stats"], queryFn: async () => (await unwrap(api.GET("/reports/stats"))) as Stats, refetchInterval: 15_000 });
   const recent = useQuery({
     queryKey: ["orders", "recent"],
@@ -38,6 +48,14 @@ export default function DashboardPage() {
   return (
     <>
       <PageHeader eyebrow="نمای کلی" title={`${greeting()}، ${me.full_name || me.username}`} subtitle="وضعیت لحظه‌ای سفارش‌ها، ناوگان و موجودی — هر ۱۵ ثانیه به‌روز می‌شود." />
+      <ActionCenter />
+
+      <button type="button" onClick={() => setOverviewOpen(o => !o)} aria-expanded={overviewOpen} data-testid="overview-toggle"
+        className="mb-3 flex w-full items-center justify-between gap-3 text-start">
+        <h2 className="text-base font-bold">نمای کلی</h2>
+        <ChevronDown className={cn("size-5 text-muted transition-transform duration-200", overviewOpen && "rotate-180")} />
+      </button>
+      {overviewOpen && <div className="animate-fade">
       {stats.error && <ErrorState error={stats.error} onRetry={stats.refetch} />}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -100,6 +118,7 @@ export default function DashboardPage() {
           )}
         </Card>
       </div>
+      </div>}
     </>
   );
 }

@@ -4,6 +4,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertOctagon, AlertTriangle, Calculator, ChevronDown, FileSpreadsheet, FileText, PackageX, Search, Settings2, ShoppingCart, Sparkles, Zap,
 } from "lucide-react";
@@ -46,7 +47,10 @@ export default function ReorderPage() {
   const warehouses = useWarehouses();
   const [q, setQ] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
-  const [status, setStatus] = useState<"" | Status>("");
+  // وضعیت در آدرس صفحه (پیوند کارت «نیازمند اقدام»: ?status=attention)
+  const [params, setParams] = useSearchParams();
+  const status = (params.get("status") ?? "") as "" | Status | "attention";
+  const setStatus = (v: "" | Status | "attention") => setParams(p => { if (v) p.set("status", v); else p.delete("status"); return p; }, { replace: true });
   const [editing, setEditing] = useState<Item | null>(null);
   const [policyOpen, setPolicyOpen] = useState(false);
   const [showFormula, setShowFormula] = useState(false);
@@ -68,7 +72,7 @@ export default function ReorderPage() {
 
   const items = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (list.data?.items ?? []).filter(i => (!status || i.status === status)
+    return (list.data?.items ?? []).filter(i => (!status || i.status === status || (status === "attention" && i.status !== "ok"))
       && (!needle || i.name.toLowerCase().includes(needle) || i.sku.toLowerCase().includes(needle) || (i.category ?? "").toLowerCase().includes(needle)));
   }, [list.data, q, status]);
   const s = list.data?.summary;
@@ -129,7 +133,7 @@ export default function ReorderPage() {
             </Select>
           )}
           <SegmentedControl value={status} onChange={setStatus} options={[
-            { value: "", label: "همه" }, { value: "out", label: "ناموجود" }, { value: "critical", label: "بحرانی" },
+            { value: "", label: "همه" }, { value: "attention", label: "نیازمند سفارش" }, { value: "out", label: "ناموجود" }, { value: "critical", label: "بحرانی" },
             { value: "reorder", label: "زمان سفارش" }, { value: "ok", label: "عادی" },
           ]} />
         </div>

@@ -3,11 +3,14 @@
  * «در راه» در مقصد ثبت می‌کند؛ «دریافت» آن را سالم یا آسیب‌دیده در محل مقصد می‌گذارد؛ کسری هنگام بستن تعیین تکلیف می‌شود.
  */
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { ArrowLeftRight, Plus, Trash2 } from "lucide-react";
 import { api, errorMessage, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
+import { SavedViews } from "@/components/SavedViews";
 import { useToast } from "@/components/Toast";
+import { useDeepLink } from "@/hooks/useDeepLink";
 import { useProducts, useWarehouses } from "@/hooks/data";
 import { TRANSFER_STATUS } from "@/lib/labels";
 import { faDateTime, faNumber } from "@/lib/format";
@@ -21,8 +24,16 @@ type Transfer = Schemas["TransferOut"];
 export default function TransfersPage() {
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
+  // فیلتر در آدرس صفحه (نماهای ذخیره‌شده و کارت «نیازمند اقدام»)؛ ?transfer=ID جزئیات را باز می‌کند
+  const [params, setParams] = useSearchParams();
+  const status = params.get("status") ?? "";
+  const setFilters = (f: Record<string, string | undefined>) =>
+    setParams(Object.fromEntries(Object.entries(f).filter(([k, v]) => v && k === "status")) as Record<string, string>, { replace: true });
+  useDeepLink("transfer", { onHit: setOpenId });
   const { data: transfers, isLoading, error, refetch } = useQuery({
-    queryKey: ["transfer-orders"], queryFn: () => unwrap(api.GET("/transfer-orders/")),
+    queryKey: ["transfer-orders", status],
+    queryFn: () => unwrap(api.GET("/transfer-orders/", { params: { query: { status: (status || undefined) as "open" | "in_transit" | "received" | "closed" | "canceled" | undefined } } })),
+    placeholderData: keepPreviousData,
   });
   return (
     <>
@@ -30,8 +41,15 @@ export default function TransfersPage() {
         subtitle="انتقال دومرحله‌ای بین انبارها یا محل‌ها: کالای ارسال‌شده تا دریافت «در راه» و قابل ردیابی است."
         actions={<Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)} data-testid="transfer-new">سفارش انتقال</Button>} />
       <Card>
+        <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
+          <Select value={status} onChange={e => setFilters({ status: e.target.value })} aria-label="وضعیت انتقال" data-testid="transfers-status" className="w-48">
+            <option value="">همه وضعیت‌ها</option>
+            {Object.entries(TRANSFER_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </Select>
+          <SavedViews page="transfers" filters={{ status }} onApply={setFilters} />
+        </div>
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : !transfers?.length ? (
-          <EmptyState icon={<ArrowLeftRight className="size-5" />} title="هنوز سفارش انتقالی نیست" />
+          <EmptyState icon={<ArrowLeftRight className="size-5" />} title={status ? "انتقالی با این وضعیت نیست" : "هنوز سفارش انتقالی نیست"} />
         ) : (
           <Table testId="transfers-table">
             <thead><tr><th>کد</th><th>وضعیت</th><th>از</th><th>به</th><th>اقلام</th><th>در راه</th><th>زمان</th></tr></thead>

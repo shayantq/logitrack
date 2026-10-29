@@ -359,19 +359,41 @@ def _driver_filter(db: Session, driver_ids: list[int]):
     return or_(Order.driver_id.in_(ids), and_(Order.driver_id.is_(None), Order.vehicle_id.in_(vehicle_ids)))
 
 
-def list_orders(db: Session, user: User, order_status: str | None = None, province: str | None = None,
-                city: str | None = None, q: str | None = None, vehicle_id: int | None = None,
-                date_from: datetime | None = None, date_to: datetime | None = None,
-                skip: int = 0, limit: int = 100, *, tracking_code: str | None = None, product: str | None = None,
-                driver_id: int | None = None, driver: str | None = None, plate: str | None = None,
-                delivery_from: date | None = None, delivery_to: date | None = None,
-                priority: bool | None = None) -> list[Order]:
-    """
-    جستجوی پیشرفته (مرحله ۹). همه فیلترها با AND ترکیب می‌شوند؛ q یک جستجوی سراسری است که
-    کد سفارش، مشتری/تحویل‌گیرنده، کالا، راننده و پلاک را با OR می‌گردد.
-    delivery_from/delivery_to: روز تحویل به وقت ایران (هر دو شامل).
-    """
-    query = db.query(Order).options(selectinload(Order.items), joinedload(Order.customer))
+# نماهای نام‌دار فهرست سفارش‌ها: مرکز اقدام و صفحه سفارش‌ها هر دو از همین تعریف استفاده می‌کنند
+ORDER_VIEWS = {
+    "late": "از بازه تحویل گذشته و هنوز تحویل نشده",
+    "today": "سفارش‌های فعال امروز",
+    "needs_update": "زمان شروع کار رسیده و هنوز حرکت ثبت نشده",
+}
+
+
+def _view_filter(view: str):
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if view == "late":
+        return and_(Order.status.in_(ACTIVE_ORDER_STATUSES), Order.delivery_window_end < now)
+    if view == "today":
+        today = dispatch_service.to_local(now).date()
+        start = dispatch_service.local_to_utc(datetime.combine(today, time.min))
+        return and_(Order.status.in_(ACTIVE_ORDER_STATUSES), Order.delivery_window_start >= start,
+                    Order.delivery_window_start < start + timedelta(days=1))
+    if view == "needs_update":
+        return and_(Order.status.in_(("assigned", "picking_up")), Order.delivery_window_start <= now)
+    raise ConflictError("نمای سفارش نامعتبر است.")
+
+
+def _orders_query(db: Session, user: User, order_status: str | None = None, province: str | None = None,
+                  city: str | None = None, q: str | None = None, vehicle_id: int | None = None,
+                  date_from: datetime | None = None, date_to: datetime | None = None, *,
+                  tracking_code: str | None = None, product: str | None = None,
+                  driver_id: int | None = None, driver: str | None = None, plate: str | None = None,
+                  delivery_from: date | None = None, delivery_to: date | None = None,
+                  priority: bool | None = None, view: str | None = None, ids: list[int] | None = None):
+    query = db.query(Order)
+
+    if view:
+        query = query.filter(_view_filter(view))
+    if ids is not None:
+        query = query.filter(Order.id.in_(ids or [-1]))
 
     if user.role == 'driver':
         driver_vehicle_ids = [v.id for v in db.query(Vehicle).filter(Vehicle.driver_id == user.id).all()]
@@ -418,8 +440,25 @@ def list_orders(db: Session, user: User, order_status: str | None = None, provin
             _driver_filter(db, _matching_driver_ids(db, term)),
             Order.vehicle_id.in_(_matching_vehicle_ids(db, term) or [-1]),
         ))
+    return query
 
-    return query.order_by(Order.id.desc()).offset(skip).limit(limit).all()
+
+def list_orders(db: Session, user: User, order_status: str | None = None, province: str | None = None,
+                city: str | None = None, q: str | None = None, vehicle_id: int | None = None,
+                date_from: datetime | None = None, date_to: datetime | None = None,
+                skip: int = 0, limit: int = 100, **filters) -> list[Order]:
+    """
+    جستجوی پیشرفته (مرحله ۹). همه فیلترها با AND ترکیب می‌شوند؛ q یک جستجوی سراسری است که
+    کد سفارش، مشتری/تحویل‌گیرنده، کالا، راننده و پلاک را با OR می‌گردد.
+    delivery_from/delivery_to: روز تحویل به وقت ایران (هر دو شامل). view: یکی از ORDER_VIEWS.
+    """
+    query = _orders_query(db, user, order_status, province, city, q, vehicle_id, date_from, date_to, **filters)
+    return query.options(selectinload(Order.items), joinedload(Order.customer))         .order_by(Order.id.desc()).offset(skip).limit(limit).all()
+
+
+def count_orders(db: Session, user: User, **filters) -> int:
+    """شمار همان فهرست list_orders با همان فیلترها (برای شمارنده‌های مرکز اقدام)."""
+    return _orders_query(db, user, **filters).order_by(None).count()
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +485,27 @@ def assign_vehicle(db: Session, user: User, order_id: int, request: OrderAssignR
         order.status = 'assigned'
         _add_history(db, order, 'pending', 'assigned', user, f"تخصیص خودرو {vehicle.license_plate or vehicle.id}")
         notification_service.order_assigned(db, order)
+        db.commit()
+        return get_order(db, user, order.id)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def set_priority(db: Session, user: User, order_id: int, priority: bool) -> Order:
+    """فوری/عادی کردن سفارش فعال (فقط ادمین)؛ در تاریخچه سفارش ثبت می‌شود."""
+    if user.role != 'org_admin':
+        raise ForbiddenError('فقط ادمین سازمان اولویت سفارش را تغییر می‌دهد.')
+    try:
+        order = db.query(Order).filter(Order.id == order_id).with_for_update().first()
+        if order is None:
+            raise NotFoundError('سفارش مورد نظر یافت نشد.')
+        if order.status not in ACTIVE_ORDER_STATUSES:
+            raise ConflictError('اولویت سفارش پایان‌یافته را نمی‌توان تغییر داد.')
+        if order.priority == priority:
+            raise ConflictError('اولویت سفارش از قبل همین است.')
+        order.priority = priority
+        _add_history(db, order, order.status, order.status, user, "فوری شد" if priority else "از حالت فوری خارج شد")
         db.commit()
         return get_order(db, user, order.id)
     except Exception:

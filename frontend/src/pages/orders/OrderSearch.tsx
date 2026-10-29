@@ -7,15 +7,18 @@ import { useProvinces } from "@/hooks/data";
 import { ORDER_STATUS } from "@/lib/labels";
 import { faDate } from "@/lib/format";
 import { isoDate, pyWeekday } from "@/lib/schedule";
+import { SavedViews } from "@/components/SavedViews";
 import { Button, Checkbox, Field, Input, Select, cn } from "@/ui/primitives";
 
-export const FILTER_KEYS = ["q", "order_status", "province", "tracking_code", "product", "driver", "plate", "delivery_from", "delivery_to", "priority"] as const;
+export const FILTER_KEYS = ["q", "order_status", "province", "tracking_code", "product", "driver", "plate", "delivery_from", "delivery_to", "priority", "view"] as const;
 export type OrderFilters = Partial<Record<(typeof FILTER_KEYS)[number], string>>;
 
 const LABELS: Record<string, string> = {
   q: "جستجو", order_status: "وضعیت", province: "استان", tracking_code: "کد", product: "کالا", driver: "راننده", plate: "پلاک",
-  delivery_from: "تحویل از", delivery_to: "تحویل تا", priority: "فوری",
+  delivery_from: "تحویل از", delivery_to: "تحویل تا", priority: "فوری", view: "نما",
 };
+// نماهای نام‌دار سرور (همان تعریف کارت‌های مرکز اقدام)
+export const ORDER_VIEW_LABELS: Record<string, string> = { late: "دیرکرد", today: "فعال امروز", needs_update: "منتظر ثبت حرکت" };
 
 const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return isoDate(d); };
 function weekRange() {
@@ -63,7 +66,7 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
 
   return (
     <div className="border-b border-border" data-testid="order-search">
-      <form className="grid gap-3 p-4 md:grid-cols-[1fr_180px_170px_auto_auto]" onSubmit={(e: FormEvent) => { e.preventDefault(); apply(); }}>
+      <form className="grid gap-3 p-4 md:grid-cols-[1fr_180px_170px_auto_auto_auto]" onSubmit={(e: FormEvent) => { e.preventDefault(); apply(); }}>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" />
           <Input className="pr-10" placeholder="جستجو در کد، مشتری، کالا، راننده، پلاک، شهر…" value={draft.q ?? ""} onChange={e => set("q", e.target.value)} data-testid="search-q" />
@@ -78,6 +81,7 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
         <Button type="button" variant="ghost" icon={<SlidersHorizontal className="size-4" />} onClick={() => setOpen(o => !o)} data-testid="search-advanced-toggle">
           پیشرفته<ChevronDown className={cn("size-4 transition", open && "rotate-180")} /></Button>
         <Button variant="secondary" type="submit" icon={<Search className="size-4" />} data-testid="search-submit">جستجو</Button>
+        <SavedViews page="orders" filters={filters} onApply={f => { setDraft(f as OrderFilters); onChange(f as OrderFilters); }} />
       </form>
 
       <div className="flex flex-wrap items-center gap-2 px-4 pb-3" data-testid="date-presets">
@@ -111,7 +115,7 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
         <div className="flex flex-wrap gap-2 border-t border-border px-4 py-2.5" data-testid="active-filters">
           {active.map(([k, v]) => (
             <span key={k} className="flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs text-brand-strong">
-              {LABELS[k]}: <b>{k.startsWith("delivery") ? faDate(v) : k === "order_status" ? ORDER_STATUS[v as keyof typeof ORDER_STATUS]?.label : k === "priority" ? "بله" : v}</b>
+              {LABELS[k]}: <b>{k.startsWith("delivery") ? faDate(v) : k === "order_status" ? ORDER_STATUS[v as keyof typeof ORDER_STATUS]?.label : k === "priority" ? "بله" : k === "view" ? ORDER_VIEW_LABELS[v] ?? v : v}</b>
               <button type="button" aria-label={`حذف فیلتر ${LABELS[k]}`} onClick={() => { const next = { ...filters, [k]: undefined }; setDraft(next); onChange(next); }}><X className="size-3" /></button>
             </span>
           ))}

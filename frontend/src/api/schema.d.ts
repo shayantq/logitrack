@@ -41,6 +41,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔄 تمدید توکن دسترسی با نشست ماندگار (کوکی) */
+        post: operations["refresh_access_token_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🚪 خروج و بستن نشست ماندگار این مرورگر */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🛡️ وضعیت ورود دومرحله‌ای من */
+        get: operations["mfa_status_auth_mfa_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🛡️ ساخت راز و کد QR ورود دومرحله‌ای (هنوز فعال نیست) */
+        post: operations["mfa_setup_auth_mfa_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🛡️ فعال‌سازی ورود دومرحله‌ای با اولین کد */
+        post: operations["mfa_enable_auth_mfa_enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/mfa/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🛡️ خاموش‌کردن ورود دومرحله‌ای (با رمز و کد) */
+        post: operations["mfa_disable_auth_mfa_disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🖥️ نشست‌های فعال من (دستگاه‌ها) */
+        get: operations["my_sessions_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** ⛔ بستن یکی از نشست‌های من */
+        delete: operations["revoke_my_session_auth_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/password-reset": {
         parameters: {
             query?: never;
@@ -613,6 +749,60 @@ export interface paths {
         put?: never;
         /** ⚡ ثبت سفارش چندقلمی + تخصیص هوشمند ناوگان */
         post: operations["add_order_orders__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 🧺 عملیات گروهی (پیش‌نمایش با dry_run، سپس اجرا سطر به سطر)
+         * @description **عملیات:** `assign` (تخصیص خودرو؛ params.vehicle_id اختیاری = خودکار) و `priority` (params.priority؛ فقط ادمین).
+         */
+        post: operations["bulk_orders_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🕒 خط زمانی یکپارچه سفارش (انبار، ناوگان، مالی، پشتیبانی) */
+        get: operations["timeline_orders__order_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** ⚡ فوری یا عادی کردن سفارش فعال (فقط ادمین) */
+        put: operations["set_priority_orders__order_id__priority_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2010,6 +2200,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/action-center": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🎯 کارهایی که الان اقدام می‌خواهند (بر اساس نقش) */
+        get: operations["action_center_action_center_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔎 جستجوی سراسری: سفارش، کالا، محموله، انتقال، تیکت، راننده، خودرو */
+        get: operations["search_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ⭐ نماهای ذخیره‌شده یک صفحه (خودم و مشترک با نقشم) */
+        get: operations["list_views_saved_views_get"];
+        put?: never;
+        /** ⭐ ذخیره نمای فعلی */
+        post: operations["create_view_saved_views_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** 🗑️ حذف نمای خودم */
+        delete: operations["delete_view_saved_views__view_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/geo/cities": {
         parameters: {
             query?: never;
@@ -2124,6 +2383,26 @@ export interface paths {
         get: operations["tickets_summary_tickets_summary_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tickets/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 🧺 عملیات گروهی تیکت‌ها (پیش‌نمایش، سپس اجرا سطر به سطر)
+         * @description **عملیات:** `assign` (params.assignee_id)، `priority` (params.priority)، `resolve`، `close` (params.confirm = «تأیید»).
+         */
+        post: operations["bulk_tickets_bulk_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4125,6 +4404,56 @@ export interface components {
             /** C */
             C: number;
         };
+        /** ActionCard */
+        ActionCard: {
+            /** Key */
+            key: string;
+            /**
+             * Tone
+             * @enum {string}
+             */
+            tone: "danger" | "warning" | "info";
+            /** Weight */
+            weight: number;
+            /** Count */
+            count: number;
+            /** Title */
+            title: string;
+            /** Why */
+            why: string;
+            /** Owner */
+            owner: string;
+            /** Next Action */
+            next_action: string;
+            /** Action Label */
+            action_label: string;
+            /** Link */
+            link: string;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["ActionItem"][];
+        };
+        /** ActionCenterOut */
+        ActionCenterOut: {
+            /** Cards */
+            cards: components["schemas"]["ActionCard"][];
+        };
+        /** ActionItem */
+        ActionItem: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Sub
+             * @default
+             */
+            sub: string;
+            /** Link */
+            link: string;
+        };
         /** ActivityItem */
         ActivityItem: {
             /** At */
@@ -4407,6 +4736,13 @@ export interface components {
         };
         /** Body_login_for_access_token_auth_token_post */
         Body_login_for_access_token_auth_token_post: {
+            /**
+             * Remember
+             * @default false
+             */
+            remember: boolean;
+            /** Otp */
+            otp?: string | null;
             /** Grant Type */
             grant_type?: string | null;
             /** Username */
@@ -4505,6 +4841,53 @@ export interface components {
              * Format: binary
              */
             file: string;
+        };
+        /** BulkIn */
+        BulkIn: {
+            /** Action */
+            action: string;
+            /** Ids */
+            ids: number[];
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Dry Run
+             * @default true
+             */
+            dry_run: boolean;
+        };
+        /** BulkOut */
+        BulkOut: {
+            /** Action */
+            action: string;
+            /** Dry Run */
+            dry_run: boolean;
+            /** Total */
+            total: number;
+            /** Valid */
+            valid: number;
+            /** Invalid */
+            invalid: number;
+            /** Unauthorized */
+            unauthorized: number;
+            /** Results */
+            results: components["schemas"]["BulkRow"][];
+        };
+        /** BulkRow */
+        BulkRow: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "invalid" | "unauthorized" | "done" | "failed";
+            /** Reason */
+            reason?: string | null;
         };
         /** CancelIn */
         CancelIn: {
@@ -6255,14 +6638,20 @@ export interface components {
              */
             permissions: string[];
             /**
+             * Mfa Enabled
+             * @default false
+             */
+            mfa_enabled: boolean;
+            /**
+             * Mfa Setup Required
+             * @default false
+             */
+            mfa_setup_required: boolean;
+            /**
              * Is Demo
              * @default false
              */
             is_demo: boolean;
-            /** @default false */
-            mfa_enabled: boolean;
-            /** @default false */
-            mfa_setup_required: boolean;
         };
         /** MessageResponse */
         MessageResponse: {
@@ -6277,6 +6666,18 @@ export interface components {
             weighted_average: number;
             /** Standard */
             standard: number;
+        };
+        /** MfaCodeIn */
+        MfaCodeIn: {
+            /** Code */
+            code: string;
+        };
+        /** MfaDisableIn */
+        MfaDisableIn: {
+            /** Code */
+            code: string;
+            /** Password */
+            password: string;
         };
         /**
          * MovementLineOut
@@ -6705,6 +7106,23 @@ export interface components {
             order_status: "pending" | "assigned" | "picking_up" | "picked_up" | "in_transit" | "delivered" | "failed" | "canceled" | "expired";
             /** Note */
             note?: string | null;
+        };
+        /** OrderTimelineOut */
+        OrderTimelineOut: {
+            /** Order Id */
+            order_id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Stage */
+            stage: string;
+            /** Last Action */
+            last_action?: string | null;
+            /** Last Action At */
+            last_action_at?: string | null;
+            /** Blocker */
+            blocker?: string | null;
+            /** Events */
+            events: components["schemas"]["TimelineEvent"][];
         };
         /**
          * OrganizationAdminCreate
@@ -7771,6 +8189,11 @@ export interface components {
             is_current: boolean;
             /** Is Future */
             is_future: boolean;
+        };
+        /** PriorityIn */
+        PriorityIn: {
+            /** Priority */
+            priority: boolean;
         };
         /** ProductCreate */
         ProductCreate: {
@@ -8840,6 +9263,8 @@ export interface components {
             months?: number | null;
             /** Status */
             status?: ("pending" | "assigned" | "picking_up" | "picked_up" | "in_transit" | "delivered" | "failed" | "canceled" | "expired") | null;
+            /** Order Ids */
+            order_ids?: number[] | null;
         };
         /** RequestDocument */
         RequestDocument: {
@@ -9083,6 +9508,45 @@ export interface components {
             eta?: string | null;
             last_report?: components["schemas"]["LastReport"] | null;
         };
+        /** SavedViewIn */
+        SavedViewIn: {
+            /**
+             * Page Key
+             * @enum {string}
+             */
+            page_key: "orders" | "receipts" | "inventory" | "transfers" | "tickets";
+            /** Name */
+            name: string;
+            /** Filters */
+            filters?: {
+                [key: string]: unknown;
+            };
+            /** Shared Role */
+            shared_role?: ("org_admin" | "warehouse_manager") | null;
+        };
+        /** SavedViewOut */
+        SavedViewOut: {
+            /** Id */
+            id: number;
+            /** Page Key */
+            page_key: string;
+            /** Name */
+            name: string;
+            /** Filters */
+            filters: {
+                [key: string]: unknown;
+            };
+            /** Shared Role */
+            shared_role?: string | null;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Mine */
+            mine: boolean;
+            /** Created At */
+            created_at?: string | null;
+        };
         /** ScanResult */
         ScanResult: {
             /** Kind */
@@ -9130,6 +9594,37 @@ export interface components {
             capacity_kg?: number | null;
             /** Status */
             status?: string | null;
+        };
+        /** SearchGroup */
+        SearchGroup: {
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /** Hits */
+            hits: components["schemas"]["SearchHit"][];
+        };
+        /** SearchHit */
+        SearchHit: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Sub
+             * @default
+             */
+            sub: string;
+            /** Link */
+            link: string;
+        };
+        /** SearchOut */
+        SearchOut: {
+            /** Query */
+            query: string;
+            exact?: components["schemas"]["SearchHit"] | null;
+            /** Groups */
+            groups: components["schemas"]["SearchGroup"][];
         };
         /** ShiftIn */
         ShiftIn: {
@@ -10200,6 +10695,34 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** TimelineEvent */
+        TimelineEvent: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "order" | "warehouse" | "fleet" | "finance" | "support";
+            /** Area Label */
+            area_label: string;
+            /** Title */
+            title: string;
+            /** Actor */
+            actor: string;
+            /** Outcome */
+            outcome?: string | null;
+            /** Link */
+            link?: string | null;
+            /**
+             * Source
+             * @default status
+             */
+            source: string;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -11060,6 +11583,228 @@ export interface operations {
             };
         };
     };
+    refresh_access_token_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                pasineh_refresh?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                pasineh_refresh?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_status_auth_mfa_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    mfa_setup_auth_mfa_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    mfa_enable_auth_mfa_enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mfa_disable_auth_mfa_disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MfaDisableIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_sessions_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                pasineh_refresh?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_my_session_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     password_reset_channels_auth_password_reset_get: {
         parameters: {
             query?: never;
@@ -11230,7 +11975,9 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                pasineh_refresh?: string | null;
+            };
         };
         requestBody: {
             content: {
@@ -12239,6 +12986,8 @@ export interface operations {
                 delivery_to?: string | null;
                 /** @description فقط فوری‌ها */
                 priority?: boolean | null;
+                /** @description نمای نام‌دار (مثل دیرکرد) */
+                view?: ("late" | "today" | "needs_update") | null;
             };
             header?: never;
             path?: never;
@@ -12284,6 +13033,105 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_orders_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    timeline_orders__order_id__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderTimelineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_priority_orders__order_id__priority_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriorityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15224,6 +16072,150 @@ export interface operations {
             };
         };
     };
+    action_center_action_center_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionCenterOut"];
+                };
+            };
+        };
+    };
+    search_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_views_saved_views_get: {
+        parameters: {
+            query?: {
+                page?: ("orders" | "receipts" | "inventory" | "transfers" | "tickets") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_view_saved_views_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedViewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_view_saved_views__view_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cities_geo_cities_get: {
         parameters: {
             query?: {
@@ -15467,6 +16459,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketsSummary"];
+                };
+            };
+        };
+    };
+    bulk_tickets_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -16875,7 +17900,7 @@ export interface operations {
         parameters: {
             query?: {
                 warehouse_id?: number | null;
-                status?: ("out" | "critical" | "reorder" | "ok") | null;
+                status?: ("out" | "critical" | "reorder" | "ok" | "attention") | null;
                 mode?: ("manual" | "auto") | null;
                 q?: string | null;
             };

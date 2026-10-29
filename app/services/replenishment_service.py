@@ -348,7 +348,9 @@ def list_items(db: Session, user: User, warehouse_id: int | None = None, status:
     summary["auto"] = sum(1 for r in rows if r["rop_mode"] == "auto")
     summary["insufficient"] = sum(1 for r in rows if not r["calc"]["sufficient"])
     summary["total"] = len(rows)
-    if status:
+    if status == "attention":       # هر چه به نقطه سفارش رسیده (ناموجود، بحرانی، زمان سفارش)
+        rows = [r for r in rows if r["status"] != "ok"]
+    elif status:
         rows = [r for r in rows if r["status"] == status]
     if mode:
         rows = [r for r in rows if r["rop_mode"] == mode]

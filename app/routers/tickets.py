@@ -9,7 +9,8 @@ from app.database import db_dependency
 from app.dependencies import require_role, user_dependency
 from app.models import RoleEnum
 from app.schemas.ticket import EscalateIn, PublicTicketCreated, TicketDetail, TicketsSummary, TicketSummary, TicketUpdate
-from app.services import ticket_service
+from app.schemas.action_center import BulkIn, BulkOut
+from app.services import bulk_service, ticket_service
 from app.services.exceptions import DomainError
 
 platform_staff = require_role([RoleEnum.PLATFORM_ADMIN, RoleEnum.PLATFORM_SUPPORT])
@@ -75,6 +76,12 @@ async def create_ticket(db: db_dependency, user: user_dependency, category: str 
     data = await _read(file)
     return _call(ticket_service.create_ticket, db, user, category=category, subject=subject, body=body,
                  priority=priority, order_id=order_id, attachment=data)
+
+
+@router.post("/bulk", response_model=BulkOut, summary="🧺 عملیات گروهی تیکت‌ها (پیش‌نمایش، سپس اجرا سطر به سطر)")
+def bulk(data: BulkIn, db: db_dependency, user: user_dependency):
+    """**عملیات:** `assign` (params.assignee_id)، `priority` (params.priority)، `resolve`، `close` (params.confirm = «تأیید»)."""
+    return _call(bulk_service.tickets, db, user, data.action, data.ids, data.params, data.dry_run)
 
 
 @router.get("/{ticket_id}", response_model=TicketDetail, summary="💬 جزئیات و گفت‌وگوی تیکت")

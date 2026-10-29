@@ -13,6 +13,7 @@ class ReportRequest(BaseModel):
     warehouse_id: Optional[int] = Field(None, gt=0)
     months: Optional[int] = Field(None, ge=1, le=12)        # فقط برآورد سرمایه
     status: Optional[Literal["pending", "assigned", "picking_up", "picked_up", "in_transit", "delivered", "failed", "canceled", "expired"]] = None
+    order_ids: Optional[list[int]] = Field(None, min_length=1, max_length=200)   # فقط سفارش‌های انتخاب‌شده
 
 
 class FinanceKpis(BaseModel):

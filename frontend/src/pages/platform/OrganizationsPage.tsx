@@ -8,6 +8,7 @@ import { BUSINESS_TYPES, ROLE_LABELS, type Role } from "@/lib/labels";
 import { faDate, faNumber } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
 import { StarInput, Stars } from "@/components/performance/PerformanceUI";
+import { ActionCenter } from "@/components/ActionCenter";
 import { Badge, Button, Card, DataList, ErrorState, Field, Input, PageHeader, Spinner, StatCard, Table, TableSkeleton } from "@/ui/primitives";
 import { confirmDialog } from "@/ui/dialogs";
 
@@ -94,6 +95,7 @@ export default function OrganizationsPage() {
     <>
       <PageHeader eyebrow="پلتفرم" title="سازمان‌ها" subtitle={isAdmin ? "ساخت و مدیریت سازمان‌هایی که از سامانه استفاده می‌کنند" : "پشتیبان پلتفرم — فقط مشاهده"}
         actions={isAdmin && <Button icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>سازمان جدید</Button>} />
+      <ActionCenter />
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="سازمان‌ها" value={faNumber(list.length)} icon={<Building className="size-[18px]" />} />
         <StatCard label="فعال" value={faNumber(list.filter(o => o.is_active).length)} tone="success" />

@@ -133,7 +133,7 @@ await session("org_admin", "qazvin_admin", "admin123", async page => {
   await choose(page, "[data-testid=next-status]", "canceled");
   await page.click("[data-testid=apply-status]");
   await page.waitForSelector("[data-testid=order-history] >> text=لغوشده");
-  check("org_admin", "history shows pending→assigned→canceled", (await page.locator("[data-testid=order-history] li").count()) === 3);
+  check("org_admin", "history shows pending→assigned→canceled", (await page.locator("[data-testid=order-history] li[data-source=status]").count()) === 3);
   await page.keyboard.press("Escape");
 
   // انبار: ثبت ورود کالا + دفتر گردش
@@ -1947,6 +1947,103 @@ await session("tour", "qazvin_manager", "manager123", async page => {
   await page.keyboard.press("Escape");
   await page.waitForSelector("[data-testid=tour]", { state: "detached" });
 }, { tours: true, viewport: { width: 1440, height: 900 } });
+
+// ---------------- بهره‌وری: مرکز اقدام، جستجوی سراسری، نماهای ذخیره‌شده، خط زمانی، عملیات گروهی ----------------
+const prodPending = await apiCall(adminToken, "POST", "/orders/", {
+  items: [{ product_id: stockProduct.id, quantity: 1 }], customer: { name: "مشتری مرکز اقدام", mobile: "09125554433" },
+  destination_province: "قزوین", destination_city: "قزوین", destination_address: "خیابان اقدام، پلاک ۳", size: "m", priority: false,
+  delivery_window_start: `${iranDate(2)}T09:00:00+03:30`, delivery_window_end: `${iranDate(2)}T13:00:00+03:30`, auto_assign: false,
+});
+await session("productivity", "qazvin_admin", "admin123", async page => {
+  // مرکز اقدام: عدد کارت = طول فهرستی که دکمه‌اش باز می‌کند
+  await page.waitForSelector("[data-testid=action-card-orders_unassigned]");
+  const cardCount = Number(latinize(await page.locator("[data-testid=action-card-orders_unassigned] [data-testid=action-count]").textContent()));
+  await page.click("[data-testid=action-go-orders_unassigned]");
+  await page.waitForURL(/order_status=pending/);
+  await page.waitForSelector("[data-testid=orders-count]");
+  const listed = Number(latinize((await page.textContent("[data-testid=orders-count]")).split(" ")[0]).replace(/[٬,]/g, ""));
+  check("productivity", "action card count equals the list it opens", cardCount > 0 && cardCount === listed, `${cardCount} vs ${listed}`);
+  await page.goto(`${BASE}/app`);
+  await page.waitForSelector("text=کالاهای رو‌به‌اتمام");
+  await page.click("[data-testid=overview-toggle]");
+  await page.waitForSelector("text=کالاهای رو‌به‌اتمام", { state: "detached" });
+  await page.click("[data-testid=overview-toggle]");
+  check("productivity", "overview collapses and reopens", await page.isVisible("text=کالاهای رو‌به‌اتمام"));
+
+  // جستجوی سراسری: Ctrl+K، کد با ارقام فارسی، Enter ← جزئیات همان سفارش
+  await page.keyboard.press("Control+k");
+  await page.waitForSelector("[data-testid=search-dialog]");
+  const persianCode = prodPending.tracking_code.replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+  await page.fill("[data-testid=search-input]", persianCode);
+  await page.waitForSelector(`[data-testid=search-hit] >> text=${prodPending.tracking_code}`);
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(`[data-testid=order-detail] >> text=${prodPending.tracking_code}`);
+  check("productivity", "global search exact code opens the order", page.url().includes("/app/orders"));
+
+  // خط زمانی: سرآیند با مرحله فعلی و مانع
+  await page.waitForSelector("[data-testid=order-timeline] [data-testid=timeline-header]");
+  check("productivity", "timeline shows stage and blocker",
+    (await page.textContent("[data-testid=timeline-blocker]")).includes("خودرو تعیین نشده"));
+  check("productivity", "timeline has area filter chips", (await page.locator("[data-area-chip]").count()) >= 2);
+  await page.keyboard.press("Escape");
+
+  // نمای ذخیره‌شده: ذخیره فیلتر فعلی و اعمال دوباره از منو
+  const viewName = `بی‌خودرو ${runId}`;
+  await page.goto(`${BASE}/app/orders?order_status=pending`);
+  await page.waitForSelector("[data-testid=orders-count]");
+  await page.click("[data-testid=saved-views-orders]");
+  await page.click("[data-testid=saved-view-save]");
+  await page.fill("[data-testid=prompt-input]", viewName);
+  await page.click("[data-testid=dialog-ok]");
+  await toast(page);
+  await page.goto(`${BASE}/app/orders`);
+  await page.waitForSelector("[data-testid=orders-count]");
+  await page.click("[data-testid=saved-views-orders]");
+  await page.click(`[data-testid=saved-view-item] >> text=${viewName}`);
+  await page.waitForURL(/order_status=pending/);
+  check("productivity", "saved view re-applies its filters", true);
+
+  // عملیات گروهی: پیش‌نمایش ← اجرا ← نتیجه هر سطر
+  await page.locator(`[data-testid=orders-table] tr:has-text("${prodPending.tracking_code}") [data-testid=order-select]`).check();
+  await page.click("[data-testid=bulk-priority]");
+  await page.waitForSelector("[data-testid=bulk-summary]");
+  check("productivity", "bulk preview counts valid rows without changing data",
+    (await page.getAttribute("[data-testid=bulk-summary]", "data-valid")) === "1"
+    && (await apiCall(adminToken, "GET", `/orders/${prodPending.id}`)).priority === false);
+  await page.click("[data-testid=bulk-run]");
+  await page.waitForSelector("[data-testid=bulk-row][data-status=done]");
+  check("productivity", "bulk run reports per-row result", (await apiCall(adminToken, "GET", `/orders/${prodPending.id}`)).priority === true);
+  await page.click("[data-testid=bulk-close]");
+  await page.waitForSelector(`[data-testid=orders-table] tr:has-text("${prodPending.tracking_code}") >> text=فوری`);
+
+  // تیکت‌ها: فیلتر در آدرس صفحه می‌ماند و با باز کردن تیکت پاک نمی‌شود
+  await page.goto(`${BASE}/app/tickets?tab=all`);
+  await page.waitForSelector("[data-testid=tickets-list]");
+  if (await page.locator("[data-testid=ticket-row]").count()) {
+    await page.locator("[data-testid=ticket-row]").first().click();
+    await page.waitForURL(/\/app\/tickets\/\d+\?tab=all/);
+  }
+  check("productivity", "ticket filter survives opening a ticket", page.url().includes("tab=all"));
+  const views = await apiCall(adminToken, "GET", "/saved-views?page=orders");
+  for (const v of views.filter(x => x.name === viewName)) await apiCall(adminToken, "DELETE", `/saved-views/${v.id}`).catch(() => {});
+});
+await session("productivity-roles", "manager_tehran", "manager123", async page => {
+  await page.goto(`${BASE}/app`);
+  await page.waitForSelector("[data-testid=action-center], [data-testid=action-center-empty]");
+  check("productivity", "warehouse manager sees action center", true);
+});
+await session("productivity-driver", kycUser, "driver123", async page => {
+  await page.waitForSelector("[data-testid=action-center], [data-testid=action-center-empty]");
+  check("productivity", "driver page shows next work", true);
+  check("productivity", "driver has no global search", (await page.locator("[data-testid=search-open]").count()) === 0);
+});
+await session("productivity-platform", "superadmin", "superadmin123", async page => {
+  await page.waitForSelector("[data-testid=action-center], [data-testid=action-center-empty]");
+  await page.click("[data-testid=search-open]");
+  await page.fill("[data-testid=search-input]", "قزوین");
+  await page.waitForSelector("[data-testid=search-group-organization], [data-testid=search-empty]");
+  check("platform", "global search for platform staff", true);
+});
 
 // ---------------- مسیرهای قدیمی و ورود ناموفق ----------------
 await session("public", null, null, async page => {

@@ -7,6 +7,7 @@ import { api, authFetch, unwrap } from "@/api/client";
 import { useAuth, useMe } from "@/auth/AuthContext";
 import { TourProvider, useTour } from "@/components/tour/TourProvider";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { demoAllows, NavLinks, navItemsFor } from "@/components/navigation";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { ScanButton } from "@/components/ScanDialog";
@@ -95,6 +96,7 @@ function Shell() {
   const logo = useOrgLogo(!!me.organization_id);
   const staff = me.role === "org_admin" || me.role === "warehouse_manager";
   const showNotifications = staff || me.role === "driver";
+  const searchable = staff || me.role === "platform_admin" || me.role === "platform_support";
   const swipe = useSwipeToClose(() => setMobileOpen(false));
 
   useEffect(() => { try { localStorage.setItem("sidebar", collapsed ? "collapsed" : "open"); } catch { /* */ } }, [collapsed]);
@@ -161,6 +163,7 @@ function Shell() {
             </div>
           </div>
           <div className="ms-auto flex items-center gap-1">
+            {searchable && <GlobalSearch />}
             {staff && <ScanButton />}
             {showNotifications && <NotificationCenter />}
             <ThemeToggle />

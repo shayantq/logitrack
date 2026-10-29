@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CalendarClock, Clock, Lock, MapPin, MapPinned, Package, Phone, Truck } from "lucide-react";
 import { api, errorMessage, unwrap, type Schemas } from "@/api/client";
+import { ActionCenter } from "@/components/ActionCenter";
 import { OrderRouteCard } from "@/components/map/RouteCard";
 import { OrderStatusBadge, VehicleStatusBadge } from "@/components/StatusBadges";
 import { useToast } from "@/components/Toast";
@@ -11,6 +12,7 @@ import { Link } from "react-router-dom";
 import { EMPLOYMENT, WEEK, hhmm, isoDate, pyWeekday } from "@/lib/schedule";
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, cn } from "@/ui/primitives";
 import { promptDialog } from "@/ui/dialogs";
+import { useDeepLink } from "@/hooks/useDeepLink";
 
 /** مراحل سفر از دید راننده */
 const STEPS: { status: OrderStatus; label: string }[] = [
@@ -43,7 +45,7 @@ function TripProgress({ status }: { status: string }) {
 /** روز تحویل سفارش (تاریخ محلی شروع بازه) */
 const deliveryDay = (o: Schemas["OrderResponse"]) => isoDate(new Date(/[zZ]|[+-]\d\d:\d\d$/.test(o.delivery_window_start) ? o.delivery_window_start : `${o.delivery_window_start}Z`));
 
-function OrderCard({ order, locked = false }: { order: Schemas["OrderResponse"]; locked?: boolean }) {
+function OrderCard({ order, locked = false, flash = false }: { order: Schemas["OrderResponse"]; locked?: boolean; flash?: boolean }) {
   const toast = useToast();
   const queryClient = useQueryClient();
   const change = useMutation({
@@ -58,7 +60,7 @@ function OrderCard({ order, locked = false }: { order: Schemas["OrderResponse"];
   const [showRoute, setShowRoute] = useState(false);
 
   return (
-    <Card className="overflow-hidden" data-testid="driver-order">
+    <Card className={cn("overflow-hidden", flash && "focus-flash")} data-testid="driver-order" data-focus={`order-${order.id}`}>
       <div className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -128,10 +130,13 @@ export default function DriverPage() {
   const actionable = active.filter(o => deliveryDay(o) <= todayIso);
   const upcoming = active.filter(o => deliveryDay(o) > todayIso).sort((a, b) => a.delivery_window_start.localeCompare(b.delivery_window_start));
   const finished = (orders.data ?? []).filter(o => !ACTIVE_ORDER_STATUSES.includes(o.status as OrderStatus)).slice(0, 8);
+  // از کارت «نیازمند اقدام»: همان سفارش برجسته می‌شود
+  const flash = useDeepLink("order", { ready: !!orders.data });
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader eyebrow="راننده" title="خودرو و سفارش‌های من" subtitle="وضعیت هر سفارش را مرحله‌به‌مرحله ثبت کنید — هر ۱۵ ثانیه به‌روز می‌شود." />
+      <ActionCenter compact />
       <Card className="mb-6" data-testid="driver-vehicle">
         <CardHeader title={<span className="flex items-center gap-2"><Truck className="size-5 text-brand" />خودروی من</span>}
           actions={vehicle && <VehicleStatusBadge status={vehicle.status} />} />
@@ -163,11 +168,11 @@ export default function DriverPage() {
       {orders.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : orders.error ? <ErrorState error={orders.error} onRetry={orders.refetch} /> : (
         <div className="space-y-4">
           {actionable.length === 0 && <Card><EmptyState icon={<Package className="size-5" />} title="برای امروز سفارش فعالی ندارید" text="سفارش‌های جدید به‌محض تخصیص اینجا ظاهر می‌شوند." /></Card>}
-          {actionable.map(o => <OrderCard key={o.id} order={o} />)}
+          {actionable.map(o => <OrderCard key={o.id} order={o} flash={flash === o.id} />)}
           {upcoming.length > 0 && (
             <div className="space-y-4 pt-2" data-testid="upcoming-orders">
               <h2 className="font-bold">سفارش‌های روزهای آینده <span className="text-muted">({faNumber(upcoming.length)})</span></h2>
-              {upcoming.map(o => <OrderCard key={o.id} order={o} locked />)}
+              {upcoming.map(o => <OrderCard key={o.id} order={o} locked flash={flash === o.id} />)}
             </div>
           )}
           {finished.length > 0 && (

@@ -33,7 +33,7 @@ def update_policy(data: InventoryPolicyUpdate, db: db_dependency, user: user_dep
 
 @router.get("/items", response_model=RopList, summary="📈 نقطه سفارش هر کالا در هر انبار با جزئیات فرمول")
 def list_items(db: db_dependency, user: user_dependency, warehouse_id: Optional[int] = Query(None, gt=0),
-               status: Optional[Literal["out", "critical", "reorder", "ok"]] = None,
+               status: Optional[Literal["out", "critical", "reorder", "ok", "attention"]] = None,
                mode: Optional[Literal["manual", "auto"]] = None, q: Optional[str] = Query(None, max_length=100)):
     return _call(replenishment_service.list_items, db, user, warehouse_id, status, q, mode)
 

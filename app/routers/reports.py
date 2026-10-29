@@ -188,7 +188,8 @@ def generate_report(data: ReportRequest, db: db_dependency, current_user=Depends
         raise HTTPException(status_code=e.status_code, detail=e.message)
     params = {"date_from": data.date_from.isoformat() if data.date_from else None,
               "date_to": data.date_to.isoformat() if data.date_to else None,
-              "warehouse_id": data.warehouse_id, "status": data.status, "months": data.months}
+              "warehouse_id": data.warehouse_id, "status": data.status, "months": data.months,
+              "ids": data.order_ids if data.report == "orders" else None}
     task = generate_report_task.delay(current_user.organization_id, current_user.id, data.report, data.format, params)
     audit_service.record(db, current_user, "report.generate",
                          f"{report_data.TITLES[data.report]} ({ {'pdf': 'PDF', 'csv': 'CSV'}.get(data.format, 'اکسل') }) گرفته شد",

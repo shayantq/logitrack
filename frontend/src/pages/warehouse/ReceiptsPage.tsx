@@ -8,6 +8,7 @@ import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCheck, ClipboardCheck, PackageOpen, Plus, Search, Trash2, X } from "lucide-react";
 import { api, errorMessage, isServerError, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
+import { SavedViews } from "@/components/SavedViews";
 import { useToast } from "@/components/Toast";
 import { usePartners, useProducts, useWarehouses } from "@/hooks/data";
 import { DISCREPANCY, PUTAWAY_STATUS, RECEIPT_STATUS, RECEIPT_TYPES } from "@/lib/labels";
@@ -54,7 +55,7 @@ export default function ReceiptsPage() {
         subtitle="ورود برنامه‌ریزی‌شده یا پیش‌بینی‌نشده با شمارش، بچ، انقضا و سریال؛ کسری و اضافه تحویل هنگام بستن رسید ثبت می‌شود."
         actions={<Button icon={<Plus className="size-4" />} onClick={() => setCreating(true)} data-testid="receipt-new">رسید جدید</Button>} />
       <Card>
-        <div className="grid gap-3 border-b border-border p-4 md:grid-cols-4">
+        <div className="grid gap-3 border-b border-border p-4 md:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" />
             <Input className="pr-10" placeholder="کد رسید، بارنامه یا سفارش خرید" value={params.get("q") ?? ""} onChange={e => setFilter("q", e.target.value)} data-testid="receipts-search" />
@@ -70,6 +71,9 @@ export default function ReceiptsPage() {
               <option value="">همه انبارها</option>{warehouses.filter(w => w.holds_stock).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </Select>
           ) : <div className="hidden md:block" />}
+          <SavedViews page="receipts" filters={{ q: params.get("q") ?? undefined, status: params.get("status") ?? undefined,
+            type: params.get("type") ?? undefined, warehouse: params.get("warehouse") ?? undefined }}
+            onApply={f => setParams(Object.fromEntries(Object.entries(f).filter(([, v]) => v)) as Record<string, string>, { replace: true })} />
         </div>
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : !receipts?.length ? (
           <EmptyState icon={<PackageOpen className="size-5" />} title="رسیدی با این فیلترها نیست"

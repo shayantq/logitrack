@@ -6,18 +6,15 @@ import { useMe } from "@/auth/AuthContext";
 import { SuggestionList } from "@/components/dispatch/SuggestionList";
 import { OrderRouteCard } from "@/components/map/RouteCard";
 import { OrderSettlement } from "./OrderSettlement";
+import { OrderTimeline } from "./OrderTimeline";
 import { OrderStatusBadge } from "@/components/StatusBadges";
 import { useToast } from "@/components/Toast";
 import { useUsers, useVehicles } from "@/hooks/data";
-import { nextStatusesFor, orderStatusLabel, orderStatusTone, type OrderStatus } from "@/lib/labels";
+import { nextStatusesFor, orderStatusLabel, type OrderStatus } from "@/lib/labels";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, ErrorState, Input, Select, Spinner, cn } from "@/ui/primitives";
+import { Badge, Button, ErrorState, Input, Select, Spinner } from "@/ui/primitives";
 import { confirmDialog } from "@/ui/dialogs";
-
-const DOT: Record<string, string> = {
-  success: "bg-success", danger: "bg-danger", warning: "bg-warning", info: "bg-info", violet: "bg-violet", brand: "bg-brand", accent: "bg-accent", muted: "bg-muted",
-};
 
 function InfoBlock({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
@@ -159,19 +156,7 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
             </div>
           )}
 
-          <div>
-            <h4 className="mb-3 text-sm font-bold">تاریخچه وضعیت</h4>
-            <ol className="relative space-y-4 border-r-2 border-border pr-5" data-testid="order-history">
-              {order.history.map(h => (
-                <li key={h.id} className="relative">
-                  <span className={cn("absolute top-1.5 -right-[27px] size-3 rounded-full ring-4 ring-surface", DOT[orderStatusTone(h.to_status)])} />
-                  <div className="flex flex-wrap items-center gap-2"><OrderStatusBadge status={h.to_status} />
-                    <span className="text-xs text-muted">{faShortDateTime(h.changed_at)} — {h.changed_by_name ?? "سیستم"}</span></div>
-                  {h.note && <p className="mt-1 text-sm text-text-2">{h.note}</p>}
-                </li>
-              ))}
-            </ol>
-          </div>
+          <OrderTimeline orderId={order.id} version={`${order.status}-${order.history.length}-${order.priority}`} />
         </div>
       )}
     </Modal>

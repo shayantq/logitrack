@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftRight, Boxes, Download, FileSpreadsheet, FileText, History, Layers, PackagePlus, PackageSearch, Search, Trash2, Upload } from "lucide-react";
 import { api, errorMessage, isServerError, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
+import { SavedViews } from "@/components/SavedViews";
 import { StockBadge } from "@/components/StatusBadges";
 import { useToast } from "@/components/Toast";
 import { useAsyncExport, usePartners, useProducts, useWarehouses } from "@/hooks/data";
@@ -276,7 +277,10 @@ export default function InventoryPage() {
   const { data: products, isLoading, error, refetch } = useProducts();
   const [productModal, setProductModal] = useState(false);
   const [movementFor, setMovementFor] = useState<Product | null | undefined>(undefined);
-  const [search, setSearch] = useState("");
+  // جستجو در آدرس صفحه (قابل اشتراک و ذخیره در «نماهای من»)
+  const [params, setParams] = useSearchParams();
+  const search = params.get("q") ?? "";
+  const setSearch = (v: string) => setParams(p => { if (v) p.set("q", v); else p.delete("q"); return p; }, { replace: true });
   const [catalogId, setCatalogId] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [positionsFor, setPositionsFor] = useState<Product | null>(null);
@@ -307,11 +311,12 @@ export default function InventoryPage() {
           <Button icon={<PackagePlus className="size-4" />} onClick={() => setProductModal(true)}>کالای جدید</Button>
         </>} />
       <Card>
-        <div className="border-b border-border p-4">
-          <div className="relative max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
+          <div className="relative w-full max-w-sm">
             <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" />
             <Input className="pr-10" placeholder="جستجوی نام، کد یا بارکد کالا" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
+          <SavedViews page="inventory" filters={{ q: search }} onApply={f => setSearch(f.q ?? "")} />
         </div>
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : visible.length === 0 ? (
           <EmptyState icon={<PackageSearch className="size-5" />} title={term ? "کالایی با این مشخصات نیست" : "هنوز کالایی ثبت نشده"}

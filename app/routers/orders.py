@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from starlette import status
@@ -10,7 +10,8 @@ from app.models import ACTIVE_ORDER_STATUSES, Order, RoleEnum, Vehicle
 from app.schemas.order import (
     OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatus, OrderStatusRequest,
 )
-from app.services import order_service
+from app.schemas.action_center import BulkIn, BulkOut, OrderTimelineOut, PriorityIn
+from app.services import bulk_service, order_service, order_timeline_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -63,12 +64,38 @@ def get_all_orders(
         delivery_from: Optional[date] = Query(None, description='روز تحویل از (وقت ایران، شامل)'),
         delivery_to: Optional[date] = Query(None, description='روز تحویل تا (وقت ایران، شامل)'),
         priority: Optional[bool] = Query(None, description='فقط فوری‌ها'),
+        view: Optional[Literal[tuple(order_service.ORDER_VIEWS)]] = Query(None, description='نمای نام‌دار (مثل دیرکرد)'),
     ):
     return order_service.list_orders(
         db, user, order_status, province, city, q, vehicle_id, date_from, date_to, skip, limit,
         tracking_code=tracking_code, product=product, driver_id=driver_id, driver=driver, plate=plate,
-        delivery_from=delivery_from, delivery_to=delivery_to, priority=priority,
+        delivery_from=delivery_from, delivery_to=delivery_to, priority=priority, view=view,
     )
+
+
+@router.post('/bulk', response_model=BulkOut, summary="🧺 عملیات گروهی (پیش‌نمایش با dry_run، سپس اجرا سطر به سطر)")
+def bulk(data: BulkIn, db: db_dependency, user: user_dependency):
+    """**عملیات:** `assign` (تخصیص خودرو؛ params.vehicle_id اختیاری = خودکار) و `priority` (params.priority؛ فقط ادمین)."""
+    try:
+        return bulk_service.orders(db, user, data.action, data.ids, data.params, data.dry_run)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get('/{order_id}/timeline', response_model=OrderTimelineOut, summary="🕒 خط زمانی یکپارچه سفارش (انبار، ناوگان، مالی، پشتیبانی)")
+def timeline(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0)):
+    try:
+        return order_timeline_service.timeline(db, user, order_id)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.put('/{order_id}/priority', response_model=OrderDetailResponse, summary="⚡ فوری یا عادی کردن سفارش فعال (فقط ادمین)")
+def set_priority(data: PriorityIn, db: db_dependency, user: user_dependency, order_id: int = Path(gt=0)):
+    try:
+        return OrderDetailResponse.from_order(order_service.set_priority(db, user, order_id, data.priority))
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get('/{order_id}', status_code=status.HTTP_200_OK, response_model=OrderDetailResponse, summary="🔍 جزئیات کامل سفارش + تاریخچه وضعیت")

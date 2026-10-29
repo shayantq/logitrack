@@ -6,11 +6,13 @@
  * فهرست و گفت‌وگو کنار هم (روی موبایل جدا)؛ هر ۱۵ ثانیه به‌روز می‌شود.
  */
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Clock, Inbox, LifeBuoy, Lock, MessageSquarePlus, Package, Search, Share2, Truck, UserRound } from "lucide-react";
 import { api, errorMessage, unwrap } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
+import { BulkActionModal, type BulkRequest } from "@/components/BulkActionModal";
+import { SavedViews } from "@/components/SavedViews";
 import { useToast } from "@/components/Toast";
 import { TicketThread } from "@/components/tickets/TicketThread";
 import { useUsers } from "@/hooks/data";
@@ -67,9 +69,28 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
   const { id } = useParams();
   const selected = id ? Number(id) : null;
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>(mode === "driver" ? "all" : "waiting");
-  const [source, setSource] = useState<string>("");
-  const [q, setQ] = useState("");
+  const { search } = useLocation();
+  // فیلترها در آدرس صفحه (قابل اشتراک و ذخیره در «نماهای من»)؛ باز کردن یک تیکت آن‌ها را نگه می‌دارد
+  const [urlParams, setUrlParams] = useSearchParams();
+  const defaultTab: Tab = mode === "driver" ? "all" : "waiting";
+  const tab = (urlParams.get("tab") as Tab | null) ?? defaultTab;
+  const source = urlParams.get("source") ?? "";
+  const q = urlParams.get("q") ?? "";
+  const setFilter = (key: "tab" | "source" | "q", value: string) => setUrlParams(p => {
+    if (value && !(key === "tab" && value === defaultTab)) p.set(key, value); else p.delete(key);
+    return p;
+  }, { replace: true });
+  const setTab = (v: Tab) => setFilter("tab", v);
+  const setSource = (v: string) => setFilter("source", v);
+  const setQ = (v: string) => setFilter("q", v);
+  const applyView = (f: Record<string, string | undefined>) =>
+    setUrlParams(Object.fromEntries(Object.entries(f).filter(([k, v]) => v && ["tab", "source", "q"].includes(k))) as Record<string, string>, { replace: true });
+  const open = (ticketId: number) => navigate({ pathname: `${cfg.route}/${ticketId}`, search });
+  // انتخاب چندتایی (فقط میز سازمان) برای عملیات گروهی
+  const queryClient = useQueryClient();
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [bulk, setBulk] = useState<BulkRequest | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [frame, frameStyle] = useFillViewport<HTMLDivElement>();
 
@@ -118,13 +139,26 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
                 </Select>
               )}
             </div>
+            {mode === "org" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <SavedViews page="tickets" filters={{ tab: tab === defaultTab ? undefined : tab, source, q }} onApply={applyView} />
+                <Button size="sm" variant={picking ? "soft" : "ghost"} data-testid="tickets-pick"
+                  onClick={() => { setPicking(v => !v); setPicked(new Set()); }}>{picking ? "پایان انتخاب" : "انتخاب چندتایی"}</Button>
+              </div>
+            )}
+            {picking && picked.size > 0 && (
+              <TicketBulkBar ids={[...picked]} onRequest={setBulk} />
+            )}
           </div>
           <div className="flex-1 overflow-y-auto" data-testid="tickets-list">
             {list.isLoading ? <div className="space-y-2 p-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-20" />)}</div>
               : list.error ? <ErrorState error={list.error} onRetry={list.refetch} />
                 : !list.data?.length ? <EmptyState icon={<Inbox className="size-5" />} title={tab === "waiting" ? "تیکتی منتظر پاسخ شما نیست" : "تیکتی پیدا نشد"} />
                   : list.data.map(t => <TicketListRow key={t.id} t={t} side={cfg.side} mode={mode} active={t.id === selected}
-                    onClick={() => navigate(`${cfg.route}/${t.id}`)} />)}
+                    picking={picking} picked={picked.has(t.id)}
+                    onClick={() => picking
+                      ? setPicked(prev => { const next = new Set(prev); if (next.has(t.id)) next.delete(t.id); else if (next.size < 200) next.add(t.id); return next; })
+                      : open(t.id)} />)}
           </div>
         </Card>
 
@@ -135,18 +169,27 @@ export function TicketsWorkspace({ mode }: { mode: Mode }) {
               </Card>}
         </div>
       </div>
-      {newOpen && <NewTicketModal mode={mode} onClose={() => setNewOpen(false)} onCreated={t => navigate(`${cfg.route}/${t.id}`)} />}
+      {newOpen && <NewTicketModal mode={mode} onClose={() => setNewOpen(false)} onCreated={t => open(t.id)} />}
+      <BulkActionModal request={bulk} onClose={() => setBulk(null)} onDone={() => {
+        setPicked(new Set());
+        queryClient.invalidateQueries({ queryKey: ["tickets"] });
+        queryClient.invalidateQueries({ queryKey: ["action-center"] });
+      }} />
     </>
   );
 }
 
-function TicketListRow({ t, side, mode, active, onClick }: { t: TicketRow; side: Side; mode: Mode; active: boolean; onClick: () => void }) {
+function TicketListRow({ t, side, mode, active, onClick, picking = false, picked = false }: {
+  t: TicketRow; side: Side; mode: Mode; active: boolean; onClick: () => void; picking?: boolean; picked?: boolean;
+}) {
   const waiting = waitingLabel(t, side);
   const Icon = SOURCE_ICON[t.source as keyof typeof SOURCE_ICON] ?? UserRound;
   return (
-    <button type="button" onClick={onClick} data-testid="ticket-row" data-code={t.code} aria-pressed={active}
-      className={cn("block w-full border-b border-border px-4 py-3 text-start transition last:border-b-0", active ? "bg-brand-soft/60" : "hover:bg-surface-2")}>
+    <button type="button" onClick={onClick} data-testid="ticket-row" data-code={t.code} aria-pressed={picking ? picked : active}
+      className={cn("block w-full border-b border-border px-4 py-3 text-start transition last:border-b-0",
+        (picking ? picked : active) ? "bg-brand-soft/60" : "hover:bg-surface-2")}>
       <div className="flex items-center gap-2">
+        {picking && <input type="checkbox" readOnly tabIndex={-1} checked={picked} aria-hidden className="size-4 shrink-0 accent-[var(--brand)]" />}
         <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", waiting?.mine ? "bg-brand text-brand-ink" : "bg-surface-2 text-muted")}><Icon className="size-3.5" /></span>
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{t.subject}</span>
         {t.priority !== "normal" && <Badge tone={TICKET_PRIORITY[t.priority].tone}>{TICKET_PRIORITY[t.priority].label}</Badge>}
@@ -167,8 +210,37 @@ function TicketListRow({ t, side, mode, active, onClick }: { t: TicketRow; side:
   );
 }
 
+/** نوار عملیات گروهی تیکت‌های انتخاب‌شده: مسئول، اولویت، حل‌شده، بستن (با تأیید تایپی) */
+function TicketBulkBar({ ids, onRequest }: { ids: number[]; onRequest: (r: BulkRequest) => void }) {
+  const staff = useUsers();
+  const label = `${ids.length.toLocaleString("fa-IR")} تیکت`;
+  const req = (action: string, title: string, params: Record<string, unknown> = {}, typedConfirm = false) =>
+    onRequest({ endpoint: "/tickets/bulk", action, ids, params, title, typedConfirm });
+  return (
+    <div className="space-y-2 rounded-xl bg-brand-soft/40 p-2.5" data-testid="tickets-bulk-bar">
+      <div className="text-xs font-semibold">{label} انتخاب شده</div>
+      <div className="flex flex-wrap gap-2">
+        <Select value="" onChange={e => { if (e.target.value) req("assign", `تعیین مسئول برای ${label}`, { assignee_id: Number(e.target.value) }); }}
+          className="w-36" aria-label="تعیین مسئول">
+          <option value="">تعیین مسئول…</option>
+          {(staff.data ?? []).filter(u => u.role === "org_admin" || u.role === "warehouse_manager")
+            .map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
+        </Select>
+        <Select value="" onChange={e => { if (e.target.value) req("priority", `تغییر اولویت ${label}`, { priority: e.target.value }); }}
+          className="w-32" aria-label="اولویت">
+          <option value="">اولویت…</option>
+          {Object.entries(TICKET_PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </Select>
+        <Button size="sm" variant="secondary" onClick={() => req("resolve", `حل‌شده اعلام کردن ${label}`)} data-testid="tickets-bulk-resolve">حل‌شده</Button>
+        <Button size="sm" variant="outline-danger" onClick={() => req("close", `بستن ${label}`, {}, true)} data-testid="tickets-bulk-close">بستن</Button>
+      </div>
+    </div>
+  );
+}
+
 function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
   const cfg = CONFIG[mode];
+  const { search } = useLocation();
   const toast = useToast();
   const queryClient = useQueryClient();
   const me = useMe();
@@ -211,7 +283,7 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
     <Card className="flex h-full min-h-0 flex-col overflow-hidden animate-fade" data-testid="ticket-detail" data-status={t.status}>
       <div className="border-b border-border px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Link to={cfg.route} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 lg:hidden" aria-label="بازگشت"><ArrowRight className="size-4" /></Link>
+          <Link to={{ pathname: cfg.route, search }} className="grid size-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 lg:hidden" aria-label="بازگشت"><ArrowRight className="size-4" /></Link>
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <h2 className="min-w-0 truncate text-base font-bold leading-8" title={t.subject}>{t.subject}</h2>
             <Badge tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Badge>
