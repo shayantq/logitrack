@@ -127,10 +127,37 @@ def _shift_template(template_url: str) -> None:
         vacuum.dispose()
 
 
+def _head_revision() -> str:
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    return ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini"))).get_current_head()
+
+
+def _upgrade_if_stale(template_url: str) -> None:
+    """
+    پس از هر به‌روزرسانی سرور، مایگریشن‌های تازه فقط روی دیتابیس اصلی اجرا می‌شوند؛ قالب دمو با ساختار قدیمی می‌ماند
+    و هر درخواست دمو خطا می‌دهد. پیش از هر ریست، اگر قالب از head عقب است همان مایگریشن‌ها روی قالب اجرا می‌شوند.
+    """
+    engine = create_engine(template_url)
+    try:
+        with engine.connect() as conn:
+            current = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    finally:
+        engine.dispose()
+    if current == _head_revision():
+        return
+    _run([sys.executable, "-m", "alembic", "upgrade", "head"], template_url)
+    from app import db_roles
+    role = db_roles.runtime_role()
+    if role:
+        db_roles.grant(template_url, role)
+
+
 def reset() -> None:
     if not demo.enabled():
         return
     _, template_url, _, name = _urls()
+    _upgrade_if_stale(template_url)
     _shift_template(template_url)
     _admin(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
     _admin(f'CREATE DATABASE "{name}" TEMPLATE "{name}_template"')
