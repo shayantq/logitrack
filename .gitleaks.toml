@@ -5,4 +5,5 @@ useDefault = true
 
 [allowlist]
 description = "مقدارهای ساختگی تست‌های امنیتی"
-regexes = ['''Tmp-Secret-9921''']
+# Tmp-Secret-9921: رمز موقت ساختگی تست لاگ؛ GEZDGNBV...: کلید آزمون عمومی RFC 6238 (= "12345678901234567890")
+regexes = ['''Tmp-Secret-9921''', '''GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ''']

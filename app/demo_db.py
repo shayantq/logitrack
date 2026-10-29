@@ -35,7 +35,12 @@ def _local_date(value: datetime):
 
 
 def _urls() -> tuple[str, str, str, str]:
+    # ساخت/حذف دیتابیس و پر کردن قالب با کاربر مدیر؛ نقش محدود برنامه (app/db_roles.py) این امتیازها را ندارد
     url = make_url(demo.database_url())
+    admin = os.getenv("MIGRATION_DATABASE_URL", "").strip()
+    if admin:
+        a = make_url(admin)
+        url = url.set(username=a.username, password=a.password, host=a.host, port=a.port)
     name = url.database
     template = f"{name}_template"
     return (url.render_as_string(hide_password=False), url.set(database=template).render_as_string(hide_password=False),
@@ -52,8 +57,9 @@ def _admin(sql: str) -> None:
 
 
 def _run(args: list[str], database_url: str) -> None:
-    env = {**os.environ, "DATABASE_URL": database_url.replace("postgresql+psycopg://", "postgresql://", 1),
-           "SHOWCASE_MEDIA_PREFIX": "demo/"}
+    url = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    # مایگریشن MIGRATION_DATABASE_URL را ترجیح می‌دهد (alembic/env.py)؛ هر دو باید به همین قالب اشاره کنند
+    env = {**os.environ, "DATABASE_URL": url, "MIGRATION_DATABASE_URL": url, "SHOWCASE_MEDIA_PREFIX": "demo/"}
     subprocess.run(args, cwd=ROOT, env=env, check=True)
 
 
@@ -73,6 +79,11 @@ def build() -> None:
             conn.execute(text("INSERT INTO demo_meta VALUES (:t)"), {"t": _now()})
     finally:
         engine.dispose()
+    # نقش محدود برنامه روی قالب هم دسترسی ردیفی بگیرد (دیتابیس دمو با همین دسترسی‌ها از قالب کپی می‌شود)
+    from app import db_roles
+    role = db_roles.runtime_role()
+    if role:
+        db_roles.grant(template_url, role)
     reset()
     print("✅ نسخه نمایشی آماده است.")
 

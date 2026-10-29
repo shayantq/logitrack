@@ -16,7 +16,8 @@ config = context.config
 
 # آدرس دیتابیس را از همان متغیر محیطی پروژه (DATABASE_URL) می‌خوانیم،
 # دقیقا همان چیزی که app/database.py استفاده می‌کند — یک منبع حقیقت واحد.
-db_url = os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:123456@localhost:5432/logitrack")
+# اگر برنامه با نقش محدود اجرا می‌شود (app/db_roles.py)، مایگریشن با کاربر مدیر (MIGRATION_DATABASE_URL) اجرا می‌شود
+db_url = os.getenv("MIGRATION_DATABASE_URL") or os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:123456@localhost:5432/logitrack")
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 config.set_main_option("sqlalchemy.url", db_url)

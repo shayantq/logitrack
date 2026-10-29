@@ -49,7 +49,7 @@ def insecure_settings() -> list[tuple[str, bool]]:
         (f"SECRET_KEY حداقل {MIN_SECRET_LENGTH} نویسه", len(key) >= MIN_SECRET_LENGTH),
         ("SECRET_KEY مقدار نمونه نیست", key.lower() not in PLACEHOLDER_SECRETS and not key.lower().startswith("change-me")),
     ]
-    for name in ("DATABASE_URL", "DEMO_DATABASE_URL"):
+    for name in ("DATABASE_URL", "MIGRATION_DATABASE_URL", "DEMO_DATABASE_URL"):
         url = os.getenv(name, "").strip()
         if url:
             password = _db_password(url)

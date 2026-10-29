@@ -54,3 +54,120 @@
 - **تست‌ها** — `tests/unit/test_security_hardening.py` و `tests/api/test_security_api.py`.
 
 بررسی تاریخچه git با gitleaks هیچ رازی پیدا نکرد.
+
+## ۳. تغییرات فاز ۲
+
+- **نشست ماندگار (SEC-05، SEC-21)**
+  - توکن دسترسی ۳۰ دقیقه‌ای است و درست پیش از انقضا بی‌صدا تمدید می‌شود.
+  - اعتبار ماندگار فقط در کوکی `HttpOnly`، `SameSite=Strict` و `Secure` (روی HTTPS) با مسیر `/auth` است و جاوااسکریپت صفحه آن را نمی‌بیند.
+  - هر تمدید، توکن کوکی را عوض می‌کند (چرخش). اگر توکنِ جایگزین‌شده دوباره بیاید، یعنی دزدیده شده و کل نشست باطل می‌شود. استثنا: ۳۰ ثانیه برای دو زبانه‌ای که هم‌زمان تمدید کرده‌اند.
+  - گزینه «مرا به خاطر بسپار» در صفحه ورود:
+    - با آن: ۳۰ روز، با سقف ۷ روز بیکاری.
+    - بدون آن: با بستن مرورگر پاک می‌شود و حداکثر ۱۲ ساعت (۲ ساعت بیکاری) اعتبار دارد.
+    - برای کارکنان پلتفرم هرگز ماندگار نمی‌شود.
+  - خروج، نشست را سمت سرور هم می‌بندد.
+  - تغییر یا بازنشانی رمز و غیرفعال‌سازی، همه نشست‌های دیگر را بی‌اثر می‌کند.
+  - فهرست و بستن نشست‌ها: `GET /auth/sessions` و `DELETE /auth/sessions/{id}`.
+  - درخواست تمدید و خروج فقط با هدر `X-Requested-With: pasineh` از خود سایت پذیرفته می‌شود (سد دوم CSRF).
+- **ورود دومرحله‌ای (SEC-06)**
+  - کد TOTP شش‌رقمی (Google/Microsoft Authenticator)، مطابق بردارهای آزمون RFC 6238.
+  - هر کد فقط یک بار پذیرفته می‌شود. کد اشتباه هم تلاش ناموفق ورود حساب می‌شود.
+  - کد QR در خود سرور ساخته می‌شود و راز به هیچ سرویس بیرونی نمی‌رسد.
+  - برای کارکنان پلتفرم در سرور اصلی اجباری است: تا راه‌اندازی نکنند پنل باز نمی‌شود و خاموش‌کردنش ممکن نیست.
+  - برای بقیه کاربران اختیاری است (منوی کاربر ← «ورود دومرحله‌ای»).
+  - گوشی گم‌شده: بازنشانی رمز توسط ادمین آن را خاموش می‌کند. همه این‌ها در گزارش فعالیت ثبت می‌شوند.
+- **مبلغ‌های دقیق (DB-01)** — ۱۴ ستون پولی از `Float` به `NUMERIC(18,2)` رفتند (مایگریشن 0028). در پایتون همچنان عدد معمولی برمی‌گردند تا هیچ محاسبه‌ای نشکند. وزن، ابعاد، درصدها و ضریب‌های آماری `Float` ماندند.
+- **حفظ تاریخچه (DB-02)**
+  - `stocktake_lines.product_id` و `stocktakes.warehouse_id` از `CASCADE` به `RESTRICT` رفتند. سرویس‌ها پیش از دیتابیس پیام خوانا می‌دهند.
+  - بقیه رابطه‌های `CASCADE` جزئی از خود رکوردند (اقلام سفارش، پیام تیکت، مدارک کاربری که فقط بدون سابقه حذف می‌شود) و عمداً ماندند.
+- **مدارک راننده (SEC-09)** — مشاهده مدرک هویتی یا خودروی راننده توسط ادمین در گزارش فعالیت ثبت می‌شود (`driver.document_view`). محتوای فایل ثبت نمی‌شود.
+- **نقش محدود دیتابیس (SEC-10، DB-06)** — اختیاری است و تا روی سرور فعال نشود رفتاری عوض نمی‌شود.
+  - `python -m app.db_roles` نقش `pasineh_app` را می‌سازد. این نقش فقط خواندن و نوشتن ردیف دارد: نه تغییر جدول، نه ساخت نقش یا دیتابیس، نه دور زدن RLS، نه خاموش‌کردن triggerهای دفتر گردش.
+  - مایگریشن و بازسازی دمو با `MIGRATION_DATABASE_URL` (کاربر مدیر) انجام می‌شود.
+  - آزموده شده: تست یکپارچگی روی PostgreSQL (`tests/integration/test_db_roles_postgres.py`)، کل E2E (۳۸۸ بررسی) با برنامه روی نقش محدود، و ساخت و بازنشانی دمو.
+
+### آنچه عمداً انجام نشد (با دلیل)
+
+- **RLS در PostgreSQL (SEC-02)**
+  - جداسازی امروز در لایه ORM است (`app/core/tenancy.py`) و با تست‌های گسترده پوشش دارد.
+  - RLS نیازمند سیاست روی حدود ۶۰ جدول و ست‌کردن سازمان جاری در هر تراکنش است. اشتباه در آن یا سایت را از کار می‌اندازد یا داده را پنهان می‌کند.
+  - پیش‌نیازش (نقش غیرمالک و غیر superuser) اکنون آماده است.
+  - گام بعدی پیشنهادی:
+    1. `SET LOCAL pasineh.org_id` در `set_tenant`.
+    2. سیاست `USING/WITH CHECK (organization_id = current_setting('pasineh.org_id')::int)` جدول‌به‌جدول، با تست هر جدول.
+    3. سیاست جدا برای کارکنان پلتفرم.
+- **کلید خارجی ترکیبی سازمانی (DB-03)**
+  - ارجاع به رکورد سازمان دیگر در سرویس‌ها و لایه ORM رد می‌شود و تست دارد.
+  - قید ترکیبی یعنی `UNIQUE(organization_id, id)` روی ده‌ها جدول و بازسازی همه کلیدهای خارجی، با قفل طولانی روی جدول‌های بزرگ سرور.
+  - بهتر است همراه RLS و در یک پنجره نگهداری انجام شود.
+- **CSP اجباری** — فعلاً در حالت گزارش است. بعد از چند هفته بدون گزارش تخطی، می‌توان `Content-Security-Policy-Report-Only` را به `Content-Security-Policy` تبدیل کرد (`app/core/http_security.py`).
+- **python-jose** — نسخه رفع‌شده ندارد و در پسینه قابل سوءاستفاده نیست (فقط HS256 با الگوریتم محدود). جایگزینی با PyJWT کار بعدی است.
+
+## ۴. راهنمای سرور (فاز ۳) — این دستورها را خودتان روی سرور اجرا کنید
+
+هیچ‌کدام از این دستورها مقدار رمزی چاپ نمی‌کند.
+
+### فعال‌سازی بستن امن و نقش محدود دیتابیس
+
+```bash
+cd /opt/logitrack
+# ۱) بررسی تنظیمات (فقط PASS/FAIL)
+docker compose run --rm --no-deps web python -m app.security_preflight
+# ۲) اگر SECRET_KEY رد شد: کلید تازه (همه یک بار از سیستم خارج می‌شوند)
+sed -i '/^SECRET_KEY=/d' .env && echo "SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n/+=')" >> .env
+# ۳) نقش محدود برنامه
+APP_DB_PASSWORD=$(openssl rand -hex 24)
+docker compose exec -T -e APP_DB_USER=pasineh_app -e APP_DB_PASSWORD="$APP_DB_PASSWORD" web python -m app.db_roles
+printf 'APP_DB_USER=pasineh_app\nAPP_DB_PASSWORD=%s\n' "$APP_DB_PASSWORD" >> .env && unset APP_DB_PASSWORD
+# ۴) حالت سرور اصلی
+grep -q '^APP_ENV=' .env && sed -i 's/^APP_ENV=.*/APP_ENV=production/' .env || echo 'APP_ENV=production' >> .env
+docker compose run --rm --no-deps web python -m app.security_preflight   # همه باید PASS باشند
+docker compose up -d --wait
+```
+
+برگشت در صورت مشکل: خط‌های `APP_DB_USER` و `APP_DB_PASSWORD` را از `.env` پاک کنید و `docker compose up -d` بزنید (برنامه دوباره با کاربر قبلی وصل می‌شود).
+
+### بررسی‌های دوره‌ای
+
+```bash
+ss -lntp | grep -E ':(5432|5433|8001)\b'      # باید فقط 127.0.0.1 باشد، نه 0.0.0.0
+curl -s -o /dev/null -w '%{http_code}\n' https://passineh.ir/docs   # پس از APP_ENV=production باید 404 باشد
+sudo ufw status                               # فقط 22، 80 و 443 باز
+```
+
+### پشتیبان رمزگذاری‌شده بیرون از سرور (SEC-15)
+
+پیشنهاد: **RPO ۲۴ ساعت** (حداکثر یک روز داده از دست برود) و **RTO ۲ ساعت** (بازگشت کامل).
+
+```bash
+# یک بار: کلید رمزگذاری پشتیبان (جای امن و بیرون از سرور هم نگه دارید)
+sudo install -m 600 /dev/null /root/.pasineh-backup-key && openssl rand -base64 32 | sudo tee /root/.pasineh-backup-key >/dev/null
+# هر شب ساعت ۳ (crontab -e کاربر root)
+0 3 * * * cd /opt/logitrack && docker compose exec -T db pg_dump -U postgres -d logitrack | gzip | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/root/.pasineh-backup-key -out backups/nightly-$(date +\%F).sql.gz.enc && find backups -name 'nightly-*.enc' -mtime +14 -delete
+# سپس انتقال به فضای بیرونی (مثلاً با rclone به فضای ابری) — همین پوشه backups/
+```
+
+تمرین بازگردانی، ماهی یک بار، روی دیتابیس جدا:
+
+```bash
+openssl enc -d -aes-256-cbc -pbkdf2 -pass file:/root/.pasineh-backup-key -in backups/nightly-YYYY-MM-DD.sql.gz.enc | gunzip > /tmp/restore.sql
+docker compose exec -T db createdb -U postgres restore_check && docker compose exec -T db psql -U postgres -d restore_check -q < /tmp/restore.sql
+docker compose exec -T db psql -U postgres -d restore_check -c "select count(*) from orders"   # مقایسه با دیتابیس اصلی
+docker compose exec -T db dropdb -U postgres restore_check && rm /tmp/restore.sql
+```
+
+### کاربر استقرار و SSH (SEC-12)
+
+- استقرار خودکار CI فعلاً خاموش است (Secrets تنظیم نشده‌اند). استقرار دستی است و همین امن‌تر است.
+- اگر روزی روشنش کردید:
+  - یک کاربر و کلید SSH جدا فقط برای استقرار بسازید.
+  - `PasswordAuthentication no` در `/etc/ssh/sshd_config`.
+  - عضویت در گروه `docker` را هم‌ارز root بدانید.
+  - محیط `production` در GitHub را با تأیید دستی ببندید.
+
+### لاگ و نگهداری داده (SEC-14، SEC-20)
+
+- **لاگ‌های قدیمی سرور:** تا قبل از این تغییرات، پیامک و ایمیل روی سرور تنظیم نبود و متن پیام‌ها (از جمله رمز موقت سازمان‌های تأییدشده) در لاگ container ثبت می‌شد.
+  - لاگ هر container با ساخته‌شدن container جدید پاک می‌شود و استقرار همین کار را می‌کند.
+  - آن رمزهای موقت در اولین ورود اجباراً عوض شده‌اند.
+- **مدارک رانندگان ردشده یا غیرفعال:** پیشنهاد نگهداری ۹۰ روزه و سپس حذف. باید در «شرایط و حریم خصوصی» هم اعلام شود؛ هنوز خودکار نیست.

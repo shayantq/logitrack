@@ -2,7 +2,9 @@
 
 x-app-env: &app-env
   MEDIA_ROOT: /code/media
-  DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/logitrack
+  # برنامه با نقش APP_DB_USER (اگر تنظیم شده؛ app/db_roles.py) و مایگریشن/بازسازی دمو با کاربر مدیر
+  DATABASE_URL: postgresql://${APP_DB_USER:-postgres}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:-your_secure_password}}@db:5432/logitrack
+  MIGRATION_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/logitrack
   REDIS_URL: redis://redis:6379/0
   # کلید امضای JWT — اگر خالی باشد هر بار کلید موقت ساخته می‌شود و با ری‌استارت همه باید دوباره وارد شوند
   SECRET_KEY: ${SECRET_KEY:-}
@@ -10,7 +12,7 @@ x-app-env: &app-env
   APP_ENV: ${APP_ENV:-development}
   # نسخه نمایشی خصوصی (app/core/demo.py): تا DEMO_ACCESS_TOKEN خالی است، وجود ندارد
   DEMO_ACCESS_TOKEN: ${DEMO_ACCESS_TOKEN:-}
-  DEMO_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/pasineh_demo
+  DEMO_DATABASE_URL: postgresql://${APP_DB_USER:-postgres}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:-your_secure_password}}@db:5432/pasineh_demo
 
 x-app-depends: &app-depends
   db:
