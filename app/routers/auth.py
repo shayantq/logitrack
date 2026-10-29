@@ -5,6 +5,8 @@ from app.database import db_dependency
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import APIRouter, Cookie, Depends, Form, HTTPException, Path, Request, Response
 from typing import Annotated
+
+from pydantic import BaseModel, Field
 from datetime import timedelta
 from starlette import status
 from app.dependencies import current_user_dependency, user_dependency
@@ -31,7 +33,8 @@ def create_user(db: db_dependency, create_user_request: CreateUserRequest, curre
 
 @router.post('/token', summary="🔑 ورود و دریافت توکن دسترسی JWT")
 def login_for_access_token(request: Request, response: Response, form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-                           db: db_dependency, remember: Annotated[bool, Form()] = False):
+                           db: db_dependency, remember: Annotated[bool, Form()] = False,
+                           otp: Annotated[str | None, Form(max_length=12)] = None):
     # قفل موقت پس از تلاش‌های ناموفق، حساب غیرفعال و ثبت در گزارش فعالیت — app/services/user_service.authenticate
     # جدا از قفل هر حساب، تلاش ناموفق زیاد از یک IP (روی نام‌های کاربری مختلف) هم موقتاً بسته می‌شود
     ip = request.client.host if request.client else "unknown"
@@ -39,7 +42,12 @@ def login_for_access_token(request: Request, response: Response, form_data: Anno
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                             detail="تلاش ناموفق ورود از این شبکه زیاد بوده است؛ چند دقیقه دیگر دوباره امتحان کنید.")
     try:
-        user = user_service.authenticate(db, form_data.username, form_data.password)
+        user = user_service.authenticate(db, form_data.username, form_data.password, otp)
+    except user_service.MfaRequired as e:
+        # رمز درست بوده؛ فرم ورود با این هدر فیلد کد دومرحله‌ای را نشان می‌دهد (کد اشتباه هم تلاش ناموفق است)
+        if e.message != user_service.MFA_REQUIRED:
+            login_failure_limiter.allow(ip)
+        raise HTTPException(status_code=e.status_code, detail=e.message, headers={"X-MFA-Required": "1"})
     except DomainError as e:
         if e.status_code == 401:
             login_failure_limiter.allow(ip)
@@ -86,6 +94,47 @@ def logout(request: Request, response: Response, db: db_dependency,
     session_service.clear_cookie(request, response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+# ---------------------------------------------------------------------------
+# ورود دومرحله‌ای (TOTP) — app/core/totp.py
+# ---------------------------------------------------------------------------
+class MfaCodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=12)
+
+
+class MfaDisableIn(MfaCodeIn):
+    password: str = Field(min_length=1, max_length=128)
+
+
+@router.get('/mfa', summary="🛡️ وضعیت ورود دومرحله‌ای من")
+def mfa_status(user: current_user_dependency):
+    return {"enabled": user.totp_enabled_at is not None, "required": user_service.mfa_required(user)}
+
+
+@router.post('/mfa/setup', summary="🛡️ ساخت راز و کد QR ورود دومرحله‌ای (هنوز فعال نیست)")
+def mfa_setup(user: current_user_dependency, db: db_dependency, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return user_service.mfa_setup(db, user)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post('/mfa/enable', status_code=status.HTTP_204_NO_CONTENT, summary="🛡️ فعال‌سازی ورود دومرحله‌ای با اولین کد")
+def mfa_enable(data: MfaCodeIn, user: current_user_dependency, db: db_dependency):
+    try:
+        user_service.mfa_enable(db, user, data.code)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post('/mfa/disable', status_code=status.HTTP_204_NO_CONTENT, summary="🛡️ خاموش‌کردن ورود دومرحله‌ای (با رمز و کد)")
+def mfa_disable(data: MfaDisableIn, user: current_user_dependency, db: db_dependency):
+    try:
+        user_service.mfa_disable(db, user, data.password, data.code)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get('/sessions', summary="🖥️ نشست‌های فعال من (دستگاه‌ها)")

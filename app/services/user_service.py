@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.core import storage
+from app.core import storage, totp
 from app.core.iran import fa_digits, latin_digits
 from app.models import AuditLog, DriverDocument, PasswordReset, Order, OrderStatusHistory, StockMovement, User, Vehicle, Warehouse
 from app.core.security import SECRET_KEY, bcrypt_context
@@ -207,7 +207,11 @@ def reset_password(db: Session, admin: User, user_id: int) -> tuple[User, str]:
     target.must_change_password = True
     target.token_version = (target.token_version or 0) + 1
     target.failed_logins, target.locked_until = 0, None
-    audit_service.log(db, admin, "user.reset_password", f"رمز «{_label(target)}» بازنشانی شد (رمز موقت)", target=target)
+    # گوشی گم‌شده: بازنشانی رمز توسط ادمین، ورود دومرحله‌ای را هم خاموش می‌کند تا کاربر دوباره راه‌اندازی‌اش کند
+    mfa_was_on = target.totp_enabled_at is not None
+    target.totp_secret, target.totp_enabled_at, target.totp_last_step = None, None, None
+    audit_service.log(db, admin, "user.reset_password", f"رمز «{_label(target)}» بازنشانی شد (رمز موقت)"
+                      + ("؛ ورود دومرحله‌ای خاموش شد" if mfa_was_on else ""), target=target)
     db.commit()
     db.refresh(target)
     return target, password
@@ -284,8 +288,40 @@ def _equalize_timing(password: str) -> None:
     bcrypt_context.verify(password, _timing_hash)
 
 
-def authenticate(db: Session, username: str, password: str) -> User:
-    """ورود با قفل موقت: پس از ۵ تلاش ناموفق پشت‌سرهم، ۱۵ دقیقه ورود بسته است (حتی با رمز درست)."""
+class MfaRequired(DomainError):
+    """رمز درست است ولی کد ورود دومرحله‌ای لازم است (فرم ورود فیلد کد را نشان می‌دهد)."""
+
+
+MFA_REQUIRED = "کد ورود دومرحله‌ای را از برنامه احراز هویت گوشی‌تان وارد کنید."
+MFA_WRONG = "کد ورود دومرحله‌ای درست نیست یا قبلاً استفاده شده؛ کد تازه را وارد کنید."
+
+
+def _count_failure(db: Session, user: User, now: datetime) -> None:
+    # شمارش و قفل با UPDATE شرطی در خود دیتابیس تا تلاش‌های هم‌زمان هیچ‌کدام گم نشوند
+    attempts = db.execute(
+        update(User).where(User.id == user.id)
+        .values(failed_logins=func.coalesce(User.failed_logins, 0) + 1)
+        .returning(User.failed_logins).execution_options(**SKIP_TENANT_FILTER)
+    ).scalar_one()
+    audit_service.log(db, None, "auth.login_failed", f"ورود ناموفق با نام کاربری «{user.username}»", target=user,
+                      organization_id=user.organization_id, details={"attempt": attempts})
+    locked = attempts >= LOCK_AFTER and db.execute(
+        update(User).where(User.id == user.id, User.failed_logins >= LOCK_AFTER)
+        .values(failed_logins=0, locked_until=now + timedelta(minutes=LOCK_MINUTES))
+        .execution_options(**SKIP_TENANT_FILTER)
+    ).rowcount
+    if locked:
+        audit_service.log(db, None, "auth.locked",
+                          f"ورود «{user.username}» پس از {fa_digits(str(LOCK_AFTER))} تلاش ناموفق "
+                          f"{fa_digits(str(LOCK_MINUTES))} دقیقه قفل شد", target=user, organization_id=user.organization_id)
+    db.commit()
+
+
+def authenticate(db: Session, username: str, password: str, otp: str | None = None) -> User:
+    """
+    ورود با قفل موقت: پس از ۵ تلاش ناموفق پشت‌سرهم (رمز یا کد دومرحله‌ای)، ۱۵ دقیقه ورود بسته است (حتی با رمز درست).
+    اگر ورود دومرحله‌ای فعال است، بعد از رمز درست کد شش‌رقمی هم لازم است.
+    """
     user = db.query(User).filter(User.username == username).execution_options(**SKIP_TENANT_FILTER).first()
     if user is None:
         _equalize_timing(password)
@@ -296,33 +332,70 @@ def authenticate(db: Session, username: str, password: str) -> User:
         raise DomainError(f"به دلیل چند تلاش ناموفق، ورود این حساب تا {fa_digits(str(minutes))} دقیقه دیگر بسته است. "
                           "اگر رمز را فراموش کرده‌اید، از ادمین سازمان بخواهید آن را بازنشانی کند.", 429)
     if not bcrypt_context.verify(password, user.hashed_password):
-        # شمارش و قفل با UPDATE شرطی در خود دیتابیس تا تلاش‌های هم‌زمان هیچ‌کدام گم نشوند
-        attempts = db.execute(
-            update(User).where(User.id == user.id)
-            .values(failed_logins=func.coalesce(User.failed_logins, 0) + 1)
-            .returning(User.failed_logins).execution_options(**SKIP_TENANT_FILTER)
-        ).scalar_one()
-        audit_service.log(db, None, "auth.login_failed", f"ورود ناموفق با نام کاربری «{user.username}»", target=user,
-                          organization_id=user.organization_id, details={"attempt": attempts})
-        locked = attempts >= LOCK_AFTER and db.execute(
-            update(User).where(User.id == user.id, User.failed_logins >= LOCK_AFTER)
-            .values(failed_logins=0, locked_until=now + timedelta(minutes=LOCK_MINUTES))
-            .execution_options(**SKIP_TENANT_FILTER)
-        ).rowcount
-        if locked:
-            audit_service.log(db, None, "auth.locked",
-                              f"ورود «{user.username}» پس از {fa_digits(str(LOCK_AFTER))} تلاش ناموفق "
-                              f"{fa_digits(str(LOCK_MINUTES))} دقیقه قفل شد", target=user, organization_id=user.organization_id)
-        db.commit()
+        _count_failure(db, user, now)
         raise DomainError(GENERIC_LOGIN_ERROR, 401)
     if user.is_active is False:
         raise DomainError("حساب کاربری شما غیرفعال شده است؛ با ادمین سازمان تماس بگیرید.", 403)
     if user.organization_id is not None and (user.organization is None or not user.organization.is_active):
         raise DomainError('حساب سازمان شما غیرفعال شده است؛ با پشتیبانی پسینه تماس بگیرید.', 403)
+    if user.totp_enabled_at is not None:
+        if not (otp or "").strip():
+            raise MfaRequired(MFA_REQUIRED, 401)
+        step = totp.verify(user.totp_secret, otp, user.totp_last_step)
+        if step is None:
+            _count_failure(db, user, now)
+            raise MfaRequired(MFA_WRONG, 401)
+        user.totp_last_step = step
     user.failed_logins, user.locked_until, user.last_login_at = 0, None, now
     audit_service.log(db, user, "auth.login", "ورود به سامانه")
     db.commit()
     return user
+
+
+PLATFORM_ROLES = ("platform_admin", "platform_support")
+
+
+def mfa_required(user: User) -> bool:
+    """در سرور اصلی ورود دومرحله‌ای برای کارکنان پلتفرم (دسترسی به همه سازمان‌ها) اجباری است."""
+    from app.core.security import is_production
+    return is_production() and _role(user) in PLATFORM_ROLES
+
+
+def mfa_setup(db: Session, user: User) -> dict:
+    if user.totp_enabled_at is not None:
+        raise ConflictError("ورود دومرحله‌ای از قبل فعال است.")
+    user.totp_secret = totp.new_secret()
+    db.commit()
+    uri = totp.provisioning_uri(user.totp_secret, user.username)
+    return {"secret": user.totp_secret, "uri": uri, "qr": totp.qr_svg_data_uri(uri)}
+
+
+def mfa_enable(db: Session, user: User, code: str) -> None:
+    if user.totp_enabled_at is not None:
+        raise ConflictError("ورود دومرحله‌ای از قبل فعال است.")
+    if not user.totp_secret:
+        raise ConflictError("اول کد QR را بسازید و در برنامه احراز هویت اسکن کنید.")
+    step = totp.verify(user.totp_secret, code, None)
+    if step is None:
+        raise ConflictError("کد درست نیست؛ ساعت گوشی را بررسی کنید و کد تازه را وارد کنید.")
+    user.totp_enabled_at, user.totp_last_step = _now(), step
+    audit_service.log(db, user, "auth.mfa_enabled", "ورود دومرحله‌ای فعال شد", target=user)
+    db.commit()
+
+
+def mfa_disable(db: Session, user: User, password: str, code: str) -> None:
+    if user.totp_enabled_at is None:
+        raise ConflictError("ورود دومرحله‌ای فعال نیست.")
+    if mfa_required(user):
+        raise ForbiddenError("برای کارکنان پلتفرم ورود دومرحله‌ای اجباری است و خاموش نمی‌شود.")
+    if not bcrypt_context.verify(password or "", user.hashed_password):
+        raise ConflictError("رمز عبور درست نیست.")
+    step = totp.verify(user.totp_secret, code, user.totp_last_step)
+    if step is None:
+        raise ConflictError(MFA_WRONG)
+    user.totp_secret, user.totp_enabled_at, user.totp_last_step = None, None, None
+    audit_service.log(db, user, "auth.mfa_disabled", "ورود دومرحله‌ای خاموش شد", target=user)
+    db.commit()
 
 
 MAX_TOURS = 50

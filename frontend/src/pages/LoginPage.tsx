@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, LockKeyhole, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { homePathFor, useAuth } from "@/auth/AuthContext";
+import { homePathFor, MfaRequiredError, useAuth } from "@/auth/AuthContext";
 import { api, errorMessage, unwrap } from "@/api/client";
 import { BRAND } from "@/brand";
 import { Logo, ThemeToggle } from "@/ui/brand";
@@ -67,6 +67,9 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  // ورود دومرحله‌ای: بعد از رمز درست، کد شش‌رقمی برنامه احراز هویت
+  const [mfa, setMfa] = useState(false);
+  const [otp, setOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // لینک «فراموشی رمز» فقط وقتی پیامک یا ایمیل خودکار فعال است
@@ -79,9 +82,16 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const user = await login(username.trim(), password, remember);
+      const user = await login(username.trim(), password, remember, mfa ? otp.trim() : undefined);
       navigate(homePathFor(user), { replace: true });
     } catch (err) {
+      if (err instanceof MfaRequiredError) {
+        // بار اول فقط فیلد کد باز می‌شود؛ خطا وقتی نشان داده می‌شود که کد واردشده نادرست بوده
+        if (mfa) setError(errorMessage(err));
+        setMfa(true);
+        setOtp("");
+        return;
+      }
       setError(errorMessage(err));
     } finally {
       setSubmitting(false);
@@ -109,6 +119,12 @@ export default function LoginPage() {
           <div className="-mt-2 text-start">
             <Link to="/app/forgot-password" state={{ identifier: username.trim() }} className="text-sm font-medium text-brand hover:underline" data-testid="forgot-password-link">رمز را فراموش کرده‌اید؟</Link>
           </div>
+        )}
+        {mfa && (
+          <Field label="کد ورود دومرحله‌ای" hint="کد شش‌رقمی برنامه احراز هویت روی گوشی‌تان">
+            <Input id="otp" inputMode="numeric" className="ltr text-center" value={otp} required maxLength={6} autoFocus
+              autoComplete="one-time-code" onChange={e => setOtp(e.target.value)} data-testid="login-otp" />
+          </Field>
         )}
         {/* ماندگاری ۳۰ روزه با کوکی امن؛ بدون آن، با بستن مرورگر خارج می‌شوید */}
         <label className="-mt-1 flex cursor-pointer items-start gap-2.5 text-sm text-text-2">

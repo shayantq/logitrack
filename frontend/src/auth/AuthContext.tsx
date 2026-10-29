@@ -9,7 +9,7 @@ export type Me = Schemas["MeResponse"] & { role: Role };
 interface AuthState {
   me: Me | null;
   loading: boolean;
-  login: (username: string, password: string, remember?: boolean) => Promise<Me>;
+  login: (username: string, password: string, remember?: boolean, otp?: string) => Promise<Me>;
   logout: () => void;
   isPlatform: boolean;
 }
@@ -22,10 +22,15 @@ function demoLink(): string | null {
   try { return localStorage.getItem(DEMO_LINK_KEY); } catch { return null; }
 }
 
+/** رمز درست بود و کد ورود دومرحله‌ای لازم است (فرم ورود فیلد کد را نشان می‌دهد) */
+export class MfaRequiredError extends ApiError {}
+
 /** صفحه اول هر کاربر بعد از ورود (راننده تأییدنشده ← فرم احراز هویت) */
-export function homePathFor(user: { role: Role | string; driver_status?: string | null; must_change_password?: boolean }): string {
+export function homePathFor(user: { role: Role | string; driver_status?: string | null; must_change_password?: boolean; mfa_setup_required?: boolean }): string {
   // ورود با رمز موقت ادمین ← اول تغییر رمز
   if (user.must_change_password) return "/app/change-password";
+  // کارکنان پلتفرم در سرور اصلی ← اول راه‌اندازی ورود دومرحله‌ای
+  if (user.mfa_setup_required) return "/app/mfa";
   const role = user.role as Role;
   if (PLATFORM_ROLES.includes(role)) return "/app/platform";
   if (role === "driver") return isApprovedDriver(user) ? "/app/driver" : "/app/onboarding";
@@ -68,14 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate(`/app/d/${demo}`, { replace: true });
   }), [logout, navigate, queryClient]);
 
-  const login = useCallback(async (username: string, password: string, remember = false) => {
+  const login = useCallback(async (username: string, password: string, remember = false, otp?: string) => {
     const response = await fetch("/auth/token", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ username, password, remember: remember ? "true" : "false" }),
+      body: new URLSearchParams({ username, password, remember: remember ? "true" : "false", ...(otp ? { otp } : {}) }),
     });
     const body = await response.json().catch(() => ({}));
+    if (response.headers.get("X-MFA-Required")) throw new MfaRequiredError(errorMessage(body), response.status);
     if (!response.ok) throw new ApiError(errorMessage(body, "نام کاربری یا رمز عبور نامعتبر است."), response.status);
     tokenStore.set(body.access_token);
     try { localStorage.removeItem(DEMO_LINK_KEY); } catch { /* */ }

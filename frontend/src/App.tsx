@@ -47,6 +47,7 @@ const ReadinessPage = lazy(() => import("./pages/control/ReadinessPage"));
 const WorkflowsPage = lazy(() => import("./pages/control/WorkflowsPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const ChangePasswordPage = lazy(() => import("./pages/ChangePasswordPage"));
+const MfaPage = lazy(() => import("./pages/MfaPage"));
 const UserDetailPage = lazy(() => import("./pages/users/UserDetailPage"));
 const ActivityPage = lazy(() => import("./pages/users/ActivityPage"));
 const ReportsPage = lazy(() => import("./pages/reports/ReportsPage"));
@@ -87,6 +88,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
   if (loading) return <PageLoader />;
   if (!me) return <Navigate to="/app/login" replace state={{ from: location.pathname }} />;
   if (me.must_change_password) return <Navigate to="/app/change-password" replace />;
+  if (me.mfa_setup_required) return <Navigate to="/app/mfa" replace />;
   return <>{children}</>;
 }
 
@@ -160,6 +162,7 @@ export function App() {
           <Route path="/app/d/:token" element={<DemoEntryPage />} />
           <Route path="/app/forgot-password" element={fade(<ForgotPasswordPage />)} />
           <Route path="/app/change-password" element={<RequireLogin>{fade(<ChangePasswordPage />)}</RequireLogin>} />
+          <Route path="/app/mfa" element={<RequireLogin>{fade(<MfaPage />)}</RequireLogin>} />
           <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={guard(ORG_STAFF, <DashboardPage />)} />
             <Route path="orders" element={guard(ORG_STAFF, <OrdersPage />)} />

@@ -34,6 +34,8 @@ def get_current_user_info(db: db_dependency, user: current_user_dependency):
     data = MeResponse.model_validate(user, from_attributes=True)
     data.permissions = permission_service.mine(db, user)
     data.is_demo = bool(db.info.get("demo"))
+    data.mfa_enabled = user.totp_enabled_at is not None
+    data.mfa_setup_required = user_service.mfa_required(user) and not data.mfa_enabled
     return data
 
 

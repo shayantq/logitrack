@@ -17,6 +17,8 @@ psycopg-binary==3.3.4
 # ---- احراز هویت ----
 python-jose==3.5.0
 passlib==1.7.4
+# کد QR ورود دومرحله‌ای (SVG، بدون Pillow)
+qrcode==8.2
 # bcrypt 4.0.1 آخرین نسخه سازگار با passlib 1.7.4 است — ارتقا ندهید
 bcrypt==4.0.1
 

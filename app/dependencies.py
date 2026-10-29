@@ -1,5 +1,5 @@
 from typing import Annotated, Optional
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -17,7 +17,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 # ------------------------------------------------------------------------------
 # ۱. واکشی و تایید هویت کاربر جاری از روی توکن JWT
 # ------------------------------------------------------------------------------
+# تا کارمند پلتفرم ورود دومرحله‌ای را راه نینداخته، فقط همین مسیرها باز است (سرور اصلی)
+MFA_SETUP_PATHS = ("/users/me", "/auth/mfa", "/auth/sessions", "/auth/logout")
+
+
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
@@ -61,6 +66,10 @@ def get_current_user(
         set_tenant(db, None)
     set_actor(db, user)
 
+    from app.services.user_service import mfa_required
+    if mfa_required(user) and user.totp_enabled_at is None and not request.url.path.rstrip("/").startswith(MFA_SETUP_PATHS):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="برای ادامه، ابتدا ورود دومرحله‌ای را از صفحه «ورود دومرحله‌ای» فعال کنید.")
     return user
 
 

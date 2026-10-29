@@ -189,6 +189,10 @@ class User(TenantScoped, Base):
     failed_logins = Column(Integer, nullable=False, default=0, server_default="0")
     locked_until = Column(DateTime, nullable=True)
     last_login_at = Column(DateTime, nullable=True)
+    # ورود دومرحله‌ای (app/core/totp.py): راز تا تأیید اولین کد فعال نیست؛ آخرین گام مصرف‌شده جلوی استفاده دوباره را می‌گیرد
+    totp_secret = Column(String(64), nullable=True)
+    totp_enabled_at = Column(DateTime, nullable=True)
+    totp_last_step = Column(Integer, nullable=True)
     # راهنمای تعاملی: {"<شناسه راهنما>": "done" | "skipped"} — فقط بار اول خودکار باز می‌شود
     tour_state = Column(JSON, nullable=True)
 

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Building2, Compass, KeyRound, LogOut, MapPinned, Menu as MenuIcon, PanelRightClose, PanelRightOpen, UserRound, X } from "lucide-react";
+import { Building2, Compass, KeyRound, LogOut, MapPinned, Menu as MenuIcon, PanelRightClose, PanelRightOpen, ShieldCheck, UserRound, X } from "lucide-react";
 import { api, authFetch, unwrap } from "@/api/client";
 import { useAuth, useMe } from "@/auth/AuthContext";
 import { TourProvider, useTour } from "@/components/tour/TourProvider";
@@ -173,6 +173,7 @@ function Shell() {
               <MenuLabel>{me.full_name || me.username}{me.driver_code ? ` — ${me.driver_code}` : ""}</MenuLabel>
               {me.role === "org_admin" && !me.is_demo && <MenuItem onSelect={() => navigate("/app/organization")} icon={<Building2 className="size-4" />}>پروفایل سازمان</MenuItem>}
               {!me.is_demo && <MenuItem onSelect={() => setPasswordOpen(true)} icon={<KeyRound className="size-4" />}><span data-testid="menu-change-password">تغییر رمز عبور</span></MenuItem>}
+              {!me.is_demo && <MenuItem onSelect={() => navigate("/app/mfa")} icon={<ShieldCheck className="size-4" />}><span data-testid="menu-mfa">ورود دومرحله‌ای</span></MenuItem>}
               <MenuSeparator />
               {tour.mainTour && <MenuItem onSelect={() => tour.start(tour.mainTour!)} icon={<Compass className="size-4" />}><span data-testid="menu-tour">راهنمای استفاده</span></MenuItem>}
               {tour.pageTour && <MenuItem onSelect={() => tour.start(tour.pageTour!)} icon={<MapPinned className="size-4" />}><span data-testid="menu-page-tour">راهنمای این صفحه</span></MenuItem>}

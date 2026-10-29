@@ -6259,6 +6259,10 @@ export interface components {
              * @default false
              */
             is_demo: boolean;
+            /** @default false */
+            mfa_enabled: boolean;
+            /** @default false */
+            mfa_setup_required: boolean;
         };
         /** MessageResponse */
         MessageResponse: {
