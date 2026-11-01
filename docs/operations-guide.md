@@ -836,7 +836,7 @@
 | # | شدت | فایل و تابع | اثر | آزمون پیشنهادی |
 |---|---|---|---|---|
 | ۱ | زیاد | `app/services/platform_service.py`: `build_export` | خرابی worker یا سقف سخت زمان ردیف خروجی را برای همیشه `pending` می‌گذارد. کل فایل هم در حافظه ساخته می‌شود و روی این سرور ریسک کمبود رم دارد. | کشتن worker وسط خروجی، سپس سنجش وضعیت و درخواست دوباره. |
-| ۲ | زیاد | `app/services/platform_service.py`: `erase_organization` | رویداد `file_deleted` پیش از پاک شدن فایل commit می‌شود و `rmtree` خطا را نادیده می‌گیرد. پس ممکن است ثبت شود پاک شده ولی فایل بماند. این مورد را همین مرحله با گروه ۳ وارد کرد. | پاک‌سازی با پوشه غیرقابل‌حذف و سنجش رویداد و فایل. |
+| ۲ | رفع شد | `app/services/platform_service.py`: `erase_organization` | رویداد `file_deleted` پیش از پاک شدن فایل commit می‌شد. این باگ را گروه ۳ وارد کرده بود، پس همان‌جا رفع شد: رویداد فقط برای فایلی ثبت می‌شود که واقعاً از دیسک رفته است. | `test_file_that_could_not_be_removed_is_not_reported_deleted` |
 | ۳ | متوسط | `app/services/outbox_service.py`: `publish_due` | خرابی پس از ارسال و پیش از commit، پیام را پس از پایان lease دوباره می‌فرستد. مشتری ممکن است پیامک تکراری بگیرد. | شبیه‌سازی خرابی بعد از `_deliver`. |
 | ۴ | متوسط | `app/routers/reports.py` و `app/tasks.py`: `generate_report` | با خرابی worker نتیجه `PENDING` می‌ماند و کاربر پیام روشنی نمی‌گیرد. | کشتن worker و سنجش رفتار پیگیری وضعیت. |
 | ۵ | متوسط | `app/tasks.py`: `build_report_file` و `app/celery_app.py:29` | محتوای کامل گزارش تا یک ساعت با base64 در Redis می‌ماند و Redis سقف حافظه ندارد. | گزارش بزرگ و سنجش حافظه؛ بار آزمایشی بخشی از آن را می‌سنجد. |

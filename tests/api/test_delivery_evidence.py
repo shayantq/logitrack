@@ -140,3 +140,12 @@ def test_organization_erasure_keeps_the_record_and_logs_redaction(env, delivered
     assert kept.storage_key == key and kept.sha256 == sha and kept.delivery_method == method
     assert env.db.query(DeliveryEvidenceNote).count() == 0 and not file_path.exists()
     assert {e.event_type for e in env.db.query(DeliveryEvidenceEvent).all()} == {"file_deleted", "note_redacted"}
+
+
+def test_file_that_could_not_be_removed_is_not_reported_deleted(env, delivered, monkeypatch):  # noqa: F811
+    _upload(env, delivered)
+    row = _rows(env)[0]
+    monkeypatch.setattr(platform_service.shutil, "rmtree", lambda *a, **k: None)
+    platform_service.erase_organization(env.db, row.organization_id)
+    env.db.expire_all()
+    assert env.db.query(DeliveryEvidenceEvent).count() == 0

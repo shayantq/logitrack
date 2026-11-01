@@ -12,6 +12,7 @@
 import csv
 import io
 import re
+import logging
 import shutil
 import uuid
 import zipfile
@@ -43,6 +44,7 @@ EXPORT_VALID = timedelta(days=30)
 # ستون‌هایی که هرگز از سازمان خارج نمی‌شوند
 EXPORT_SECRET_COLUMNS = {"hashed_password", "totp_secret", "totp_last_step", "token_version", "access_token", "rating_token", "request_hash", "idempotency_key"}
 # جدول‌های سند و گزارش فعالیت با trigger غیرقابل‌تغییرند و در پاک‌سازی دست نمی‌خورند
+logger = logging.getLogger("pasineh")
 IMMUTABLE_TABLES = {"stock_movements", "stock_movement_lines", "domain_events", "stock_documents", "audit_logs", "delivery_evidence", "delivery_evidence_events"}
 PII_COLUMNS = {
     "recipient_name", "recipient_mobile", "requester_name", "requester_mobile", "destination_address", "destination_postal_code", "first_name", "last_name",
@@ -372,16 +374,29 @@ def erase_due(db: Session, now: datetime | None = None) -> int:
     return len(due)
 
 
+ERASE_REASON = "پاک‌سازی پس از خروج سازمان"
+
+
+def _record_deleted_evidence_files(db: Session, organization_id: int) -> None:
+    """فقط فایلی که واقعاً از دیسک رفته است «پاک‌شده» ثبت می‌شود."""
+    rows = db.query(DeliveryEvidence.id, DeliveryEvidence.storage_key).filter(DeliveryEvidence.organization_id == organization_id).execution_options(
+        skip_tenant_filter=True).all()
+    now = _now()
+    for evidence_id, key in rows:
+        if storage.path_of(key) is None:
+            db.add(DeliveryEvidenceEvent(organization_id=organization_id, evidence_id=evidence_id, event_type="file_deleted", reason=ERASE_REASON, at=now))
+        else:
+            logger.error("فایل مدرک پس از پاک‌سازی سازمان باقی ماند: evidence_id=%s", evidence_id)
+    db.commit()
+
+
 def _redact_delivery_evidence(db: Session, organization_id: int) -> None:
-    """ردیف مدرک دست نمی‌خورد: توضیح جدا حذف می‌شود و پاک شدن توضیح و فایل با رویداد فقط‌افزودنی ثبت می‌شود."""
-    now, reason = _now(), "پاک‌سازی پس از خروج سازمان"
-    evidence = db.query(DeliveryEvidence.id).filter(DeliveryEvidence.organization_id == organization_id).execution_options(skip_tenant_filter=True).all()
+    """ردیف مدرک دست نمی‌خورد: توضیح جدا حذف می‌شود و این حذف با رویداد فقط‌افزودنی ثبت می‌شود."""
+    now = _now()
     notes = {evidence_id for (evidence_id,) in db.query(DeliveryEvidenceNote.evidence_id).filter(
         DeliveryEvidenceNote.organization_id == organization_id).execution_options(skip_tenant_filter=True).all()}
-    for (evidence_id,) in evidence:
-        db.add(DeliveryEvidenceEvent(organization_id=organization_id, evidence_id=evidence_id, event_type="file_deleted", reason=reason, at=now))
-        if evidence_id in notes:
-            db.add(DeliveryEvidenceEvent(organization_id=organization_id, evidence_id=evidence_id, event_type="note_redacted", reason=reason, at=now))
+    for evidence_id in notes:
+        db.add(DeliveryEvidenceEvent(organization_id=organization_id, evidence_id=evidence_id, event_type="note_redacted", reason=ERASE_REASON, at=now))
     db.query(DeliveryEvidenceNote).filter(DeliveryEvidenceNote.organization_id == organization_id).execution_options(
         skip_tenant_filter=True).delete(synchronize_session=False)
     db.flush()
@@ -425,3 +440,4 @@ def erase_organization(db: Session, organization_id: int) -> None:
         target = (root / folder / str(organization_id)).resolve()
         if root in target.parents and target.is_dir():
             shutil.rmtree(target, ignore_errors=True)
+    _record_deleted_evidence_files(db, organization_id)
