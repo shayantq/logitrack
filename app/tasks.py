@@ -27,8 +27,9 @@ from bidi.algorithm import get_display
 
 from sqlalchemy.orm import joinedload, selectinload
 
-from celery.signals import task_failure
+from celery.signals import after_setup_logger, after_setup_task_logger, before_task_publish, task_failure, task_postrun, task_prerun, worker_process_init
 
+from app.core import observability, request_context
 from app.celery_app import celery_app
 from app.core.tenancy import set_tenant
 from app.database import SessionLocal
@@ -84,10 +85,45 @@ def _tenant_session(organization_id: int):
         if organization is None or organization.is_active is False:
             raise TaskContextError(f"سازمان {organization_id} برای اجرای وظیفه معتبر نیست.")
         set_tenant(db, organization_id)
+        observability.task_organization.set(organization_id)
     except Exception:
         db.close()
         raise
     return db
+
+
+@after_setup_logger.connect
+@after_setup_task_logger.connect
+def _format_task_logs(logger=None, **_):
+    observability.format_celery_logger(logger)
+
+
+@worker_process_init.connect
+def _fresh_connections(**_):
+    """اتصال دیتابیس بین processهای fork شده مشترک نمی‌ماند."""
+    from app.database import engine
+    engine.dispose(close=False)
+
+
+@before_task_publish.connect
+def _copy_request_id(headers=None, **_):
+    """شناسه درخواست همراه وظیفه می‌رود تا از API تا worker یک خط پیگیری باشد."""
+    rid = request_context.request_id.get()
+    if rid and headers is not None:
+        headers["pasineh_request_id"] = rid
+
+
+@task_prerun.connect
+def _start_task_context(task_id=None, task=None, **_):
+    observability.task_id.set(task_id)
+    request_context.request_id.set(task.request.get("pasineh_request_id") if task is not None else None)
+
+
+@task_postrun.connect
+def _end_task_context(**_):
+    observability.task_id.set(None)
+    observability.task_organization.set(None)
+    request_context.request_id.set(None)
 
 
 @task_failure.connect

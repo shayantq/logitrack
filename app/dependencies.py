@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import SECRET_KEY, ALGORITHM
 from app.core.tenancy import set_tenant
 from app.services.event_bus import set_actor
+from app.core import request_context
 from app.database import get_db
 from app.models import User, RoleEnum, PLATFORM_ROLES
 
@@ -69,6 +70,9 @@ def get_current_user(
     else:
         set_tenant(db, None)
     set_actor(db, user)
+    state = request_context.current.get()
+    if state is not None:
+        state.update(organization_id=user.organization_id, user_id=user.id)
 
     from app.services.user_service import mfa_required
     if mfa_required(user) and user.totp_enabled_at is None and not request.url.path.rstrip("/").startswith(MFA_SETUP_PATHS):

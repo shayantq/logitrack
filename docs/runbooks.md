@@ -85,6 +85,12 @@ docker compose exec web python create_admin.py
 
 ---
 
+## پیدا کردن علت کندی
+
+- **لاگ:** هر خط JSON است و `request_id` را دارد؛ همین شناسه در هدر `X-Request-ID` پاسخ و پیام خطا هست: `docker compose logs web celery_worker | grep <request_id>`
+- **کوئری گران:** `bash scripts/slow-queries.sh`
+- **متریک:** با `METRICS_TOKEN` در `.env`: `curl -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8000/internal/metrics`
+
 ## تمرین بازیابی
 
 بکاپی که بازیابی نشده باشد بکاپ حساب نمی‌شود. این تمرین را هر ماه و بعد از هر تغییر بزرگ اجرا کنید:

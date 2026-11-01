@@ -15,6 +15,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.wms import AVAILABLE, STOCK_STATUS_LABELS
+from app.models_operations import StockMovementLine
 from app.models import (
     ACTIVE_ORDER_STATUSES, Inventory, Order, OrderItem, Partner, Product, StockDocument, StockMovement, StockReservation, StocktakeLine,
     User, Warehouse,
@@ -480,6 +481,7 @@ def list_movements(db: Session, user: User, product_id: int | None = None, wareh
     query = db.query(StockMovement).options(
         joinedload(StockMovement.product), joinedload(StockMovement.warehouse), joinedload(StockMovement.created_by),
         joinedload(StockMovement.document),
+        selectinload(StockMovement.lines).options(joinedload(StockMovementLine.location), joinedload(StockMovementLine.owner)),
     )
     if product_id is not None:
         query = query.filter(StockMovement.product_id == product_id)

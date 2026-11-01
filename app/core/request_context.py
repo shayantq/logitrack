@@ -10,6 +10,8 @@ from contextvars import ContextVar
 client_ip: ContextVar[str | None] = ContextVar("client_ip", default=None)
 user_agent: ContextVar[str | None] = ContextVar("user_agent", default=None)
 request_id: ContextVar[str | None] = ContextVar("request_id", default=None)
+# سازمان، کاربر و شمار کوئری درخواست. dict مشترک است چون وابستگی‌ها در thread جدا اجرا می‌شوند و contextvar آن‌ها برنمی‌گردد.
+current: ContextVar[dict | None] = ContextVar("request_current", default=None)
 
 _VALID_ID = re.compile(rb"^[A-Za-z0-9._:-]{8,64}$")
 
@@ -29,6 +31,7 @@ class RequestContextMiddleware:
         t1 = client_ip.set(client[0] if client else None)
         t2 = user_agent.set(ua)
         t3 = request_id.set(rid)
+        t4 = current.set({})
 
         async def send_with_id(message):
             if message["type"] == "http.response.start":
@@ -41,3 +44,4 @@ class RequestContextMiddleware:
             client_ip.reset(t1)
             user_agent.reset(t2)
             request_id.reset(t3)
+            current.reset(t4)

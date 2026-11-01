@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import logging
 import secrets
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -12,10 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, TimeoutError as PoolTimeoutError
 
 from app.database import db_dependency
 from app.core.http_security import SecurityHeadersMiddleware, build_csp, install_access_log_redaction
+from app.core.observability import MetricsMiddleware, configure_logging, render_metrics
 from app.core.request_context import RequestContextMiddleware, request_id
 from app.core.security import enforce_production_settings, is_production
 from app.core.tenancy import TenantIsolationError
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
 # سرور اصلی با کلید JWT یا رمز دیتابیس ناامن بالا نمی‌آید (app/core/security.py)
 enforce_production_settings()
 install_access_log_redaction()
+configure_logging()
 
 # مستندات API فقط در توسعه و تست؛ در سرور اصلی نقشه کامل API در دسترس عموم نیست
 _PRODUCTION = is_production()
@@ -59,6 +61,7 @@ app = FastAPI(
 )
 
 # IP و مرورگر هر درخواست برای گزارش فعالیت (app/services/audit_service.py)
+app.add_middleware(MetricsMiddleware)
 app.add_middleware(RequestContextMiddleware)
 # هدرهای امنیتی، no-store برای پاسخ‌های حساس و CSP در حالت گزارش (app/core/http_security.py)
 app.add_middleware(SecurityHeadersMiddleware, csp=build_csp(SPA_INDEX))
@@ -155,6 +158,16 @@ def health_check(db: db_dependency):
     return {"status": "ok"}
 
 
+@app.get("/internal/metrics", include_in_schema=False)
+def internal_metrics(request: Request, db: db_dependency):
+    """بدون METRICS_TOKEN این مسیر وجود ندارد. توکن نادرست هم همان ۴۰۴ را می‌گیرد تا وجود مسیر لو نرود."""
+    token = os.getenv("METRICS_TOKEN", "").strip()
+    provided = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+    if not token or not secrets.compare_digest(provided.encode(), token.encode()):
+        raise HTTPException(status_code=404)
+    return Response(render_metrics(db), media_type="text/plain; version=0.0.4")
+
+
 # اتصال روترهای API
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -233,6 +246,12 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
     message = next((m for name, m in _CONSTRAINT_MESSAGES.items() if name in str(exc.orig)),
                    "این تغییر با داده‌ای که هم‌زمان ثبت شد تداخل دارد؛ دوباره تلاش کنید.")
     return JSONResponse(status_code=409, content=_error_body(409, message))
+
+
+@app.exception_handler(PoolTimeoutError)
+async def database_pool_handler(request: Request, exc: PoolTimeoutError):
+    logger.error("pool اتصال دیتابیس پر است")
+    return JSONResponse(status_code=503, content=_error_body(503, "سرور الان مشغول است؛ چند لحظه دیگر دوباره امتحان کنید."))
 
 
 @app.exception_handler(OperationalError)

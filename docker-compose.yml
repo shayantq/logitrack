@@ -10,6 +10,8 @@ x-app-env: &app-env
   SECRET_KEY: ${SECRET_KEY:-}
   # فقط روی سرور اصلی production: کلید و رمز ناامن پذیرفته نمی‌شود و مستندات API بسته است (app/core/security.py)
   APP_ENV: ${APP_ENV:-development}
+  # متریک داخلی (/internal/metrics): تا خالی است، مسیر وجود ندارد
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
   # نسخه نمایشی خصوصی (app/core/demo.py): تا DEMO_ACCESS_TOKEN خالی است، وجود ندارد
   DEMO_ACCESS_TOKEN: ${DEMO_ACCESS_TOKEN:-}
   DEMO_DATABASE_URL: postgresql://${APP_DB_USER:-postgres}:${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:-your_secure_password}}@db:5432/pasineh_demo
@@ -20,11 +22,21 @@ x-app-depends: &app-depends
   redis:
     condition: service_healthy
 
+# لاگ هر سرویس سقف دارد تا دیسک از لاگ پر نشود
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   # دیتابیس PostgreSQL
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *logging
+    # آمار کوئری‌ها برای scripts/slow-queries.sh
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password}
@@ -47,6 +59,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -58,6 +71,7 @@ services:
     build: .
     image: pasineh-app:local
     restart: unless-stopped
+    logging: *logging
     command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
       # پورت 8000 میزبان دست پروژه دیگری (ATS) است؛ پیش‌فرض 8001 — با WEB_PORT قابل تغییر
@@ -84,6 +98,7 @@ services:
     build: .
     image: pasineh-app:local
     restart: unless-stopped
+    logging: *logging
     # concurrency=2: پیش‌فرض Celery به تعداد هسته‌های CPU پروسس می‌سازد و هرکدام pandas را جدا لود می‌کنند (رم زیاد)
     command: celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=2
     environment: *app-env
@@ -101,6 +116,7 @@ services:
     build: .
     image: pasineh-app:local
     restart: unless-stopped
+    logging: *logging
     command: celery -A app.celery_app.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
     environment: *app-env
     depends_on:
