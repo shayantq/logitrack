@@ -190,6 +190,11 @@ function Shell() {
           <PasswordChangeForm onDone={() => setPasswordOpen(false)} />
         </Modal>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8">
+          {me.organization?.suspended && (
+            <p className="mb-4 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm font-medium text-warning" data-testid="suspended-banner">
+              حساب سازمان تعلیق است: کار تازه ثبت نمی‌شود، ولی سفرها و برگشت‌های در جریان را می‌توانید تمام کنید. برای رفع تعلیق با پشتیبانی پسینه تماس بگیرید.
+            </p>
+          )}
           <div key={pageKey(location.pathname)} className="stagger"><Outlet /></div>
         </main>
       </div>

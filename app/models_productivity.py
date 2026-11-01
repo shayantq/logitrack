@@ -309,3 +309,63 @@ class AdjustmentApproval(TenantScoped, Base):
     decided_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     decided_at = Column(DateTime, nullable=True)
     decision_note = Column(String(500), nullable=True)
+
+
+class PlanChange(Base):
+    """سابقه نسخه‌دار پلن هر سازمان با سقف‌های همان لحظه."""
+    __tablename__ = "plan_changes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_plan = Column(String(16), nullable=False)
+    to_plan = Column(String(16), nullable=False)
+    version = Column(Integer, nullable=False)
+    limits = Column(JSON, nullable=False)
+    modules = Column(JSON, nullable=False)
+    reason = Column(String(500), nullable=True)
+    changed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+
+class SupportAccessGrant(Base):
+    """دسترسی موقت کارکنان پلتفرم به یک سازمان: با دلیل، مهلت و امکان لغو."""
+    __tablename__ = "support_access_grants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason = Column(String(500), nullable=False)
+    granted_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class FeatureFlag(Base):
+    """روشن و خاموش کردن تدریجی قابلیت. نبود ردیف یعنی روشن؛ allowlist خالی یعنی همه سازمان‌ها."""
+    __tablename__ = "feature_flags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(48), nullable=False, unique=True)
+    enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    kill_switch = Column(Boolean, nullable=False, default=False, server_default="false")
+    allowlist = Column(JSON, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class TenantExport(Base):
+    """خروجی کامل داده یک سازمان؛ فایل خصوصی است و فقط ادمین پلتفرم دریافت می‌کند."""
+    __tablename__ = "tenant_exports"
+    __table_args__ = (CheckConstraint("status IN ('pending', 'done', 'failed')", name="ck_tenant_exports_status"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(16), nullable=False, default="pending")
+    path = Column(String(255), nullable=True)
+    reason = Column(String(500), nullable=True)
+    error = Column(String(200), nullable=True)
+    requested_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    finished_at = Column(DateTime, nullable=True)

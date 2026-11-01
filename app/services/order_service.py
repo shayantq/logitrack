@@ -214,6 +214,8 @@ def create_order(db: Session, user: User, order_request: OrderRequest, idempoten
 
 def _create_order(db: Session, user: User, order_request: OrderRequest, idempotency_key: str | None,
                   request_hash: str | None) -> Order:
+    from app.services import platform_service
+    platform_service.ensure_capacity(db, user.organization_id, "orders")
     source_warehouse_id = order_request.warehouse_id
     if user.role == 'warehouse_manager':
         if not user.warehouse_id:

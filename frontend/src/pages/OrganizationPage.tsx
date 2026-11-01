@@ -6,7 +6,7 @@ import { CitySelect } from "@/components/CitySelect";
 import { useToast } from "@/components/Toast";
 import { useProvinces } from "@/hooks/data";
 import { BUSINESS_TYPES, EMPLOYEE_RANGES, ORDER_VOLUMES } from "@/lib/labels";
-import { latinDigits, normalizeDigits } from "@/lib/format";
+import { faDate, faNumber, latinDigits, normalizeDigits } from "@/lib/format";
 import { Button, Card, CardHeader, ErrorState, Field, Input, PageHeader, Select, Skeleton, cn } from "@/ui/primitives";
 import { confirmDialog } from "@/ui/dialogs";
 import { FileField } from "@/ui/file";
@@ -16,6 +16,24 @@ const TEXT_FIELDS = ["name", "legal_name", "business_type", "national_id", "econ
   "address", "postal_code", "phone", "website", "employee_count", "monthly_order_volume", "contact_name", "contact_mobile", "contact_email"] as const;
 const DIGIT_FIELDS = new Set(["national_id", "economic_code", "registration_number", "postal_code", "phone", "contact_mobile"]);
 type FormState = Record<(typeof TEXT_FIELDS)[number] | "warehouse_count" | "fleet_size", string>;
+
+/** مصرف پلن: نزدیک سقف از پیش هشدار می‌دهد و کارهای در جریان با پر شدن سقف متوقف نمی‌شوند */
+function PlanUsage() {
+  const { data } = useQuery({ queryKey: ["organization-plan"], queryFn: () => unwrap(api.GET("/organization/plan")) });
+  if (!data) return null;
+  return (
+    <Card className="mb-6 p-5" data-testid="plan-usage">
+      <div className="mb-3 font-bold">پلن {data.label}{data.grace_until && <span className="ms-2 text-xs font-normal text-warning">مهلت کاهش پلن تا {faDate(data.grace_until)}</span>}</div>
+      <ul className="grid gap-2 text-sm sm:grid-cols-2">
+        {data.resources.map(r => (
+          <li key={r.key} className="flex justify-between rounded-lg bg-surface-2 px-3 py-2" data-testid="plan-resource" data-near={r.near_limit}>
+            <span>{r.label}</span><span className={r.near_limit ? "font-semibold text-warning" : ""}>{faNumber(r.used)} از {faNumber(r.limit)}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
 
 export default function OrganizationPage() {
   const toast = useToast();
@@ -85,6 +103,7 @@ export default function OrganizationPage() {
   return (
     <>
       <PageHeader eyebrow="تنظیمات" title="پروفایل سازمان" subtitle={<>شناسه سازمان: <span className="font-mono ltr">{profile.slug}</span></>} />
+      <PlanUsage />
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <Card className="h-fit lg:col-start-1">
           <CardHeader title="لوگوی سازمان" subtitle="در هدر پنل‌ها و سربرگ گزارش‌ها" />

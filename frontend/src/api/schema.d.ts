@@ -1529,6 +1529,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/organizations/{organization_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ⏸️ تعلیق: کار تازه بسته، کار در جریان آزاد */
+        post: operations["suspend_platform_organizations__organization_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ▶️ برداشتن تعلیق */
+        post: operations["resume_platform_organizations__organization_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📦 پلن و مصرف سازمان */
+        get: operations["plan_platform_organizations__organization_id__plan_get"];
+        /** 📦 تغییر پلن (نسخه‌دار، با مهلت هنگام کاهش) */
+        put: operations["change_plan_platform_organizations__organization_id__plan_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/support-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🛟 دسترسی‌های موقت پشتیبانی */
+        get: operations["support_access_platform_organizations__organization_id__support_access_get"];
+        put?: never;
+        /** 🛟 دادن دسترسی موقت (با دلیل و مهلت) */
+        post: operations["grant_support_access_platform_organizations__organization_id__support_access_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/support-access/{grant_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🛟 لغو دسترسی موقت */
+        post: operations["revoke_support_access_platform_support_access__grant_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/support-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🛟 نمای فقط‌خواندنی با دسترسی موقت معتبر */
+        get: operations["support_view_platform_organizations__organization_id__support_view_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/feature-flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🚩 پرچم‌های قابلیت */
+        get: operations["feature_flags_platform_feature_flags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/feature-flags/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 🚩 تنظیم پرچم: فهرست مجاز و توقف اضطراری */
+        put: operations["set_feature_flag_platform_feature_flags__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📤 خروجی‌های داده سازمان */
+        get: operations["exports_platform_organizations__organization_id__exports_get"];
+        put?: never;
+        /** 📤 ساخت خروجی کامل داده سازمان */
+        post: operations["create_export_platform_organizations__organization_id__exports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/exports/{export_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📤 دریافت فایل خروجی (ثبت در گزارش فعالیت) */
+        get: operations["download_export_platform_organizations__organization_id__exports__export_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/deprovision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🚪 ثبت خروج سازمان (پاک‌سازی پس از ۳۰ روز) */
+        post: operations["deprovision_platform_organizations__organization_id__deprovision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{organization_id}/deprovision/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🚪 لغو خروج پیش از پاک‌سازی */
+        post: operations["cancel_deprovision_platform_organizations__organization_id__deprovision_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/organization/profile": {
         parameters: {
             query?: never;
@@ -2609,6 +2816,23 @@ export interface paths {
         put?: never;
         /** 🙋 تأیید یا رد درخواست مشتری */
         post: operations["decide_customer_requests__request_id__decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/organization/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📦 پلن و مصرف سازمان من */
+        get: operations["my_plan_organization_plan_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5471,7 +5695,7 @@ export interface components {
             /** Items */
             items: components["schemas"]["PlanItem"][];
             assumptions: components["schemas"]["PlanAssumptions"];
-            summary: components["schemas"]["PlanSummary"];
+            summary: components["schemas"]["app__schemas__replenishment__PlanSummary"];
             /** By Category */
             by_category: components["schemas"]["PlanBreakdown"][];
             /** By Warehouse */
@@ -5905,6 +6129,15 @@ export interface components {
             delivered_quantity: number;
             /** Reason */
             reason: string;
+        };
+        /** DeprovisionOut */
+        DeprovisionOut: {
+            /** Requested At */
+            requested_at?: string | null;
+            /** Erase After */
+            erase_after?: string | null;
+            /** Erased At */
+            erased_at?: string | null;
         };
         /** DispatchIn */
         DispatchIn: {
@@ -6723,6 +6956,24 @@ export interface components {
             /** Expired */
             expired: boolean;
         };
+        /** ExportOut */
+        ExportOut: {
+            /** Id */
+            id: number;
+            /** Organization Id */
+            organization_id: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Error */
+            error?: string | null;
+        };
         /** FinanceDetail */
         FinanceDetail: {
             /** Day */
@@ -6838,6 +7089,36 @@ export interface components {
             /** Details */
             details: components["schemas"]["FinanceDetail"][];
         };
+        /** FlagIn */
+        FlagIn: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Kill Switch
+             * @default false
+             */
+            kill_switch: boolean;
+            /** Allowlist */
+            allowlist?: number[];
+            /** Reason */
+            reason: string;
+        };
+        /** FlagOut */
+        FlagOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Kill Switch */
+            kill_switch: boolean;
+            /** Allowlist */
+            allowlist: number[];
+        };
         /** FulfillIn */
         FulfillIn: {
             /**
@@ -6864,6 +7145,45 @@ export interface components {
             province: string;
             /** Capital */
             capital: boolean;
+        };
+        /** GrantIn */
+        GrantIn: {
+            /** User Id */
+            user_id: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Minutes
+             * @default 60
+             */
+            minutes: number;
+        };
+        /** GrantOut */
+        GrantOut: {
+            /** Id */
+            id: number;
+            /** Organization Id */
+            organization_id: number;
+            /** User Id */
+            user_id: number;
+            /** User Name */
+            user_name?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Active */
+            active: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -7713,6 +8033,11 @@ export interface components {
              */
             permissions: string[];
             /**
+             * Plan Modules
+             * @default []
+             */
+            plan_modules: string[];
+            /**
              * Mfa Enabled
              * @default false
              */
@@ -7887,6 +8212,13 @@ export interface components {
         OperationsOverview: {
             /** Pending */
             pending: number;
+            /**
+             * Oldest Pending Seconds
+             * @default 0
+             */
+            oldest_pending_seconds: number;
+            /** Queue Depth */
+            queue_depth?: number | null;
             /** Messages */
             messages: components["schemas"]["MessageFailureOut"][];
             /** Tasks */
@@ -8321,6 +8653,11 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+            /**
+             * Suspended
+             * @default false
+             */
+            suspended: boolean;
         };
         /** OrganizationCreate */
         OrganizationCreate: {
@@ -8616,6 +8953,17 @@ export interface components {
             /** Created At */
             created_at?: string | null;
             /**
+             * Plan Id
+             * @default enterprise
+             */
+            plan_id: string;
+            /** Suspended At */
+            suspended_at?: string | null;
+            /** Suspension Reason */
+            suspension_reason?: string | null;
+            /** Deprovision Requested At */
+            deprovision_requested_at?: string | null;
+            /**
              * Users Count
              * @default 0
              */
@@ -8657,6 +9005,8 @@ export interface components {
             name?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** Confirm Slug */
+            confirm_slug?: string | null;
         };
         /** OutOfServiceIn */
         OutOfServiceIn: {
@@ -9216,6 +9566,16 @@ export interface components {
             /** Capital */
             capital: number;
         };
+        /** PlanIn */
+        PlanIn: {
+            /**
+             * Plan Id
+             * @enum {string}
+             */
+            plan_id: "trial" | "basic" | "pro" | "enterprise";
+            /** Reason */
+            reason: string;
+        };
         /** PlanItem */
         PlanItem: {
             /** Inventory Id */
@@ -9300,28 +9660,18 @@ export interface components {
             /** Stockout Items */
             stockout_items: number;
         };
-        /** PlanSummary */
-        PlanSummary: {
-            /** Total Capital */
-            total_capital: number;
-            /** Peak Month */
-            peak_month?: string | null;
-            /** Peak Capital */
-            peak_capital: number;
-            /** Average Monthly */
-            average_monthly: number;
-            /** Items Planned */
-            items_planned: number;
-            /** Items Without Demand */
-            items_without_demand: number;
-            /** Items Cost Estimated */
-            items_cost_estimated: number;
-            /** Cost Estimated Names */
-            cost_estimated_names: string[];
-            /** Stockout Risk Items */
-            stockout_risk_items: number;
-            /** Current Stock Value */
-            current_stock_value: number;
+        /** PlanResource */
+        PlanResource: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number;
+            /** Near Limit */
+            near_limit: boolean;
         };
         /** PriceIn */
         PriceIn: {
@@ -11801,6 +12151,40 @@ export interface components {
              */
             is_preferred: boolean;
         };
+        /** SupportOrder */
+        SupportOrder: {
+            /** Id */
+            id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Status */
+            status: string;
+            /** Stock State */
+            stock_state?: string | null;
+            /** Destination City */
+            destination_city?: string | null;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /** SupportView */
+        SupportView: {
+            /** Organization Id */
+            organization_id: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Orders */
+            orders: components["schemas"]["SupportOrder"][];
+        };
+        /** SuspendIn */
+        SuspendIn: {
+            /** Reason */
+            reason: string;
+            /** Confirm Slug */
+            confirm_slug: string;
+        };
         /** TaskFailureOut */
         TaskFailureOut: {
             /** Id */
@@ -12864,6 +13248,49 @@ export interface components {
         app__schemas__operations__ReasonIn: {
             /** Reason */
             reason: string;
+        };
+        /** PlanSummary */
+        app__schemas__platform_ops__PlanSummary: {
+            /** Plan Id */
+            plan_id: string;
+            /** Label */
+            label: string;
+            /** Version */
+            version: number;
+            /** Grace Until */
+            grace_until?: string | null;
+            /** Modules */
+            modules: string[];
+            /** Resources */
+            resources: components["schemas"]["PlanResource"][];
+        };
+        /** ReasonIn */
+        app__schemas__platform_ops__ReasonIn: {
+            /** Reason */
+            reason: string;
+        };
+        /** PlanSummary */
+        app__schemas__replenishment__PlanSummary: {
+            /** Total Capital */
+            total_capital: number;
+            /** Peak Month */
+            peak_month?: string | null;
+            /** Peak Capital */
+            peak_capital: number;
+            /** Average Monthly */
+            average_monthly: number;
+            /** Items Planned */
+            items_planned: number;
+            /** Items Without Demand */
+            items_without_demand: number;
+            /** Items Cost Estimated */
+            items_cost_estimated: number;
+            /** Cost Estimated Names */
+            cost_estimated_names: string[];
+            /** Stockout Risk Items */
+            stockout_risk_items: number;
+            /** Current Stock Value */
+            current_stock_value: number;
         };
     };
     responses: never;
@@ -15966,6 +16393,493 @@ export interface operations {
             };
         };
     };
+    suspend_platform_organizations__organization_id__suspend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_platform_organizations__organization_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__platform_ops__ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_platform_organizations__organization_id__plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__platform_ops__PlanSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_plan_platform_organizations__organization_id__plan_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__platform_ops__PlanSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    support_access_platform_organizations__organization_id__support_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_support_access_platform_organizations__organization_id__support_access_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_support_access_platform_support_access__grant_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    support_view_platform_organizations__organization_id__support_view_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feature_flags_platform_feature_flags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagOut"][];
+                };
+            };
+        };
+    };
+    set_feature_flag_platform_feature_flags__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlagIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exports_platform_organizations__organization_id__exports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_export_platform_organizations__organization_id__exports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__platform_ops__ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_export_platform_organizations__organization_id__exports__export_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+                export_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deprovision_platform_organizations__organization_id__deprovision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeprovisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_deprovision_platform_organizations__organization_id__deprovision_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__platform_ops__ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeprovisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_profile_organization_profile_get: {
         parameters: {
             query?: never;
@@ -18317,6 +19231,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_plan_organization_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__platform_ops__PlanSummary"];
                 };
             };
         };

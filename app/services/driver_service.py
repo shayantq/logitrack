@@ -120,6 +120,8 @@ def invite_info(db: Session, code: str) -> dict:
 def signup(db: Session, code: str, data: DriverSignupRequest) -> User:
     """ساخت حساب راننده با لینک دعوت (وضعیت «incomplete» — هنوز سفارش نمی‌گیرد)."""
     invite, org = _usable_invite(db, code)
+    from app.services import platform_service
+    platform_service.ensure_capacity(db, org.id, "drivers")
     duplicate = db.query(User).filter(or_(
         User.username == data.username, *( [User.email == data.email] if data.email else [] ),
     )).execution_options(**SKIP_TENANT_FILTER).first()

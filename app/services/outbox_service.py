@@ -15,7 +15,7 @@ import os
 import random
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -166,10 +166,25 @@ def _task_out(t: TaskFailure) -> dict:
             "status": t.status, "replayable": t.status == "failed" and t.task_name in REPLAYABLE_TASKS}
 
 
+def _queue_depth() -> int | None:
+    """طول صف پیش‌فرض Celery در Redis؛ None اگر Redis در دسترس نباشد."""
+    from app.core.rate_limit import _redis
+    client = _redis()
+    if client is None:
+        return None
+    try:
+        return int(client.llen("celery"))
+    except Exception:
+        return None
+
+
 def overview(db: Session) -> dict:
     """متن پیام هرگز برنمی‌گردد و گیرنده نیمه‌پنهان است."""
+    oldest = db.query(func.min(OutboundMessage.created_at)).filter(OutboundMessage.status.in_(MESSAGE_ACTIVE_STATUSES)).scalar()
     return {
         "pending": db.query(OutboundMessage).filter(OutboundMessage.status.in_(MESSAGE_ACTIVE_STATUSES)).count(),
+        "oldest_pending_seconds": int((_now() - oldest).total_seconds()) if oldest else 0,
+        "queue_depth": _queue_depth(),
         "messages": [_message_out(m) for m in db.query(OutboundMessage).filter(OutboundMessage.status == "failed")
                      .order_by(OutboundMessage.id.desc()).limit(LIST_LIMIT).all()],
         "tasks": [_task_out(t) for t in db.query(TaskFailure).filter(TaskFailure.status == "failed")

@@ -13,6 +13,32 @@ import { Badge, Button, Card, CardHeader, ErrorState, Skeleton } from "@/ui/prim
 
 const KEY = ["platform-operations"];
 
+/** قابلیت‌هایی که می‌شود سریع خاموش کرد؛ توقف اضطراری بر فهرست مجاز مقدم است */
+function FeatureFlags({ isAdmin }: { isAdmin: boolean }) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const { data = [] } = useQuery({ queryKey: ["feature-flags"], queryFn: () => unwrap(api.GET("/platform/feature-flags")) });
+  const save = useMutation({
+    mutationFn: ({ key, kill, reason, allowlist }: { key: string; kill: boolean; reason: string; allowlist: number[] }) =>
+      unwrap(api.PUT("/platform/feature-flags/{key}", { params: { path: { key } }, body: { enabled: true, kill_switch: kill, allowlist, reason } })),
+    onSuccess: () => { toast.success("ثبت شد."); queryClient.invalidateQueries({ queryKey: ["feature-flags"] }); },
+    onError: e => toast.error(errorMessage(e)),
+  });
+  return (
+    <ul className="divide-y divide-border border-t border-border text-sm" data-testid="feature-flags">
+      {data.map(f => (
+        <li key={f.key} className="flex flex-wrap items-center gap-2 px-5 py-3" data-testid="feature-flag">
+          <span className="font-medium">{f.label}</span>
+          <Badge tone={f.kill_switch ? "danger" : "success"}>{f.kill_switch ? "متوقف" : f.allowlist.length ? `${faNumber(f.allowlist.length)} سازمان` : "همه سازمان‌ها"}</Badge>
+          {isAdmin && <Button size="sm" variant={f.kill_switch ? "secondary" : "outline-danger"} className="ms-auto" data-testid="flag-kill"
+            onClick={() => promptDialog({ title: f.kill_switch ? "برداشتن توقف" : "توقف اضطراری", label: "دلیل", required: true, minLength: 3, confirmLabel: "ثبت", danger: !f.kill_switch })
+              .then(reason => { if (reason?.trim()) save.mutate({ key: f.key, kill: !f.kill_switch, reason: reason.trim(), allowlist: f.allowlist }); })}>{f.kill_switch ? "برداشتن توقف" : "توقف اضطراری"}</Button>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function OperationsHealth() {
   const me = useMe();
   const toast = useToast();
@@ -36,7 +62,8 @@ export function OperationsHealth() {
   const empty = !data.messages.length && !data.tasks.length;
   return (
     <Card className="mb-6" data-testid="operations-health">
-      <CardHeader title="سلامت پس‌زمینه" subtitle={`${faNumber(data.pending)} پیام در صف ارسال`} />
+      <CardHeader title="سلامت پس‌زمینه"
+        subtitle={`${faNumber(data.pending)} پیام در صف ارسال${data.oldest_pending_seconds > 0 ? ` · قدیمی‌ترین ${faNumber(Math.round(data.oldest_pending_seconds / 60))} دقیقه` : ""} · صف وظایف: ${data.queue_depth == null ? "نامعلوم" : faNumber(data.queue_depth)}`} />
       {empty ? <p className="p-5 text-sm text-muted" data-testid="operations-empty">پیام یا وظیفه ناموفقی نیست.</p> : (
         <ul className="divide-y divide-border text-sm">
           {data.messages.map(m => (
@@ -59,6 +86,7 @@ export function OperationsHealth() {
           ))}
         </ul>
       )}
+      <FeatureFlags isAdmin={isAdmin} />
     </Card>
   );
 }

@@ -77,6 +77,10 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.purge_operations_records",
         "schedule": crontab(hour=21, minute=30),
     },
+    "erase-deprovisioned-daily": {
+        "task": "tasks.erase_deprovisioned",
+        "schedule": crontab(hour=22, minute=0),
+    },
     "reset-demo-half-hourly": {
         "task": "tasks.reset_demo",
         "schedule": crontab(minute="0,30"),  # نسخه نمایشی خصوصی به حالت اولیه

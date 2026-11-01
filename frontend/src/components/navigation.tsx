@@ -26,6 +26,8 @@ export type NavItem = {
   approvedDriver?: boolean; badge?: "pending-drivers" | "pending-requests" | "tickets" | "platform-tickets" | "stocktakes";
   /** مجوز ریز لازم (app/core/permissions.py) */
   perm?: string;
+  /** امکان پلن لازم (platform_service.PLANS) */
+  module?: "reorder" | "stocktake";
 };
 
 export type GroupId = "overview" | "operations" | "master" | "logistics" | "reports" | "system" | "driver" | "platform";
@@ -58,7 +60,7 @@ export const NAV: NavItem[] = [
   { to: "/app/transfers", label: "سفارش انتقال", icon: ArrowLeftRight, roles: STAFF, group: "operations" },
   { to: "/app/replenishment", label: "تأمین مجدد و ABC", icon: Repeat, roles: STAFF, group: "operations" },
   { to: "/app/dispositions", label: "تعیین تکلیف معیوب", icon: Recycle, roles: STAFF, group: "operations" },
-  { to: "/app/stocktakes", label: "انبارگردانی", icon: ClipboardCheck, roles: STAFF, group: "operations", badge: "stocktakes" },
+  { to: "/app/stocktakes", module: "stocktake", label: "انبارگردانی", icon: ClipboardCheck, roles: STAFF, group: "operations", badge: "stocktakes" },
   { to: "/app/labels", label: "برچسب و بارکد", icon: Tags, roles: STAFF, group: "operations", perm: "labels.print" },
   // اطلاعات پایه
   { to: "/app/warehouses", label: "انبارها", icon: Factory, roles: STAFF, group: "master" },
@@ -80,9 +82,9 @@ export const NAV: NavItem[] = [
   { to: "/app/ledger", label: "دفتر گردش کالا", icon: BookOpen, roles: STAFF, group: "reports" },
   { to: "/app/stock-card", label: "کاردکس کالا", icon: ClipboardList, roles: STAFF, group: "reports" },
   { to: "/app/documents", label: "اسناد انبار", icon: FileStack, roles: STAFF, group: "reports" },
-  { to: "/app/reorder", label: "نقطه سفارش هوشمند", icon: ShoppingCart, roles: STAFF, group: "reports" },
+  { to: "/app/reorder", module: "reorder", label: "نقطه سفارش هوشمند", icon: ShoppingCart, roles: STAFF, group: "reports" },
   { to: "/app/finance", label: "مالی حمل‌ونقل", icon: Wallet, roles: ADMIN, group: "reports" },
-  { to: "/app/capital", label: "برآورد سرمایه خرید", icon: PiggyBank, roles: ADMIN, group: "reports" },
+  { to: "/app/capital", module: "reorder", label: "برآورد سرمایه خرید", icon: PiggyBank, roles: ADMIN, group: "reports" },
   // سیستم و مدیریت
   { to: "/app/users", label: "کاربران و رانندگان", icon: Users, roles: ADMIN, group: "system" },
   { to: "/app/permissions", label: "مجوزهای نقش‌ها", icon: KeyRound, roles: ADMIN, group: "system", perm: "permissions.manage" },
@@ -118,6 +120,7 @@ export function navItemsFor(me: Me): NavItem[] {
   return NAV.filter(item => item.roles.includes(me.role)
     && (item.approvedDriver === undefined || item.approvedDriver === isApprovedDriver(me))
     && (!item.perm || perms.has(item.perm))
+    && (!item.module || !me.organization || (me.plan_modules ?? []).includes(item.module))
     && (!me.is_demo || demoAllows(item.to)));
 }
 

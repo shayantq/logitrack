@@ -12,8 +12,9 @@ from app.schemas.organization import (
     OrganizationRequestReject, OrganizationRequestResponse, OrganizationStats, OrganizationUpdate,
 )
 from app.schemas.operations_health import MessageFailureOut, OperationsOverview, ReplayIn, TaskFailureOut
+from app.schemas.platform_ops import DeprovisionOut, ExportOut, FlagIn, FlagOut, GrantIn, GrantOut, PlanIn, PlanSummary, ReasonIn, SupportView, SuspendIn
 from app.schemas.user import UserResponse
-from app.services import organization_request_service, organization_service, outbox_service
+from app.services import organization_request_service, organization_service, outbox_service, platform_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -148,3 +149,89 @@ def replay_task(data: ReplayIn, db: db_dependency, failure_id: int = Path(gt=0),
         return outbox_service.replay_task(db, user, failure_id, data.reason, celery_app.send_task)
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+def _ops(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/organizations/{organization_id}/suspend", response_model=OrganizationStats, summary="⏸️ تعلیق: کار تازه بسته، کار در جریان آزاد")
+def suspend(data: SuspendIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    _ops(platform_service.suspend, db, user, organization_id, data.reason, data.confirm_slug)
+    return organization_service.get_organization(db, organization_id)
+
+
+@router.post("/organizations/{organization_id}/resume", response_model=OrganizationStats, summary="▶️ برداشتن تعلیق")
+def resume(data: ReasonIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    _ops(platform_service.resume, db, user, organization_id, data.reason)
+    return organization_service.get_organization(db, organization_id)
+
+
+@router.get("/organizations/{organization_id}/plan", response_model=PlanSummary, summary="📦 پلن و مصرف سازمان")
+def plan(db: db_dependency, organization_id: int = Path(gt=0), _=Depends(platform_staff)):
+    return _ops(platform_service.plan_summary, db, organization_id)
+
+
+@router.put("/organizations/{organization_id}/plan", response_model=PlanSummary, summary="📦 تغییر پلن (نسخه‌دار، با مهلت هنگام کاهش)")
+def change_plan(data: PlanIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    return _ops(platform_service.change_plan, db, user, organization_id, data.plan_id, data.reason)
+
+
+@router.get("/organizations/{organization_id}/support-access", response_model=list[GrantOut], summary="🛟 دسترسی‌های موقت پشتیبانی")
+def support_access(db: db_dependency, organization_id: int = Path(gt=0), _=Depends(platform_staff)):
+    return _ops(platform_service.list_grants, db, organization_id)
+
+
+@router.post("/organizations/{organization_id}/support-access", response_model=GrantOut, summary="🛟 دادن دسترسی موقت (با دلیل و مهلت)")
+def grant_support_access(data: GrantIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    return _ops(platform_service.grant_access, db, user, organization_id, data.user_id, data.reason, data.minutes)
+
+
+@router.post("/support-access/{grant_id}/revoke", response_model=GrantOut, summary="🛟 لغو دسترسی موقت")
+def revoke_support_access(db: db_dependency, grant_id: int = Path(gt=0), user=Depends(platform_admin)):
+    return _ops(platform_service.revoke_access, db, user, grant_id)
+
+
+@router.get("/organizations/{organization_id}/support-view", response_model=SupportView, summary="🛟 نمای فقط‌خواندنی با دسترسی موقت معتبر")
+def support_view(db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_staff)):
+    return _ops(platform_service.support_view, db, user, organization_id)
+
+
+@router.get("/feature-flags", response_model=list[FlagOut], summary="🚩 پرچم‌های قابلیت")
+def feature_flags(db: db_dependency, _=Depends(platform_staff)):
+    return platform_service.list_flags(db)
+
+
+@router.put("/feature-flags/{key}", response_model=FlagOut, summary="🚩 تنظیم پرچم: فهرست مجاز و توقف اضطراری")
+def set_feature_flag(data: FlagIn, db: db_dependency, key: str = Path(max_length=48), user=Depends(platform_admin)):
+    return _ops(platform_service.set_flag, db, user, key, data)
+
+
+@router.get("/organizations/{organization_id}/exports", response_model=list[ExportOut], summary="📤 خروجی‌های داده سازمان")
+def exports(db: db_dependency, organization_id: int = Path(gt=0), _=Depends(platform_staff)):
+    return platform_service.list_exports(db, organization_id)
+
+
+@router.post("/organizations/{organization_id}/exports", response_model=ExportOut, summary="📤 ساخت خروجی کامل داده سازمان")
+def create_export(data: ReasonIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    from app.tasks import export_tenant_task
+    return _ops(platform_service.request_export, db, user, organization_id, data.reason, export_tenant_task.delay)
+
+
+@router.get("/organizations/{organization_id}/exports/{export_id}/download", summary="📤 دریافت فایل خروجی (ثبت در گزارش فعالیت)")
+def download_export(db: db_dependency, organization_id: int = Path(gt=0), export_id: int = Path(gt=0), user=Depends(platform_admin)):
+    path = _ops(platform_service.export_file, db, user, organization_id, export_id)
+    return FileResponse(path, media_type="application/zip", filename=f"organization-{organization_id}-export-{export_id}.zip")
+
+
+@router.post("/organizations/{organization_id}/deprovision", response_model=DeprovisionOut, summary="🚪 ثبت خروج سازمان (پاک‌سازی پس از ۳۰ روز)")
+def deprovision(data: SuspendIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    return _ops(platform_service.request_deprovision, db, user, organization_id, data.reason, data.confirm_slug)
+
+
+@router.post("/organizations/{organization_id}/deprovision/cancel", response_model=DeprovisionOut, summary="🚪 لغو خروج پیش از پاک‌سازی")
+def cancel_deprovision(data: ReasonIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
+    return _ops(platform_service.cancel_deprovision, db, user, organization_id, data.reason)

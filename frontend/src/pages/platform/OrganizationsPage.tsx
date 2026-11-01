@@ -10,8 +10,9 @@ import { Modal } from "@/ui/overlays";
 import { StarInput, Stars } from "@/components/performance/PerformanceUI";
 import { ActionCenter } from "@/components/ActionCenter";
 import { OperationsHealth } from "./OperationsHealth";
+import { OrganizationAdmin } from "./OrganizationAdmin";
 import { Badge, Button, Card, DataList, ErrorState, Field, Input, PageHeader, Spinner, StatCard, Table, TableSkeleton } from "@/ui/primitives";
-import { confirmDialog } from "@/ui/dialogs";
+import { confirmDialog, promptDialog } from "@/ui/dialogs";
 
 function ProfileModal({ orgId, onClose }: { orgId: number | null; onClose: () => void }) {
   const { data: p } = useQuery({
@@ -75,6 +76,7 @@ export default function OrganizationsPage() {
   const [form, setForm] = useState(EMPTY);
   const [profileId, setProfileId] = useState<number | null>(null);
   const [usersOf, setUsersOf] = useState<{ id: number; name: string } | null>(null);
+  const [adminId, setAdminOf] = useState<{ id: number } | null>(null);
   const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const create = useMutation({
@@ -85,8 +87,8 @@ export default function OrganizationsPage() {
     onError: e => toast.error(errorMessage(e)),
   });
   const toggle = useMutation({
-    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
-      unwrap(api.PATCH("/platform/organizations/{organization_id}", { params: { path: { organization_id: id } }, body: { is_active: active } })),
+    mutationFn: ({ id, active, confirm_slug }: { id: number; active: boolean; confirm_slug?: string }) =>
+      unwrap(api.PATCH("/platform/organizations/{organization_id}", { params: { path: { organization_id: id } }, body: { is_active: active, confirm_slug: confirm_slug ?? null } })),
     onSuccess: o => { toast.success(o.is_active ? "سازمان فعال شد." : "سازمان غیرفعال شد."); queryClient.invalidateQueries({ queryKey: ["platform-orgs"] }); },
     onError: e => toast.error(errorMessage(e)),
   });
@@ -98,6 +100,7 @@ export default function OrganizationsPage() {
         actions={isAdmin && <Button icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>سازمان جدید</Button>} />
       <ActionCenter />
       <OperationsHealth />
+      <OrganizationAdmin org={list.find(o => o.id === adminId?.id) ?? null} onClose={() => setAdminOf(null)} />
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="سازمان‌ها" value={faNumber(list.length)} icon={<Building className="size-[18px]" />} />
         <StatCard label="فعال" value={faNumber(list.filter(o => o.is_active).length)} tone="success" />
@@ -121,8 +124,12 @@ export default function OrganizationsPage() {
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" icon={<IdCard className="size-4" />} onClick={() => setProfileId(o.id)}>پروفایل</Button>
                       <Button size="sm" variant="ghost" icon={<Users className="size-4" />} onClick={() => setUsersOf({ id: o.id, name: o.name })}>کاربران</Button>
+                      {isAdmin && <Button size="sm" variant="ghost" onClick={() => setAdminOf(o)} data-testid="org-manage">مدیریت</Button>}
                       {isAdmin && <Button size="sm" variant={o.is_active ? "outline-danger" : "soft"} icon={<Power className="size-4" />}
-                        onClick={() => confirmDialog({ title: o.is_active ? `«${o.name}» غیرفعال شود؟ همه کاربرانش قفل می‌شوند.` : `«${o.name}» فعال شود؟`, danger: o.is_active, confirmLabel: o.is_active ? "غیرفعال شود" : "فعال شود" }).then(ok => ok && toggle.mutate({ id: o.id, active: !o.is_active }))}>
+                        onClick={() => o.is_active
+                          ? promptDialog({ title: `«${o.name}» غیرفعال شود؟ همه کاربرانش فوراً قفل می‌شوند، حتی راننده در راه.`, label: `برای تأیید، شناسه سازمان را بنویسید: ${o.slug} (شماره ${faNumber(o.id)})`, required: true, confirmLabel: "غیرفعال", danger: true })
+                              .then(slug => { if (slug) toggle.mutate({ id: o.id, active: false, confirm_slug: slug }); })
+                          : confirmDialog({ title: `«${o.name}» فعال شود؟` }).then(ok => { if (ok) toggle.mutate({ id: o.id, active: true }); })}>
                         {o.is_active ? "غیرفعال" : "فعال"}</Button>}
                     </div>
                   </td>

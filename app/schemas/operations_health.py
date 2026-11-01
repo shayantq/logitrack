@@ -30,6 +30,8 @@ class TaskFailureOut(BaseModelWithDateFormatting):
 
 class OperationsOverview(BaseModel):
     pending: int
+    oldest_pending_seconds: int = 0
+    queue_depth: Optional[int] = None
     messages: list[MessageFailureOut]
     tasks: list[TaskFailureOut]
 

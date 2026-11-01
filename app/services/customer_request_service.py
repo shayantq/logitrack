@@ -13,7 +13,7 @@ from app.core.tenancy import SKIP_TENANT_FILTER, set_tenant
 from app.models import Customer, Order, User
 from app.models_productivity import CustomerRequest
 from app.schemas.operations import ReceiptCreate
-from app.services import notification_service, order_service, receiving_service
+from app.services import notification_service, order_service, platform_service, receiving_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
 STAFF = ("org_admin", "warehouse_manager")
@@ -56,6 +56,8 @@ def submit(db: Session, code: str, data) -> dict:
     if order is None:
         raise NotFoundError("سفارشی با این کد پیگیری یافت نشد.")
     set_tenant(db, order.organization_id)
+    if not platform_service.feature_enabled(db, "customer_requests", order.organization_id):
+        raise ConflictError("ثبت درخواست از این صفحه فعلاً ممکن نیست؛ از پشتیبانی کمک بگیرید.")
     customer = db.get(Customer, order.customer_id) if order.customer_id else None
     last4 = latin_digits((data.phone or "").strip())
     if len(last4) != 4 or not last4.isdigit() or not verify_phone(order, customer, last4):

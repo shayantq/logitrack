@@ -288,7 +288,7 @@ def test_platform_admin_creates_organization_and_its_admin_can_log_in(tenants):
 def test_deactivated_organization_is_locked_out(tenants):
     client, db, a, b, platform_admin, support = tenants
 
-    res = client.patch(f"/platform/organizations/{b.org_id}", json={"is_active": False}, headers=_auth(platform_admin))
+    res = client.patch(f"/platform/organizations/{b.org_id}", json={"is_active": False, "confirm_slug": db.get(Organization, b.org_id).slug}, headers=_auth(platform_admin))
     assert res.status_code == 200 and res.json()["is_active"] is False
 
     assert client.get("/orders/", headers=_auth(b.admin)).status_code == 403

@@ -8,7 +8,8 @@ from app.schemas.field import (
     HandoverIn, HandoverOut, HandoverRespondIn, MissionIn, OutOfServiceIn, OutOfServiceOut, ReceiveReturnIn,
 )
 from app.core.rate_limit import RateLimiter
-from app.services import customer_request_service, field_service
+from app.schemas.platform_ops import PlanSummary
+from app.services import customer_request_service, field_service, platform_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(tags=["🚚 عملیات میدانی تحویل"])
@@ -82,6 +83,13 @@ def customer_requests(db: db_dependency, user: user_dependency, order_id: int = 
 @router.post("/customer-requests/{request_id}/decide", response_model=CustomerRequestOut, summary="🙋 تأیید یا رد درخواست مشتری")
 def decide(data: CustomerDecisionIn, db: db_dependency, user: user_dependency, request_id: int = Path(gt=0)):
     return _call(customer_request_service.decide, db, user, request_id, data)
+
+
+@router.get("/organization/plan", response_model=PlanSummary, summary="📦 پلن و مصرف سازمان من")
+def my_plan(db: db_dependency, user: user_dependency):
+    if user.role != "org_admin":
+        raise HTTPException(status_code=403, detail="فقط ادمین سازمان پلن را می‌بیند.")
+    return _call(platform_service.plan_summary, db, user.organization_id)
 
 
 @public_router.post("/{code}/requests", response_model=CustomerRequestPublicOut, summary="🙋 درخواست مشتری (نیازمند ۴ رقم موبایل)")

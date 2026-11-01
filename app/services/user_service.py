@@ -65,6 +65,8 @@ def _other_active_admins(db: Session, target: User) -> int:
 def create_user(db: Session, current_user: User, request: CreateUserRequest) -> User:
     if current_user.role != 'org_admin':
         raise ForbiddenError('فقط ادمین می‌تواند کاربر جدید ثبت کند.')
+    from app.services import platform_service
+    platform_service.ensure_capacity(db, current_user.organization_id, "drivers" if str(getattr(request.role, "value", request.role)) == "driver" else "users")
 
     # نام کاربری و ایمیل در کل پلتفرم یکتا هستند (ورود فقط با نام کاربری است)،
     # پس بررسی باید بین همه سازمان‌ها انجام شود، نه فقط سازمان جاری

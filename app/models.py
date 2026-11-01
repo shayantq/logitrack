@@ -103,6 +103,7 @@ PROFILE_FIELDS = tuple(
 class Organization(OrganizationProfileMixin, Base):
     """سازمان/کسب‌وکاری که از پسینه استفاده می‌کند — همه داده‌ها زیر یک سازمان‌اند."""
     __tablename__ = "organizations"
+    __table_args__ = (CheckConstraint("plan_id IN ('trial', 'basic', 'pro', 'enterprise')", name="ck_organizations_plan"),)
 
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -117,6 +118,14 @@ class Organization(OrganizationProfileMixin, Base):
     brand_color = Column(String(9), nullable=True)
     # سیاست انبار: پیش‌فرض‌های فرمول نقطه سفارش و برآورد سرمایه خرید (replenishment_service.DEFAULT_POLICY)
     inventory_policy = Column(JSON, nullable=True)
+    # پلن و تعلیق و خروج (app/services/platform_service.py)
+    plan_id = Column(String(16), nullable=False, default="enterprise", server_default="enterprise")
+    plan_version = Column(Integer, nullable=False, default=1, server_default="1")
+    plan_grace_until = Column(DateTime, nullable=True)
+    suspended_at = Column(DateTime, nullable=True)
+    suspension_reason = Column(String(500), nullable=True)
+    deprovision_requested_at = Column(DateTime, nullable=True)
+    deprovisioned_at = Column(DateTime, nullable=True)
 
 
 class OrganizationRequest(OrganizationProfileMixin, Base):
@@ -1041,8 +1050,8 @@ from app.models_fulfillment import (  # noqa: E402,F401
 from app.models_control import CutoverCheck, LabelPrint, RolePermission  # noqa: E402,F401
 # بهره‌وری عملیات: نماهای ذخیره‌شده فهرست‌ها
 from app.models_productivity import (  # noqa: E402,F401
-    AdjustmentApproval, ContactAttempt, CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn, DriverReturnLine, OperationException,
-    OperationExceptionEvent, OrderHandover, OutboundMessage, SavedView, TaskFailure,
+    AdjustmentApproval, ContactAttempt, CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn, DriverReturnLine, FeatureFlag, OperationException,
+    OperationExceptionEvent, OrderHandover, OutboundMessage, PlanChange, SavedView, SupportAccessGrant, TaskFailure, TenantExport,
 )
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401

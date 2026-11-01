@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from celery.result import AsyncResult
 
+from app.core.rate_limit import RateLimiter
 from app.database import db_dependency
 from app.core.wms import AVAILABLE
 from app.models import Product, Order, Vehicle, Inventory, RoleEnum
@@ -83,6 +84,16 @@ def _all_orders_params() -> dict:
     return {"date_from": (today - timedelta(days=730)).isoformat(), "date_to": (today + timedelta(days=365)).isoformat()}
 
 
+# یک سازمان نباید با گزارش‌های پیاپی صف همه را پر کند (ADM-17، SYS-16)
+report_quota = RateLimiter("report-quota", max_requests=20, window_seconds=600)
+
+
+def _queue_report(user, report: str, fmt: str, params: dict):
+    if not report_quota.allow(str(user.organization_id)):
+        raise HTTPException(status_code=429, detail="تعداد گزارش‌های این سازمان در چند دقیقه اخیر زیاد بوده است؛ کمی بعد دوباره امتحان کنید.")
+    return generate_report_task.delay(user.organization_id, user.id, report, fmt, params)
+
+
 def _export_warehouse_scope(user) -> int | None:
     """مدیر انبار فقط گزارش موجودی انبار خودش را می‌گیرد؛ ادمین همه انبارها را."""
     if user.role == RoleEnum.WAREHOUSE_MANAGER:
@@ -96,7 +107,7 @@ def _export_warehouse_scope(user) -> int | None:
 def start_inventory_excel_export(
     current_user=Depends(require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER]))
 ):
-    task = generate_report_task.delay(current_user.organization_id, current_user.id, "inventory", "excel", {"warehouse_id": _export_warehouse_scope(current_user)})
+    task = _queue_report(current_user, "inventory", "excel", {"warehouse_id": _export_warehouse_scope(current_user)})
     return {"task_id": task.id, "message": "✅ تولید گزارش در پس‌زمینه آغاز شد."}
 
 
@@ -104,7 +115,7 @@ def start_inventory_excel_export(
 def start_orders_excel_export(
     current_user=Depends(require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER]))
 ):
-    task = generate_report_task.delay(current_user.organization_id, current_user.id, "orders", "excel", _all_orders_params())
+    task = _queue_report(current_user, "orders", "excel", _all_orders_params())
     return {"task_id": task.id, "message": "✅ تولید گزارش در پس‌زمینه آغاز شد."}
 
 
@@ -112,7 +123,7 @@ def start_orders_excel_export(
 def start_inventory_pdf_export(
     current_user=Depends(require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER]))
 ):
-    task = generate_report_task.delay(current_user.organization_id, current_user.id, "inventory", "pdf", {"warehouse_id": _export_warehouse_scope(current_user)})
+    task = _queue_report(current_user, "inventory", "pdf", {"warehouse_id": _export_warehouse_scope(current_user)})
     return {"task_id": task.id, "message": "✅ تولید گزارش PDF در پس‌زمینه آغاز شد."}
 
 
@@ -120,7 +131,7 @@ def start_inventory_pdf_export(
 def start_orders_pdf_export(
     current_user=Depends(require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER]))
 ):
-    task = generate_report_task.delay(current_user.organization_id, current_user.id, "orders", "pdf", _all_orders_params())
+    task = _queue_report(current_user, "orders", "pdf", _all_orders_params())
     return {"task_id": task.id, "message": "✅ تولید گزارش PDF در پس‌زمینه آغاز شد."}
 
 
@@ -190,7 +201,7 @@ def generate_report(data: ReportRequest, db: db_dependency, current_user=Depends
               "date_to": data.date_to.isoformat() if data.date_to else None,
               "warehouse_id": data.warehouse_id, "status": data.status, "months": data.months,
               "ids": data.order_ids if data.report == "orders" else None}
-    task = generate_report_task.delay(current_user.organization_id, current_user.id, data.report, data.format, params)
+    task = _queue_report(current_user, data.report, data.format, params)
     audit_service.record(db, current_user, "report.generate",
                          f"{report_data.TITLES[data.report]} ({ {'pdf': 'PDF', 'csv': 'CSV'}.get(data.format, 'اکسل') }) گرفته شد",
                          details={k: v for k, v in params.items() if v})

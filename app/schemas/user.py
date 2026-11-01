@@ -133,6 +133,7 @@ class OrganizationBrief(BaseModel):
     id: int
     name: str
     slug: str
+    suspended: bool = False
 
 
 class MeResponse(UserResponse):
@@ -142,6 +143,8 @@ class MeResponse(UserResponse):
     tour_state: Optional[dict[str, str]] = None
     # مجوزهای ریز فعال این کاربر (app/core/permissions.py) — رابط کاربری دکمه‌ها را با آن نشان/پنهان می‌کند
     permissions: list[str] = []
+    # امکانات پلن سازمان (منو از روی آن ساخته می‌شود) و پرچم‌های فعال
+    plan_modules: list[str] = []
     # ورود دومرحله‌ای: فعال است؟ و آیا پیش از ادامه باید راه‌اندازی شود (کارکنان پلتفرم در سرور اصلی)
     mfa_enabled: bool = False
     mfa_setup_required: bool = False

@@ -406,6 +406,27 @@ def publish_messages_task():
         db.close()
 
 
+@celery_app.task(name="tasks.export_tenant", soft_time_limit=1200, time_limit=1260)
+def export_tenant_task(export_id: int):
+    from app.services import platform_service
+    db = SessionLocal()
+    try:
+        return platform_service.build_export(db, export_id)
+    finally:
+        db.close()
+
+
+@celery_app.task(name="tasks.erase_deprovisioned", soft_time_limit=1200, time_limit=1260)
+def erase_deprovisioned_task():
+    """هر روز: سازمان‌هایی که مهلت خروجشان گذشته پاک‌سازی می‌شوند."""
+    from app.services import platform_service
+    db = SessionLocal()
+    try:
+        return {"erased": platform_service.erase_due(db)}
+    finally:
+        db.close()
+
+
 @celery_app.task(name="tasks.purge_operations_records")
 def purge_operations_records_task():
     from app.services import outbox_service

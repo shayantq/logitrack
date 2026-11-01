@@ -61,6 +61,10 @@ def get_current_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="حساب سازمان شما غیرفعال شده است؛ با پشتیبانی پسینه تماس بگیرید.",
             )
+        from app.services import platform_service
+        if platform_service.blocked_by_suspension(user.organization, request.method, request.url.path):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="حساب سازمان شما تعلیق است؛ کار تازه ثبت نمی‌شود ولی سفرها و برگشت‌های در جریان را می‌توانید تمام کنید.")
         set_tenant(db, user.organization_id)
     else:
         set_tenant(db, None)

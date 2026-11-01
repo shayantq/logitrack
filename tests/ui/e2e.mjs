@@ -23,7 +23,17 @@ const browser = await chromium.launch({ args: [
   "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream",
 ] });
 
+// زمان هر نشست برای پیدا کردن کندترین بخش‌ها؛ آخر اجرا چاپ می‌شود
+const sessionTimes = [];
 async function session(scope, username, password, scenario, contextOptions = {}) {
+  const started = Date.now();
+  try {
+    await runSession(scope, username, password, scenario, contextOptions);
+  } finally {
+    sessionTimes.push([scope, Date.now() - started]);
+  }
+}
+async function runSession(scope, username, password, scenario, contextOptions = {}) {
   const { tours = false, ...options } = contextOptions;
   // مرورگر مثل کاربر واقعی به وقت تهران؛ بین ۰۰:۰۰ تا ۰۳:۳۰ بامداد تاریخ UTC با «امروز» سرور فرق دارد
   const context = await browser.newContext({ locale: "fa-IR", timezoneId: "Asia/Tehran", ...options });
@@ -2046,6 +2056,12 @@ await session("productivity-platform", "superadmin", "superadmin123", async page
   await page.keyboard.press("Escape");
   await page.waitForSelector("[data-testid=operations-health]");
   check("platform", "background health card is visible", true);
+  await page.waitForSelector("[data-testid=feature-flag]");
+  check("platform", "feature flags are listed", true);
+  await page.locator("[data-testid=org-manage]").first().click();
+  await page.waitForSelector("[data-testid=org-admin] [data-testid=org-plan-select]");
+  check("platform", "organization admin shows plan and usage", (await page.textContent("[data-testid=org-plan]")).includes("سفارش این ماه"));
+  await page.keyboard.press("Escape");
 });
 
 // ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------
@@ -2233,6 +2249,28 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
   await apiCall(reliabilityAdmin, "PUT", "/valuation/settings", { adjustment_approval_units: 0 });
 }
 
+// تعلیق: کار تازه بسته، سفر در جریان آزاد؛ شناسه سازمان تایپی لازم است
+{
+  const rootToken = await apiToken("superadmin", "superadmin123");
+  const orgs = await apiCall(rootToken, "GET", "/platform/organizations");
+  const qazvin = orgs.find(o => o.slug.includes("qazvin")) ?? orgs[0];
+  const going = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین", vehicle_id: routeVehicle.id, customer: { name: "مشتری تعلیق", mobile: "09121239883" } });
+  const wrong = await apiCall(rootToken, "POST", `/platform/organizations/${qazvin.id}/suspend`, { reason: "آزمون تعلیق", confirm_slug: "نادرست" }, false);
+  check("platform", "suspension needs the typed organization slug", wrong.status === 400, String(wrong.status));
+  await apiCall(rootToken, "POST", `/platform/organizations/${qazvin.id}/suspend`, { reason: "آزمون تعلیق", confirm_slug: qazvin.slug });
+  const blocked = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین", vehicle_id: routeVehicle.id, customer: { name: "مشتری تعلیق", mobile: "09121239884" } }).then(() => 0, e => String(e.message));
+  check("platform", "suspended organization cannot start new work", String(blocked).includes("403"), String(blocked).slice(0, 90));
+  const inFlight = await apiCall(reliabilityDriver, "PUT", `/orders/${going.id}/status`, { order_status: "picked_up" }, false);
+  check("platform", "work in progress continues during suspension", inFlight.status === 200, String(inFlight.status));
+  await session("suspended-admin", "qazvin_admin", "admin123", async page => {
+    await page.waitForSelector("[data-testid=suspended-banner]");
+    check("platform", "suspended organization sees a clear banner", true);
+  });
+  await apiCall(rootToken, "POST", `/platform/organizations/${qazvin.id}/resume`, { reason: "پایان آزمون" });
+  const resumed = await apiCall(reliabilityAdmin, "GET", "/organization/plan");
+  check("platform", "organization sees its plan after resume", resumed.plan_id === "enterprise", resumed.plan_id);
+}
+
 // آخرین سناریوی سفارش است چون کل موجودی آزاد کالا را قرنطینه می‌کند. نگه‌داشت کیفی کالای رزروشده: رزرو آزاد، بارگیری بسته، رزرو دوباره از جزئیات سفارش
 {
   const adminHeaders = { Authorization: `Bearer ${reliabilityAdmin}`, "Content-Type": "application/json" };
@@ -2281,6 +2319,8 @@ await session("public", null, null, async page => {
 await browser.close();
 const failures = results.filter(r => !r.ok);
 const failed = failures.length;
+console.log(`\nزمان کل: ${Math.round(performance.now() / 1000)} ثانیه؛ مجموع نشست‌ها: ${Math.round(sessionTimes.reduce((sum, [, ms]) => sum + ms, 0) / 1000)} ثانیه`);
+for (const [scope, ms] of [...sessionTimes].sort((a, b) => b[1] - a[1]).slice(0, 15)) console.log(`  ${String(Math.round(ms / 1000)).padStart(4)}s  ${scope}`);
 console.log(`\n${results.length - failed}/${results.length} checks passed`);
 if (CI && process.env.GITHUB_STEP_SUMMARY) {
   const cell = text => String(text || "").replace(/\|/g, "\\|").replace(/\s+/g, " ").slice(0, 300);

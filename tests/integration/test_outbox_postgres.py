@@ -96,3 +96,36 @@ def test_timeouts_are_applied_to_app_connections(monkeypatch):
             conn.execute(text("SELECT pg_sleep(1)"))
         assert type(caught.value.orig).__name__ == "QueryCanceled"
     engine.dispose()
+
+
+def test_erasing_an_organization_respects_ledger_triggers(factory, monkeypatch, tmp_path):
+    """روی PostgreSQL واقعی trigger سند انبار فعال است؛ پاک‌سازی نباید به آن جدول‌ها دست بزند و باید خطا ندهد."""
+    from app.core import storage
+    from app.core.tenancy import set_tenant
+    from app.models import Customer, Organization, StockDocument
+    from app.services import platform_service, stock_ledger
+    from app.models import Product
+    from tests.factories import default_warehouse
+
+    monkeypatch.setattr(storage, "MEDIA_ROOT", tmp_path)
+    db = factory()
+    org = Organization(name="سازمان پاک‌سازی", slug=f"erase-{datetime.now(timezone.utc).timestamp():.0f}")
+    db.add(org)
+    db.commit()
+    set_tenant(db, org.id)
+    warehouse = default_warehouse(db, org.id)
+    product = Product(organization_id=org.id, name="برنج", sku=f"ERASE-{org.id}", barcode=f"E{org.id}", price=1, weight_kg=1)
+    db.add(product)
+    db.commit()
+    inventory = stock_ledger.lock_bucket(db, product.id, warehouse.id, "available", organization_id=org.id)
+    document = stock_ledger.new_document(db, "receipt", organization_id=org.id, warehouse_id=warehouse.id, note="اولیه")
+    stock_ledger.record(db, inventory, 5, "receipt", document=document, reason="اولیه")
+    db.add(Customer(organization_id=org.id, name="مریم", mobile="09121112233"))
+    db.commit()
+    before = db.query(StockDocument).filter(StockDocument.organization_id == org.id).count()
+    platform_service.erase_organization(db, org.id)
+    db.expire_all()
+    assert db.query(StockDocument).filter(StockDocument.organization_id == org.id).count() == before
+    customer = db.query(Customer).filter(Customer.organization_id == org.id).one()
+    assert customer.name == "حذف‌شده" and "0912" not in customer.mobile
+    db.close()

@@ -182,6 +182,7 @@ class OrganizationCreate(BaseModel):
 class OrganizationUpdate(BaseModel):
     name: Optional[Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]] = None
     is_active: Optional[bool] = None
+    confirm_slug: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=64)]] = None
 
 
 class OrganizationResponse(BaseModel):
@@ -195,6 +196,10 @@ class OrganizationResponse(BaseModel):
 
 
 class OrganizationStats(OrganizationResponse):
+    plan_id: str = "enterprise"
+    suspended_at: Optional[datetime] = None
+    suspension_reason: Optional[str] = None
+    deprovision_requested_at: Optional[datetime] = None
     users_count: int = 0
     drivers_count: int = 0
     warehouses_count: int = 0

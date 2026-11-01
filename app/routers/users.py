@@ -12,7 +12,7 @@ from app.schemas.user import (
     ActivityItem, AuditLogPage, MeResponse, PasswordResetResponse, TokenResponse, TourStateIn, UpdateUserRequest,
     UserDetailResponse, UserResponse, UserUpdateRequest,
 )
-from app.services import audit_service, permission_service, session_service, user_service
+from app.services import audit_service, permission_service, session_service, user_service, platform_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -33,6 +33,9 @@ def _call(fn, *args, **kwargs):
 def get_current_user_info(db: db_dependency, user: current_user_dependency):
     data = MeResponse.model_validate(user, from_attributes=True)
     data.permissions = permission_service.mine(db, user)
+    data.plan_modules = platform_service.modules_of(user.organization) if user.organization_id else []
+    if data.organization is not None:
+        data.organization.suspended = user.organization.suspended_at is not None
     data.is_demo = bool(db.info.get("demo"))
     data.mfa_enabled = user.totp_enabled_at is not None
     data.mfa_setup_required = user_service.mfa_required(user) and not data.mfa_enabled

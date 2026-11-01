@@ -27,6 +27,7 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 echo "♻️  بازیابی در دیتابیس موقت..."
+RESTORE_STARTED=$(date +%s)
 gunzip -c "$FILE" | docker exec -i "$NAME" psql -q -v ON_ERROR_STOP=1 -U postgres -d logitrack >/dev/null
 
 count() { "$@" psql -U postgres -d logitrack -tAc "SELECT count(*) FROM $TABLE" 2>/dev/null | tr -d '[:space:]'; }
@@ -41,6 +42,12 @@ for TABLE in $TABLES; do
   if [ -n "$restored" ] && [ -n "$live" ] && [ "$restored" -gt "$live" ]; then mark="✗"; status=1; fi
   printf "%-18s %12s %12s  %s\n" "$TABLE" "${restored:-?}" "${live:-?}" "$mark"
 done
+# تمرین بازیابی: RPO عمر بکاپ است و RTO زمان واقعی بازیابی (docs/runbooks.md)
+RESTORE_SECONDS=$(( $(date +%s) - RESTORE_STARTED ))
+BACKUP_AGE_MINUTES=$(( ( $(date +%s) - $(date -r "$FILE" +%s) ) / 60 ))
+echo "⏱️  RPO: ${BACKUP_AGE_MINUTES} دقیقه — RTO: ${RESTORE_SECONDS} ثانیه"
+mkdir -p backups
+echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) file=$(basename "$FILE") rpo_minutes=${BACKUP_AGE_MINUTES} rto_seconds=${RESTORE_SECONDS} status=${status}" >> backups/restore-drills.log
 version=$(docker exec "$NAME" psql -U postgres -d logitrack -tAc "SELECT version_num FROM alembic_version" | tr -d '[:space:]')
 echo "🧬 نسخه دیتابیس در بکاپ: $version"
 if [ "$status" -eq 0 ]; then

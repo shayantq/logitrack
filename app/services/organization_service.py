@@ -35,7 +35,8 @@ def _with_stats(db: Session, organizations: list[Organization]) -> list[dict]:
 
     return [
         {
-            "id": org.id, "name": org.name, "slug": org.slug, "is_active": org.is_active,
+            "id": org.id, "name": org.name, "slug": org.slug, "is_active": org.is_active, "plan_id": org.plan_id,
+            "suspended_at": org.suspended_at, "suspension_reason": org.suspension_reason, "deprovision_requested_at": org.deprovision_requested_at,
             "created_at": org.created_at,
             "users_count": users.get(org.id, 0), "drivers_count": drivers.get(org.id, 0),
             "warehouses_count": warehouses.get(org.id, 0), "products_count": products.get(org.id, 0),
@@ -95,6 +96,8 @@ def update_organization(db: Session, organization_id: int, data: OrganizationUpd
         raise NotFoundError("سازمان مورد نظر یافت نشد.")
     if data.name is not None:
         org.name = data.name
+    if data.is_active is False and org.is_active and (data.confirm_slug or "").strip() != org.slug:
+        raise ConflictError(f"برای غیرفعال کردن، شناسه سازمان ({org.slug}) را دقیق بنویسید.")
     if data.is_active is not None:
         org.is_active = data.is_active
     db.commit()
