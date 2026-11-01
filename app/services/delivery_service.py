@@ -50,6 +50,7 @@ def serialize(db: Session, attempt: DeliveryAttempt) -> dict:
         "next_attempt_at": attempt.next_attempt_at, "resolution": attempt.resolution,
         "resolution_label": RESOLUTION_LABELS.get(attempt.resolution), "resolved_by_name": people.get(attempt.resolved_by_id),
         "resolved_at": attempt.resolved_at, "has_photo": bool(attempt.photo_path), "photo_type": attempt.photo_type,
+        "partial": bool(attempt.partial), "lines": list(attempt.lines),
     }
 
 

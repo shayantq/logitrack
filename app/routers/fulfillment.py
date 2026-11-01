@@ -221,6 +221,11 @@ def dispatch(data: DispatchIn, db: db_dependency, user: user_dependency, shipmen
     return _call(shipping_service.dispatch, db, user, shipment_id, data.note)
 
 
+@shipping.post("/shipments/{shipment_id}/close", response_model=ShipmentOut, summary="🏁 بستن سفر پس از پایان سفارش‌ها و ثبت برگشت‌ها")
+def close_shipment(db: db_dependency, user: user_dependency, shipment_id: int = Path(gt=0)):
+    return _call(shipping_service.close, db, user, shipment_id)
+
+
 @shipping.post("/shipments/{shipment_id}/cancel", response_model=ShipmentOut, summary="✖️ لغو محموله پیش از تحویل")
 def cancel_shipment(db: db_dependency, user: user_dependency, shipment_id: int = Path(gt=0)):
     return _call(shipping_service.cancel, db, user, shipment_id)

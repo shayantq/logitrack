@@ -30,6 +30,8 @@ export function DeliveryOutcomeModal({ order, outcome, onClose, onSaved }: { ord
   const [note, setNote] = useState("");
   const [nextAt, setNextAt] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [partial, setPartial] = useState(false);
+  const [lines, setLines] = useState<Record<number, { quantity: string; reason: string }>>({});
   const [busy, setBusy] = useState(false);
   const delivered = outcome === "delivered";
 
@@ -40,7 +42,9 @@ export function DeliveryOutcomeModal({ order, outcome, onClose, onSaved }: { ord
       const saved = await unwrap(api.PUT("/orders/{order_id}/status", {
         params: { path: { order_id: order.id } },
         body: delivered
-          ? { order_status: "delivered", recipient_name: recipient || null, recipient_role: role, exception_note: issue || null, note: null }
+          ? { order_status: "delivered", recipient_name: recipient || null, recipient_role: role, exception_note: issue || null, note: null,
+              delivery_lines: partial ? Object.entries(lines).filter(([id, l]) => l.quantity !== "" && Number(l.quantity) < (order.items.find(i => i.id === Number(id))?.quantity ?? 0))
+                .map(([id, l]) => ({ item_id: Number(id), delivered_quantity: Number(l.quantity), reason: l.reason })) : null }
           : { order_status: "failed", failure_reason: reason as Reason, note: note || null, next_attempt_at: nextAt ? new Date(nextAt).toISOString() : null },
       }));
       if (delivered && photo) {
@@ -79,6 +83,22 @@ export function DeliveryOutcomeModal({ order, outcome, onClose, onSaved }: { ord
             <Input type="file" accept="image/*" capture="environment" onChange={e => setPhoto(e.target.files?.[0] ?? null)} data-testid="outcome-photo" />
           </Field>
           <Field label="کمبود یا آسیب (اختیاری)"><Textarea rows={2} value={issue} onChange={e => setIssue(e.target.value)} maxLength={500} data-testid="outcome-issue" /></Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-[var(--brand)]" checked={partial} onChange={e => setPartial(e.target.checked)} data-testid="outcome-partial" />
+            همه اقلام تحویل نشد
+          </label>
+          {partial && order.items.map(item => {
+            const line = lines[item.id] ?? { quantity: String(item.quantity), reason: "" };
+            const change = (patch: Partial<typeof line>) => setLines(all => ({ ...all, [item.id]: { ...line, ...patch } }));
+            return (
+              <div key={item.id} className="grid gap-2 rounded-xl border border-border p-3 sm:grid-cols-2" data-testid="outcome-line">
+                <Field label={`${item.product_name}: تحویل‌شده از ${item.quantity}`}>
+                  <Input type="number" min={0} max={item.quantity} value={line.quantity} onChange={e => change({ quantity: e.target.value })} data-testid="outcome-line-quantity" />
+                </Field>
+                {Number(line.quantity) < item.quantity && <Field label="دلیل"><Input value={line.reason} minLength={2} required maxLength={300} onChange={e => change({ reason: e.target.value })} data-testid="outcome-line-reason" /></Field>}
+              </div>
+            );
+          })}
         </> : <>
           <Field label="دلیل">
             <Select value={reason} onChange={e => setReason(e.target.value as Reason)} required data-testid="outcome-reason">

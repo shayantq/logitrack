@@ -80,6 +80,7 @@ ORDER_STOCK_STATES = (
     "reserved",    # رزرو شده، هنوز از انبار خارج نشده
     "held",        # رزرو به‌خاطر نگه‌داشت کیفی آزاد شد؛ تا رزرو دوباره بارگیری نمی‌شود
     "issued",      # حواله خروج صادر و از موجودی کم شده
+    "returning",   # تصمیم برگشت گرفته شده و کالا هنوز به انبار نرسیده (driver_returns)
     "released",    # رزرو بدون خروج آزاد شد
     "returned",    # پس از خروج به انبار برگشت
 )
@@ -225,8 +226,8 @@ PICK_LINE_STATUSES = ("open", "picked", "short", "canceled")
 FULFILLMENT_STATES = ("open", "picking", "picked", "packed", "shipped")
 FULFILLMENT_LABELS = {"open": "آماده‌نشده", "picking": "در حال برداشت", "picked": "برداشت‌شده", "packed": "بسته‌بندی‌شده",
                       "shipped": "ارسال‌شده"}
-SHIPMENT_STATUSES = ("open", "dispatched", "canceled")
-SHIPMENT_STATUS_LABELS = {"open": "در حال بارگیری", "dispatched": "تحویل راننده شد", "canceled": "لغوشده"}
+SHIPMENT_STATUSES = ("open", "dispatched", "closed", "canceled")
+SHIPMENT_STATUS_LABELS = {"open": "در حال بارگیری", "dispatched": "تحویل راننده شد", "closed": "سفر بسته شد", "canceled": "لغوشده"}
 
 # ---------------------------------------------------------------------------
 # فصل ۱۵ — تعیین تکلیف کالای مرجوعی/معیوب

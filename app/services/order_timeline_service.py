@@ -17,8 +17,8 @@ from app.models import (
 )
 from app.models_fulfillment import Backorder, Package, PickLine, PickList, Shipment
 from app.models_wms import StockDocument, StockReservation
-from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, DeliveryAttempt
-from app.services import delivery_service, eta_service, exception_service, order_service
+from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, ContactAttempt, CustomerRequest, DeliveryAttempt, DriverReturn
+from app.services import customer_request_service, delivery_service, eta_service, exception_service, field_service, order_service
 
 AREAS = {"order": "سفارش", "warehouse": "انبار", "fleet": "ناوگان", "finance": "مالی", "support": "پشتیبانی"}
 EXCEPTION_AREA = {"warehouse": "warehouse", "fleet": "fleet", "support": "support", "management": "order"}
@@ -123,11 +123,25 @@ def timeline(db: Session, user, order_id: int) -> dict:
         number = fa_digits(str(a.attempt_no))
         if a.outcome == "delivered":
             title = f"تلاش {number}: تحویل به {a.recipient_name}" if a.recipient_name else f"تلاش {number}: تحویل شد"
+            if a.partial:
+                title += " (جزئی)"
             outcome = a.exception_note and f"کمبود یا آسیب: {a.exception_note}"
         else:
             title = f"تلاش {number}: {delivery_service.FAILURE_REASON_LABELS.get(a.failure_reason, 'ناموفق')}"
             outcome = a.note
         events.append(_event(a.at, "fleet", title, attempt_people.get(a.driver_id), outcome, source="attempt"))
+    contacts = db.query(ContactAttempt).filter(ContactAttempt.order_id == order.id).all()
+    contact_people = _names(db, [c.user_id for c in contacts])
+    for c in contacts:
+        events.append(_event(c.at, "fleet", f"تماس با گیرنده: {field_service.CONTACT_OUTCOMES.get(c.outcome, c.outcome)}", contact_people.get(c.user_id), c.note, source="contact"))
+    if role != "driver":
+        for r in db.query(DriverReturn).filter(DriverReturn.order_id == order.id).all():
+            events.append(_event(r.created_at, "warehouse", "در انتظار برگشت از راننده", None, r.reason, source="driver_return"))
+            if r.received_at:
+                events.append(_event(r.received_at, "warehouse", "برگشت در انبار ثبت شد", None, r.note, source="driver_return"))
+        for q in db.query(CustomerRequest).filter(CustomerRequest.order_id == order.id).all():
+            kind = customer_request_service.KIND_LABELS.get(q.kind, q.kind)
+            events.append(_event(q.created_at, "support", f"درخواست مشتری: {kind}", None, q.note, source="customer_request"))
     exceptions = [] if role == "driver" else exception_service.active_for_order(db, order.id)
     for x in exceptions:
         label = exception_service.KINDS.get(x.kind, (x.kind,))[0]
@@ -165,6 +179,10 @@ def _blocker(order, backorders, tickets, eta, open_exception) -> str | None:
     open_backorders = [b for b in backorders if b.status in ("open", "allocated")]
     if open_backorders:
         return f"کمبود موجودی: {fa_digits(str(len(open_backorders)))} قلم معوق"
+    if order.stock_state == "returning":
+        return "کالا هنوز از راننده به انبار نرسیده است"
+    if order.assignment_state == "pending":
+        return "منتظر پاسخ راننده به مأموریت"
     if order.stock_state == "held":
         return "رزرو به‌خاطر نگه‌داشت کیفی آزاد شده؛ رزرو دوباره لازم است"
     if order.status == "failed" and order.failure_resolution is None:

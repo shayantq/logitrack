@@ -15,6 +15,8 @@ from app.schemas.fulfillment import (
 )
 from app.schemas.operations import ReceiptCreate, ReceiveIn
 from app.schemas.order import OrderStatusRequest, ResolveFailureRequest
+from app.schemas.field import ReceiveReturnIn
+from app.services import field_service
 from app.schemas.product import LocationMoveCreate, StatusChangeCreate
 from app.services import (
     backorder_service, catalog_service, disposition_service, inventory_service, order_service, picking_service,
@@ -290,6 +292,8 @@ def test_failed_delivery_returns_for_inspection(site):
     order_service.update_order_status(db, admin, order.id, OrderStatusRequest(order_status="picked_up"))
     order_service.update_order_status(db, admin, order.id, OrderStatusRequest(order_status="failed"))
     order_service.resolve_failure(db, admin, order.id, ResolveFailureRequest(resolution="return_to_warehouse"))
+    [pending] = field_service.list_returns(db, admin, order.id)
+    field_service.receive_return(db, admin, order.id, pending["id"], ReceiveReturnIn(lines=[{"product_id": site["product"].id, "received_quantity": 4}]))
     row = _position(site)
     assert (row["pending_inspection"], row["allocatable"]) == (4, 16)
 

@@ -274,6 +274,36 @@ def dispatch(db: Session, user: User, shipment_id: int, note: str | None = None)
     return get_shipment(db, user, shipment_id)
 
 
+def close(db: Session, user: User, shipment_id: int) -> dict:
+    """بستن سفر: فقط وقتی همه سفارش‌ها پایان یافته‌اند و هیچ برگشتی از راننده باز نیست."""
+    from app.models_productivity import DriverReturn
+    try:
+        shipment = db.query(Shipment).filter(Shipment.id == shipment_id).with_for_update().first()
+        if shipment is None:
+            raise NotFoundError("محموله یافت نشد.")
+        location_service.scope_warehouse(user, shipment.warehouse_id)
+        if shipment.status != "dispatched":
+            raise ConflictError(f"محموله {shipment.code} {SHIPMENT_STATUS_LABELS[shipment.status]} است و بسته نمی‌شود.")
+        orders = db.query(Order).filter(Order.shipment_id == shipment.id).all()
+        open_orders = [o.tracking_code for o in orders if o.status in ("picked_up", "in_transit", "assigned", "picking_up")
+                       or (o.status == "failed" and o.failure_resolution in (None, "dispute"))]
+        if open_orders:
+            raise ConflictError("این سفارش‌ها هنوز تمام نشده‌اند: " + "، ".join(open_orders))
+        ids = [o.id for o in orders] or [-1]
+        pending = db.query(Order.tracking_code).join(DriverReturn, DriverReturn.order_id == Order.id).filter(
+            DriverReturn.order_id.in_(ids), DriverReturn.status == "open").all()
+        if pending:
+            raise ConflictError("پیش از بستن سفر، برگشت این سفارش‌ها را در انبار ثبت کنید: " + "، ".join(c for (c,) in pending))
+        shipment.status, shipment.closed_at, shipment.closed_by_id = "closed", _now(), user.id
+        event_bus.emit(db, "shipment.closed", "shipment", shipment.id, {"code": shipment.code},
+                       organization_id=shipment.organization_id, actor=user)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return get_shipment(db, user, shipment_id)
+
+
 def cancel(db: Session, user: User, shipment_id: int) -> dict:
     try:
         shipment = _lock_shipment(db, user, shipment_id)

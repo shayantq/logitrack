@@ -26,10 +26,10 @@ from app.models import (
     ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderCheckpoint, OrderItem, OrderStatusHistory, Organization, Product,
     Shipment, StockReservation, User, Vehicle, Warehouse,
 )
-from app.models_productivity import DeliveryAttempt
+from app.models_productivity import CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn
 from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest, ResolveFailureRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
-from app.core.wms import AVAILABLE, PENDING
+from app.core.wms import AVAILABLE
 from app.services import (
     allocation_service, audit_service, capacity_service, catalog_service, commission_service, dispatch_service, messaging,
     notification_service, stock_document_service, stock_ledger, warehouse_service,
@@ -64,6 +64,11 @@ STATUS_LABELS = {
 }
 
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # بدون O/0/I/1 برای خوانایی پشت تلفن
+
+
+def _mark_assigned(db: Session, order: Order) -> None:
+    from app.services import field_service
+    field_service.mark_assigned(db, order)
 
 
 def _new_tracking_code(db: Session) -> str:
@@ -282,6 +287,7 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
                 product_sku=product.sku, quantity=quantities[product.id],
                 unit_price=unit_prices[product.id], unit_weight_kg=product.weight_kg or 0,
             ))
+        _mark_assigned(db, order)
         db.flush()  # گرفتن شناسه سفارش برای مرجع رزرو
 
         # رزرو (نه خروج): کالا تا بارگیری در انبار می‌ماند ولی برای سفارش دیگری آزاد نیست
@@ -377,6 +383,8 @@ ORDER_VIEWS = {
     "needs_update": "زمان شروع کار رسیده و هنوز حرکت ثبت نشده",
     "awaiting_resolution": "تحویل ناموفق و منتظر تعیین تکلیف",
     "at_risk": "هنوز از بازه نگذشته ولی برآورد رسیدن بعد از پایان بازه است",
+    "driver_returns": "کالا منتظر برگشت از راننده",
+    "customer_requests": "درخواست مشتری منتظر بررسی",
 }
 
 
@@ -396,6 +404,10 @@ def _view_filter(db: Session, view: str):
     if view == "at_risk":
         from app.services import eta_service
         return Order.id.in_(eta_service.at_risk_ids(db) or [-1])
+    if view == "driver_returns":
+        return Order.id.in_(db.query(DriverReturn.order_id).filter(DriverReturn.status == "open"))
+    if view == "customer_requests":
+        return Order.id.in_(db.query(CustomerRequest.order_id).filter(CustomerRequest.status == "pending"))
     raise ConflictError("نمای سفارش نامعتبر است.")
 
 
@@ -500,6 +512,7 @@ def assign_vehicle(db: Session, user: User, order_id: int, request: OrderAssignR
         order.vehicle_id = vehicle.id
         order.driver_id = vehicle.driver_id
         order.status = 'assigned'
+        _mark_assigned(db, order)
         _add_history(db, order, 'pending', 'assigned', user, f"تخصیص خودرو {vehicle.license_plate or vehicle.id}")
         notification_service.order_assigned(db, order)
         db.commit()
@@ -553,8 +566,8 @@ def _issue_stock(db: Session, order: Order, user: User | None) -> None:
 def _restore_stock(db: Session, order: Order, user: User | None, reason: str) -> None:
     """
     کالای سفارشی که تحویل نشد: اگر هنوز بارگیری نشده، رزروش آزاد می‌شود (و کالای برداشت‌شده به قفسه برمی‌گردد)؛
-    اگر از انبار خارج شده بود، با «سند برگشت از سفارش» و وضعیت «در انتظار بازرسی» به انبار مبدأ برمی‌گردد —
-    کالای برگشتی پیش از بازرسی کیفی قابل تخصیص نیست (فصل ۱۵).
+    اگر از انبار خارج شده بود، «در انتظار برگشت از راننده» می‌ماند و با شمارش انبار (field_service.receive_return)
+    با «سند برگشت از سفارش» و وضعیت «در انتظار بازرسی» وارد می‌شود. کالای برگشتی پیش از بازرسی قابل تخصیص نیست (فصل ۱۵).
     """
     if order.stock_state in ("reserved", "held"):
         for reservation in allocation_service.active_for(db, "order", order.id):
@@ -565,26 +578,13 @@ def _restore_stock(db: Session, order: Order, user: User | None, reason: str) ->
         return
     if order.stock_state != "issued":
         return
-    items = [item for item in order.items if item.product_id]
-    # کالای برگشتی همان بچ/سریال/انقضای حواله خروج را دارد (بدون محل؛ جانمایی دوباره با وظیفه جانمایی)
-    issued = {r.product_id: r.movement for r in db.query(StockReservation).filter(
-        StockReservation.reference_type == "order", StockReservation.reference_id == order.id,
-        StockReservation.status == "consumed").all() if r.movement is not None}
-    document = None
-    for item in sorted(items, key=lambda i: i.product_id):
-        if order.warehouse_id is None:
-            break
-        inventory = stock_ledger.lock_bucket(db, item.product_id, order.warehouse_id, PENDING, organization_id=order.organization_id)
-        if document is None:
-            document = stock_ledger.new_document(
-                db, "order_return", organization_id=order.organization_id, user=user, warehouse_id=order.warehouse_id,
-                reference_type="order", reference_id=order.id, note=reason,
-            )
-        issue = issued.get(item.product_id)
-        lines = stock_ledger.mirror(issue, location_id=None) if issue is not None and -issue.quantity_change == item.quantity else None
-        stock_ledger.record(db, inventory, item.quantity, "order_return", document=document, user=user, reason=reason,
-                            reference_type="order", reference_id=order.id, lines=lines)
-    order.stock_state = "returned"
+    from app.services import field_service
+    delivered_back: dict[int, int] = defaultdict(int)
+    for item in order.items:
+        if item.product_id:
+            delivered_back[item.product_id] += item.quantity
+    field_service.open_return(db, user, order, delivered_back, reason)
+    order.stock_state = "returning"
 
 
 def _release_vehicle(db: Session, order: Order) -> None:
@@ -619,7 +619,43 @@ def _record_attempt(db: Session, order: Order, outcome: str, details: OrderStatu
         next_attempt_at=dispatch_service.to_utc_naive(next_at) if next_at and not delivered else None,
     )
     db.add(attempt)
+    if delivered and details and details.delivery_lines:
+        _record_partial(db, order, attempt, details)
     return attempt
+
+
+def _record_partial(db: Session, order: Order, attempt: DeliveryAttempt, details: OrderStatusRequest) -> None:
+    """تحویل جزئی: مقدار هر قلم ثبت و باقی‌مانده در انتظار برگشت از راننده می‌ماند. کرایه و تسویه تغییر نمی‌کند."""
+    from app.services import field_service
+    items = {i.id: i for i in order.items}
+    entries = {line.item_id: line for line in details.delivery_lines}
+    if set(entries) - set(items):
+        raise ConflictError('قلم انتخاب‌شده در این سفارش نیست.')
+    returned: dict[int, int] = defaultdict(int)
+    delivered_total = 0
+    attempt.partial = True
+    for item in order.items:
+        entry = entries.get(item.id)
+        delivered = entry.delivered_quantity if entry else item.quantity
+        if delivered > item.quantity:
+            raise ConflictError(f"از «{item.product_name}» فقط {item.quantity} عدد در سفارش است.")
+        delivered_total += delivered
+        if item.product_id:
+            returned[item.product_id] += item.quantity - delivered
+        attempt.lines.append(DeliveryAttemptLine(organization_id=order.organization_id, order_item_id=item.id, product_id=item.product_id,
+                                                 product_name=item.product_name, delivered_quantity=delivered,
+                                                 returned_quantity=item.quantity - delivered, reason=entry.reason if entry else None))
+    if not delivered_total:
+        raise ConflictError('هیچ کالایی تحویل نشده است؛ «ناموفق» را ثبت کنید.')
+    db.flush()
+    field_service.open_return(db, None, order, returned, "تحویل جزئی", attempt_id=attempt.id)
+
+
+def _check_proof(db: Session, order: Order, details: OrderStatusRequest) -> None:
+    """سازمانی که مدرک را الزامی کرده: بدون نام تحویل‌گیرنده و نسبت او تحویل نهایی نمی‌شود (عکس بعد از ثبت بارگذاری می‌شود)."""
+    from app.services import control_settings
+    if control_settings.of(db, order.organization_id)["proof_required"] and not ((details.recipient_name or "").strip() and details.recipient_role):
+        raise ConflictError('این سازمان مدرک تحویل را الزامی کرده است؛ نام تحویل‌گیرنده و نسبت او را وارد کنید.')
 
 
 def _apply_status(db: Session, order: Order, new_status: str, user: User | None, note: str | None,
@@ -632,6 +668,8 @@ def _apply_status(db: Session, order: Order, new_status: str, user: User | None,
         shipment = db.get(Shipment, order.shipment_id) if order.shipment_id else None
         if shipment is not None and shipment.status == 'open':
             order.shipment_id = None
+    if new_status == 'delivered' and details is not None:
+        _check_proof(db, order, details)
     if new_status in ('delivered', 'failed'):
         _record_attempt(db, order, new_status, details)
     if new_status in ISSUE_STATUSES:
@@ -672,6 +710,8 @@ def update_order_status(db: Session, user: User, order_id: int, status_request: 
     elif user.role == 'driver':
         if not _driver_owns_order(db, user, target_order):
             raise ForbiddenError('این سفارش به شما اختصاص داده نشده است.')
+        if target_order.assignment_state == 'pending' and new_status != 'failed':
+            raise ConflictError('اول این مأموریت را قبول یا رد کنید.')
         if new_status not in DRIVER_ALLOWED_STATUSES:
             raise ConflictError('راننده فقط می‌تواند وضعیت را به «در راه انبار»، «بارگیری شد»، «در مسیر»، «تحویل‌شده» یا «ناموفق» تغییر دهد.')
     elif user.role == 'warehouse_manager':
@@ -757,6 +797,14 @@ def re_reserve(db: Session, user: User, order_id: int) -> Order:
         raise
 
 
+def try_assign(db: Session, order: Order) -> Vehicle | None:
+    """بهترین خودروی مناسب برای سفارشی که خودرویش عوض می‌شود؛ None اگر نبود (خطا نمی‌دهد)."""
+    try:
+        return _auto_assign_vehicle(db, **_order_dispatch(db, order))
+    except ConflictError:
+        return None
+
+
 def _open_failure(db: Session, user: User, order_id: int, resolution: str) -> Order:
     if user.role not in ('org_admin', 'warehouse_manager'):
         raise ForbiddenError()
@@ -786,6 +834,7 @@ def _redeliver(db: Session, user: User, order: Order, data: ResolveFailureReques
     order.delivery_window_start, order.delivery_window_end = start, end
     order.vehicle_id, order.driver_id = vehicle.id, vehicle.driver_id
     order.status = 'assigned'
+    _mark_assigned(db, order)
     # مسیر تلاش تازه از مبدأ شروع می‌شود؛ گزارش شهرهای تلاش قبلی با مسیر تازه نمی‌خواند
     order.route = None
     db.query(OrderCheckpoint).filter(OrderCheckpoint.order_id == order.id).delete(synchronize_session=False)
@@ -829,7 +878,7 @@ def delete_order(db: Session, user: User, order_id: int) -> None:
             raise NotFoundError('سفارش یافت نشد.')
 
         # سفارشی که کالایش از انبار خارج شده (یا برگشته) سند انبار دارد و برای حفظ سوابق حذف نمی‌شود؛ لغو کنید.
-        if target_order.stock_state in ("issued", "returned"):
+        if target_order.stock_state in ("issued", "returning", "returned"):
             raise ConflictError("کالای این سفارش از انبار خارج شده و سند انبار دارد؛ به‌جای حذف، سفارش را لغو کنید.")
         # ناموفق پیش از بارگیری هنوز رزرو دارد
         if target_order.status in ACTIVE_ORDER_STATUSES or target_order.status == 'failed':

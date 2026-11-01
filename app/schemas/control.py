@@ -51,6 +51,9 @@ class ControlSettings(BaseModel):
     slow_days: int
     dead_days: int
     expiry_warning_days: int
+    proof_required: bool = False
+    mission_accept_required: bool = False
+    mission_deadline_minutes: int = 30
     valuation_methods: list[CodeLabel] = []
 
 
@@ -60,6 +63,9 @@ class ControlSettingsIn(BaseModel):
     slow_days: Optional[int] = Field(None, ge=7, le=720)
     dead_days: Optional[int] = Field(None, ge=14, le=1460)
     expiry_warning_days: Optional[int] = Field(None, ge=1, le=365)
+    proof_required: Optional[bool] = None
+    mission_accept_required: Optional[bool] = None
+    mission_deadline_minutes: Optional[int] = Field(None, ge=5, le=240)
     reason: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]] = None
 
 

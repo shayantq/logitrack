@@ -9,6 +9,7 @@ import { Check, Clock, KeyRound, Lock, MapPin, MapPinned, Package, PackageSearch
 import { api, errorMessage, unwrap } from "@/api/client";
 import { BRAND } from "@/brand";
 import { RouteView } from "@/components/map/RouteCard";
+import { CustomerRequestForm } from "./CustomerRequestForm";
 import { VEHICLE_TYPES } from "@/lib/labels";
 import { faNumber, faShortDateTime, latinDigits } from "@/lib/format";
 import { Button, Input, Spinner, buttonClass, cn } from "@/ui/primitives";
@@ -130,15 +131,17 @@ export default function TrackPage() {
                       <div className="sm:col-span-2"><dt className="text-xs text-muted">نشانی</dt><dd className="font-semibold">{t.details.destination_address}</dd></div>
                     </dl>
                     <ul className="mt-4 divide-y divide-border rounded-xl border border-border text-sm">
-                      {t.details.items.map((it, i) => <li key={i} className="flex justify-between px-4 py-2.5"><span>{it.name}</span><span className="tnum text-muted">× {faNumber(it.quantity)}</span></li>)}
+                      {t.details.items.map((it, i) => <li key={i} className="flex justify-between px-4 py-2.5"><span>{it.name}{it.delivered_quantity != null && it.delivered_quantity !== it.quantity && ` (تحویل‌شده: ${faNumber(it.delivered_quantity)})`}</span><span className="tnum text-muted">× {faNumber(it.quantity)}</span></li>)}
                     </ul>
                     {t.details.rating_token && (
                       <Link to={`/rate/${t.details.rating_token}`} className={buttonClass("primary", "md", "mt-5 w-full")} data-testid="track-rate"><Star className="size-4" />نظر خود را درباره راننده ثبت کنید</Link>
                     )}
                   </div>
                 ) : null}
-                {t.verified && t.details && verifiedPhone ? (
+                {t.verified && t.details && verifiedPhone ? (<>
+                  <CustomerRequestForm track={t} phone={verifiedPhone} />
                   <SupportRequest code={t.tracking_code} phone={verifiedPhone} />
+                </>
                 ) : (
                   <form className="card flex flex-wrap items-end gap-3 p-5" onSubmit={verify} data-testid="track-verify">
                     <div className="min-w-48 flex-1">

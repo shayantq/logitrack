@@ -2099,6 +2099,7 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
   await page.goto(`${BASE}/app/orders?order=${failOrder.id}`);
   await page.waitForSelector("[data-testid=failure-panel]");
   check("reliability", "admin sees decision panel", true);
+  await page.waitForSelector("[data-testid=attempt-row][data-outcome=failed]");
   check("reliability", "attempt listed in order details", (await page.locator("[data-testid=attempt-row][data-outcome=failed]").count()) === 1);
   await page.waitForSelector("[data-testid=order-history] li[data-source=attempt]");
   check("reliability", "attempt appears on the timeline", true);
@@ -2135,7 +2136,67 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
   await page.waitForSelector("[data-testid=exceptions-status]");
   check("reliability", "exception filters live in the URL", (await page.textContent("[data-testid=exceptions-status]")).includes("حل‌شده"));
 });
-// نگه‌داشت کیفی کالای رزروشده: رزرو آزاد، بارگیری بسته، رزرو دوباره از جزئیات سفارش
+// تحویل جزئی، برگشت با شمارش انبار و درخواست مشتری
+{
+  const road = { destination_city: "قزوین", destination_province: "قزوین", vehicle_id: routeVehicle.id };
+  const partial = await orderFor(iranDate(0), { ...road, items: [{ product_id: stockProduct.id, quantity: 3 }], customer: { name: "مشتری تحویل جزئی", mobile: "09121239880" } });
+  const quantity = partial.items[0].quantity;
+  await apiCall(reliabilityDriver, "PUT", `/orders/${partial.id}/status`, { order_status: "picked_up" });
+  await apiCall(reliabilityDriver, "PUT", `/orders/${partial.id}/status`, { order_status: "in_transit" });
+  await session("field-driver", "qazvin_driver1", "driver123", async page => {
+    await page.goto(`${BASE}/app/driver`);
+    const card = page.locator("[data-testid=driver-order]", { hasText: partial.tracking_code });
+    await card.locator("[data-testid=contact-no-answer]").click();
+    await page.waitForSelector("[data-testid=toast] >> text=پاسخ نداد");
+    check("field", "driver logs a contact attempt", true);
+    await card.locator("[data-testid=driver-deliver]").click();
+    await page.click("[data-testid=outcome-partial]");
+    await page.fill("[data-testid=outcome-line-quantity]", String(quantity - 1));
+    await page.fill("[data-testid=outcome-line-reason]", "یکی خراب بود");
+    await page.click("[data-testid=outcome-save]");
+    await page.waitForSelector("[data-testid=outcome-modal]", { state: "detached" });
+    check("field", "driver records a partial delivery", true);
+  }, { viewport: { width: 420, height: 900 } });
+  await session("field-admin", "qazvin_admin", "admin123", async page => {
+    await page.goto(`${BASE}/app/orders?order=${partial.id}`);
+    await page.waitForSelector("[data-testid=attempt-lines]");
+    check("field", "partial lines are visible to staff", (await page.textContent("[data-testid=attempt-lines]")).includes("یکی خراب بود"));
+    await page.waitForSelector("[data-testid=driver-return][data-status=open]");
+    await page.click("[data-testid=return-receive]");
+    await page.waitForSelector("[data-testid=driver-return][data-status=received]");
+    check("field", "warehouse counts the return", true);
+    await page.keyboard.press("Escape");
+    await page.goto(`${BASE}/app/vehicles`);
+    await page.waitForSelector("[data-testid=vehicle-out-of-service]");
+    check("field", "vehicle out-of-service action is available", true);
+  });
+  const early = await orderFor(iranDate(0), { ...road, customer: { name: "مشتری درخواست", mobile: "09121239881" } });
+  await session("field-public", null, null, async page => {
+    await page.goto(`${BASE}/track/${early.tracking_code}`);
+    await page.waitForSelector("[data-testid=track-verify]");
+    check("field", "request form stays hidden before phone check", (await page.locator("[data-testid=customer-request-form]").count()) === 0);
+    await page.fill("[data-testid=track-verify] input", "9881");
+    await page.click("[data-testid=track-verify] button[type=submit]");
+    await page.waitForSelector("[data-testid=customer-request-form]");
+    await page.click("[data-testid=request-cancel]");
+    await page.fill("[data-testid=request-note]", "دیگر لازم ندارم");
+    await page.click("[data-testid=request-submit]");
+    await page.waitForSelector("[data-testid=request-sent]");
+    check("field", "customer submits a cancel request", true);
+  });
+  const stillOpen = await apiCall(reliabilityAdmin, "GET", `/orders/${early.id}`);
+  check("field", "customer request changes nothing until decided", stillOpen.status === "assigned", stillOpen.status);
+  await session("field-decide", "qazvin_admin", "admin123", async page => {
+    await page.goto(`${BASE}/app/orders?order=${early.id}`);
+    await page.waitForSelector("[data-testid=customer-request][data-status=pending]");
+    await page.click("[data-testid=request-approve]");
+    await page.click("[data-testid=dialog-ok]");
+    await page.waitForSelector("[data-testid=customer-request][data-status=approved]");
+    check("field", "staff approves and the order is canceled", (await apiCall(reliabilityAdmin, "GET", `/orders/${early.id}`)).status === "canceled");
+  });
+}
+
+// آخرین سناریوی سفارش است چون کل موجودی آزاد کالا را قرنطینه می‌کند. نگه‌داشت کیفی کالای رزروشده: رزرو آزاد، بارگیری بسته، رزرو دوباره از جزئیات سفارش
 {
   const adminHeaders = { Authorization: `Bearer ${reliabilityAdmin}`, "Content-Type": "application/json" };
   const held = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین",

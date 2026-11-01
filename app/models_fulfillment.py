@@ -236,6 +236,8 @@ class Shipment(TenantScoped, Base):
     created_at = Column(DateTime, nullable=False, default=_now, index=True)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     dispatched_at = Column(DateTime, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    closed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     dispatched_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     vehicle = relationship("Vehicle")

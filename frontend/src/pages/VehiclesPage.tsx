@@ -10,7 +10,7 @@ import { VEHICLE_STATUS, VEHICLE_TYPES } from "@/lib/labels";
 import { faNumber } from "@/lib/format";
 import { Modal, Tooltip } from "@/ui/overlays";
 import { Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, StatCard, Table, TableSkeleton } from "@/ui/primitives";
-import { confirmDialog } from "@/ui/dialogs";
+import { confirmDialog, promptDialog } from "@/ui/dialogs";
 
 type VehicleRequest = Schemas["VehicleRequest"];
 const EMPTY = { license_plate: "", vehicle_type: "van", vehicle_name: "", capacity_kg: "1000", vehicle_status: "available", driver_id: "", city: "" };
@@ -34,6 +34,15 @@ export default function VehiclesPage() {
       vehicle_status: form.vehicle_status as VehicleRequest["vehicle_status"], driver_id: Number(form.driver_id), city: form.city || null,
     } })),
     onSuccess: () => { toast.success("خودرو ثبت شد."); invalidate(); setOpen(false); setForm(EMPTY); },
+    onError: e => toast.error(errorMessage(e)),
+  });
+  const outOfService = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => unwrap(api.POST("/vehicles/{vehicle_id}/out-of-service", { params: { path: { vehicle_id: id } }, body: { reason } })),
+    onSuccess: r => {
+      toast.success(`${faNumber(r.reassigned.length)} سفارش جابه‌جا شد، ${faNumber(r.unassigned.length)} سفارش منتظر خودرو و ${faNumber(r.handover_needed.length)} سفارش بارگیری‌شده تحویل به راننده دیگر لازم دارد.`);
+      queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    },
     onError: e => toast.error(errorMessage(e)),
   });
   const remove = useMutation({
@@ -82,7 +91,12 @@ export default function VehiclesPage() {
                   <td className="text-text-2">{v.city ?? "—"}</td>
                   <td className="tnum">{faNumber(v.capacity_kg)} کیلوگرم</td>
                   <td><VehicleStatusBadge status={v.status} /></td>
-                  <td><Tooltip content="حذف"><Button variant="ghost" size="icon" className="hover:text-danger" onClick={() => confirmDialog({ title: "این خودرو حذف شود؟", text: <>پلاک: <span className="font-semibold">{v.license_plate}</span> — این کار برگشت‌پذیر نیست.</>, confirmLabel: "حذف خودرو", danger: true }).then(ok => ok && remove.mutate(v.id))}><Trash2 className="size-4" /></Button></Tooltip></td>
+                  <td className="flex items-center gap-1">
+                    {v.status !== "maintenance" && v.status !== "inactive" && <Button size="sm" variant="ghost" data-testid="vehicle-out-of-service"
+                      onClick={() => promptDialog({ title: `خروج ${v.license_plate} از سرویس`, label: "دلیل", required: true, minLength: 3, confirmLabel: "خروج از سرویس", danger: true })
+                        .then(reason => { if (reason?.trim()) outOfService.mutate({ id: v.id, reason: reason.trim() }); })}>خروج از سرویس</Button>}
+                    <Tooltip content="حذف"><Button variant="ghost" size="icon" className="hover:text-danger" onClick={() => confirmDialog({ title: "این خودرو حذف شود؟", text: <>پلاک: <span className="font-semibold">{v.license_plate}</span> — این کار برگشت‌پذیر نیست.</>, confirmLabel: "حذف خودرو", danger: true }).then(ok => ok && remove.mutate(v.id))}><Trash2 className="size-4" /></Button></Tooltip>
+                  </td>
                 </tr>
               ))}
             </tbody>

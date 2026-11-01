@@ -56,6 +56,7 @@ export function DeliveryAttempts({ order }: { order: Order }) {
             </div>
             {a.recipient_name && <p className="text-text-2">تحویل‌گیرنده: {a.recipient_name}{a.recipient_role_label && ` (${a.recipient_role_label})`}</p>}
             {a.exception_note && <p className="text-warning">کمبود یا آسیب: {a.exception_note}</p>}
+            {a.partial && <ul className="text-text-2" data-testid="attempt-lines">{a.lines.filter(l => l.returned_quantity > 0).map(l => <li key={l.product_name}>{l.product_name}: {faNumber(l.delivered_quantity)} تحویل، {faNumber(l.returned_quantity)} برگشتی{l.reason && ` — ${l.reason}`}</li>)}</ul>}
             {a.note && <p className="text-text-2">{a.note}</p>}
             {a.next_attempt_at && <p className="text-xs text-muted">پیشنهاد راننده برای تلاش بعدی: {faShortDateTime(a.next_attempt_at)}</p>}
             {a.resolution_label && <p className="text-xs text-muted">تصمیم: {a.resolution_label}{a.resolved_by_name && ` — ${a.resolved_by_name}`}{a.resolved_at && ` · ${faShortDateTime(a.resolved_at)}`}</p>}

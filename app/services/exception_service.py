@@ -20,11 +20,11 @@ from sqlalchemy.orm import Session
 from app.core.iran import fa_digits
 from app.core.wms import IN_TRANSIT, PENDING
 from app.models import (
-    ACTIVE_ORDER_STATUSES, DriverProfile, Inventory, Order, StockMovement, Stocktake, StocktakeLine, Ticket, User,
+    ACTIVE_ORDER_STATUSES, DriverProfile, Inventory, Order, StockMovement, Stocktake, StocktakeLine, Ticket, User, Vehicle,
 )
 from app.models_fulfillment import Backorder, PickLine, TransferOrder, TransferOrderLine
 from app.models_operations import InboundReceipt, InboundReceiptLine, PutawayTask
-from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, OperationException, OperationExceptionEvent
+from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, CustomerRequest, DriverReturn, OperationException, OperationExceptionEvent
 from app.models_wms import StockReservation
 from app.services import assignee_service, dispatch_service, eta_service, notification_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -56,11 +56,19 @@ KINDS = {
     "transit_mismatch": ("مغایرت موجودی در راه با انتقال‌ها", "warehouse", "high", "انتقال‌های باز این کالا را با موجودی در راه مقایسه کنید."),
     "order_stock_held": ("سفارش بدون رزرو به‌خاطر نگه‌داشت کیفی", "warehouse", "high", "پس از تأمین کالا رزرو دوباره بزنید یا سفارش را لغو کنید."),
     "pick_return_pending": ("کالای برداشت‌شده باید به قفسه برگردد", "warehouse", "medium", "کالا را به محل ذکرشده برگردانید و این مورد را ببندید."),
+    "return_shortage": ("کسری در برگشت کالا از راننده", "warehouse", "high", "با راننده تطبیق دهید و نتیجه را ثبت کنید."),
+    "driver_return_open": ("کالا هنوز از راننده برنگشته", "warehouse", "medium", "برگشت را شمارش و در سفارش ثبت کنید."),
+    "mission_unanswered": ("راننده به مأموریت پاسخ نداده", "fleet", "high", "با راننده تماس بگیرید یا خودرو را عوض کنید."),
+    "vehicle_down_order": ("بار روی خودروی خارج از سرویس", "fleet", "critical", "بار را به راننده دیگری تحویل دهید."),
+    "delivery_dispute": ("اختلاف مشتری روی تحویل", "support", "high", "مدرک تحویل را بررسی و نتیجه را به مشتری اعلام کنید."),
+    "customer_request_waiting": ("درخواست مشتری بی‌پاسخ", "support", "medium", "درخواست را در جزئیات سفارش تأیید یا رد کنید."),
 }
 # فقط در اجرای تطبیق سنجیده می‌شوند؛ اجرای عادی نباید آن‌ها را به‌اشتباه بسته فرض کند
 RECONCILE_KINDS = {"stock_mismatch", "reservation_orphan", "transit_mismatch"}
 # با رویداد ثبت می‌شوند و فقط انسان می‌تواند بگوید کار فیزیکی انجام شده است
-MANUAL_KINDS = {"pick_return_pending"}
+MANUAL_KINDS = {"pick_return_pending", "return_shortage"}
+RETURN_OPEN = timedelta(hours=24)
+REQUEST_WAITING = timedelta(hours=24)
 TEAM_LABELS = {"warehouse": "انبار", "fleet": "ناوگان", "support": "پشتیبانی", "management": "مدیریت"}
 SEVERITY_LABELS = {"low": "کم", "medium": "متوسط", "high": "زیاد", "critical": "بحرانی"}
 STATUS_LABELS = {"open": "باز", "in_progress": "در حال رسیدگی", "waiting": "منتظر", "resolved": "حل‌شده", "merged": "ادغام‌شده"}
@@ -105,6 +113,21 @@ def _orders(db: Session, now: datetime) -> list[Found]:
     for o in db.query(Order).filter(Order.stock_state == "held", Order.status.in_((*ACTIVE_ORDER_STATUSES, "failed"))).all():
         found.append(Found("order_stock_held", "order", o.id, o.warehouse_id,
                            f"رزرو سفارش {o.tracking_code} به‌خاطر نگه‌داشت کیفی آزاد شده و تا رزرو دوباره بارگیری نمی‌شود."))
+    for r, code, warehouse_id in db.query(DriverReturn, Order.tracking_code, Order.warehouse_id).join(Order, Order.id == DriverReturn.order_id).filter(
+            DriverReturn.status == "open", DriverReturn.created_at <= now - RETURN_OPEN).all():
+        found.append(Found("driver_return_open", "driver_return", r.id, warehouse_id,
+                           f"کالای سفارش {code} بیش از {_hours(RETURN_OPEN)} ساعت است که به انبار برنگشته."))
+    for o in db.query(Order).filter(Order.assignment_state == "pending", Order.assignment_deadline <= now, Order.status == "assigned").all():
+        found.append(Found("mission_unanswered", "order", o.id, o.warehouse_id, f"راننده تا پایان مهلت به مأموریت سفارش {o.tracking_code} پاسخ نداد.", o.delivery_window_start))
+    for o in db.query(Order).join(Vehicle, Vehicle.id == Order.vehicle_id).filter(
+            Vehicle.status.in_(("maintenance", "inactive")), Order.status.in_(("picked_up", "in_transit"))).all():
+        found.append(Found("vehicle_down_order", "order", o.id, o.warehouse_id, f"بار سفارش {o.tracking_code} روی خودرویی است که از سرویس خارج شده.", o.delivery_window_end))
+    for q, code, warehouse_id in db.query(CustomerRequest, Order.tracking_code, Order.warehouse_id).join(Order, Order.id == CustomerRequest.order_id).filter(
+            CustomerRequest.status == "pending").all():
+        if q.kind == "dispute":
+            found.append(Found("delivery_dispute", "customer_request", q.id, warehouse_id, f"مشتری تحویل سفارش {code} را نپذیرفته است."))
+        elif q.created_at <= now - REQUEST_WAITING:
+            found.append(Found("customer_request_waiting", "customer_request", q.id, warehouse_id, f"درخواست مشتری سفارش {code} بیش از {_hours(REQUEST_WAITING)} ساعت بی‌پاسخ مانده است."))
     active = db.query(Order).filter(Order.status.in_(ACTIVE_ORDER_STATUSES), Order.driver_id.is_not(None)).all()
     driver_ids = {o.driver_id for o in active}
     drivers = {u.id: u for u in db.query(User).filter(User.id.in_(driver_ids or {-1})).all()}
@@ -297,6 +320,7 @@ def _link(item: OperationException) -> str | None:
         "inventory": "/app/quality", "putaway": "/app/putaway", "pick_line": "/app/picking", "transfer": "/app/transfers?status=in_transit",
         "ticket": f"/app/tickets/{item.entity_id}", "stocktake": "/app/stocktakes", "balance": "/app/ledger", "movement": "/app/ledger",
         "reservation": "/app/inventory", "product": "/app/transfers?status=in_transit",
+        "driver_return": "/app/orders?view=driver_returns", "customer_request": "/app/orders?view=customer_requests",
     }.get(item.entity_type)
 
 

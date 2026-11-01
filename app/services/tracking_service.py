@@ -13,7 +13,8 @@ from app.core.iran import latin_digits
 from app.core.rate_limit import RateLimiter
 from app.core.tenancy import SKIP_TENANT_FILTER, set_tenant
 from app.models import Customer, DriverRating, Order, OrderStatusHistory, Organization, User, Vehicle
-from app.services import commission_service, route_service
+from app.models_productivity import DeliveryAttempt
+from app.services import commission_service, customer_request_service, route_service
 from app.services.exceptions import ConflictError, NotFoundError
 
 # ۵ تلاش اشتباه ۴ رقم موبایل برای هر کد در ساعت — حدس زدن ۱۰٬۰۰۰ حالت عملاً ممکن نیست
@@ -74,12 +75,14 @@ def verify_phone(order: Order, customer: Customer | None, last4: str) -> bool:
     return False
 
 
-def _status_text(order: Order) -> str:
+def _status_text(order: Order, partial: bool = False) -> str:
     """متن عمومی؛ دلیل شکست، یادداشت و نام تحویل‌گیرنده هرگز اینجا نمی‌آید."""
     if order.failure_resolution == "redeliver" and order.status in ("assigned", "picking_up", "picked_up"):
         return REDELIVERY_TEXT
     if order.status == "failed" and order.failure_resolution == "return_to_warehouse":
         return RETURNED_TEXT
+    if order.status == "delivered" and partial:
+        return "بخشی از سفارش تحویل داده شد؛ فروشنده درباره باقی‌مانده با شما تماس می‌گیرد."
     return STATUS_TEXT.get(order.status, "")
 
 
@@ -136,8 +139,9 @@ def track(db: Session, code: str, phone_last4: str | None = None) -> dict:
         driver_info = {"first_name": first_name,
                        "vehicle_type": vehicle.type if vehicle else None, "vehicle_model": vehicle.model if vehicle else None}
 
+    attempt = db.query(DeliveryAttempt).filter(DeliveryAttempt.order_id == order.id).order_by(DeliveryAttempt.attempt_no.desc()).first()
     result = {
-        "tracking_code": order.tracking_code, "status": order.status, "status_text": _status_text(order),
+        "tracking_code": order.tracking_code, "status": order.status, "status_text": _status_text(order, attempt is not None and bool(attempt.partial)),
         "is_final": order.status in FINAL, "organization_name": org.name if org else "",
         "created_at": order.created_at, "updated_at": order.updated_at,
         "delivery_window_start": order.delivery_window_start, "delivery_window_end": order.delivery_window_end,
@@ -152,10 +156,14 @@ def track(db: Session, code: str, phone_last4: str | None = None) -> dict:
         rated = db.query(DriverRating).filter(DriverRating.order_id == order.id, DriverRating.source == "customer").first()
         can_rate = (order.status == "delivered" and order.rating_token and rated is None
                     and (order.delivered_at is None or order.delivered_at >= _now() - timedelta(days=RATING_LINK_DAYS)))
+        delivered = {line.order_item_id: line.delivered_quantity for line in attempt.lines} if attempt is not None else {}
         result["details"] = {
             "recipient_name": order.recipient_name or (customer.name if customer else None),
             "destination_address": order.destination_address,
-            "items": [{"name": i.product_name, "quantity": i.quantity} for i in order.items],
+            "items": [{"id": i.product_id, "name": i.product_name, "quantity": i.quantity,
+                       "delivered_quantity": delivered.get(i.id, i.quantity) if order.status == "delivered" else None} for i in order.items],
+            "requests": customer_request_service.for_public(db, order),
+            "delivered_at": order.delivered_at,
             "total_weight_kg": order.total_weight_kg,
             "rating_token": order.rating_token if can_rate else None,
         }

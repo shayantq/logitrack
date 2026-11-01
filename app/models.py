@@ -468,6 +468,7 @@ class Order(TenantScoped, Base):
         CheckConstraint("status IN (" + ", ".join(f"'{s}'" for s in ORDER_STATUSES) + ")", name="ck_orders_status"),
         CheckConstraint(f"stock_state IN ({sql_in(ORDER_STOCK_STATES)})", name="ck_orders_stock_state"),
         CheckConstraint(f"fulfillment_state IN ({sql_in(FULFILLMENT_STATES)})", name="ck_orders_fulfillment_state"),
+        CheckConstraint("assignment_state IS NULL OR assignment_state IN ('pending', 'accepted')", name="ck_orders_assignment_state"),
         CheckConstraint("failure_resolution IS NULL OR failure_resolution IN ('redeliver', 'return_to_warehouse', 'dispute', 'legacy')",
                         name="ck_orders_failure_resolution"),
         UniqueConstraint("organization_id", "idempotency_key", name="uq_orders_idempotency"),
@@ -529,6 +530,9 @@ class Order(TenantScoped, Base):
     # تلاش‌های تحویل (جدول delivery_attempts). failed با failure_resolution خالی یعنی «منتظر تصمیم»
     delivery_attempt_count = Column(Integer, nullable=False, default=0, server_default="0")
     failure_resolution = Column(String(24), nullable=True)
+    # قبول مأموریت (تنظیم سازمان): خالی یعنی پاسخ لازم نیست
+    assignment_state = Column(String(16), nullable=True)
+    assignment_deadline = Column(DateTime, nullable=True)
 
     vehicle = relationship("Vehicle", back_populates="orders")
     customer = relationship("Customer", back_populates="orders")
@@ -1036,7 +1040,8 @@ from app.models_fulfillment import (  # noqa: E402,F401
 from app.models_control import CutoverCheck, LabelPrint, RolePermission  # noqa: E402,F401
 # بهره‌وری عملیات: نماهای ذخیره‌شده فهرست‌ها
 from app.models_productivity import (  # noqa: E402,F401
-    DeliveryAttempt, OperationException, OperationExceptionEvent, OutboundMessage, SavedView, TaskFailure,
+    ContactAttempt, CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn, DriverReturnLine, OperationException,
+    OperationExceptionEvent, OrderHandover, OutboundMessage, SavedView, TaskFailure,
 )
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود
 from app.services import stock_ledger  # noqa: E402,F401

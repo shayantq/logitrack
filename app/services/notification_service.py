@@ -37,6 +37,7 @@ KINDS = {
     "request_result": ("drivers", "success"),
     "low_rating": ("drivers", "danger"),
     "exception_opened": ("orders", "warning"),
+    "customer_request": ("orders", "info"),
 }
 RETENTION_DAYS = 90
 LIST_LIMIT = 60

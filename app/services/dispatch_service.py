@@ -172,6 +172,8 @@ def evaluate(db: Session, *, weight: float, window_start: datetime, window_end: 
             ev.exclude("راننده هنوز احراز هویت نشده است")
         elif driver.is_active is False:
             ev.exclude("حساب راننده غیرفعال است")
+        if profile and profile.inspection_expiry and profile.inspection_expiry < end_local.date():
+            ev.exclude(f"معاینه فنی خودرو پیش از این بازه منقضی می‌شود ({profile.inspection_expiry})")
         if v.status in ("maintenance", "inactive"):
             ev.exclude("خودرو در تعمیر است" if v.status == "maintenance" else "خودرو غیرفعال است")
         limit = capacity_service.weight_limit(v)

@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.core.rate_limit import RateLimiter
+from app.schemas.field import CustomerRequestPublicOut
 from app.database import db_dependency
 from app.schemas.route import PublicRoute
 from app.services import tracking_service
@@ -30,8 +31,10 @@ class TrackDriver(BaseModel):
 
 
 class TrackItem(BaseModel):
+    id: Optional[int] = None
     name: str
     quantity: int
+    delivered_quantity: Optional[int] = None
 
 
 class TrackDetails(BaseModel):
@@ -40,6 +43,8 @@ class TrackDetails(BaseModel):
     items: list[TrackItem]
     total_weight_kg: float
     rating_token: Optional[str] = None
+    requests: list[CustomerRequestPublicOut] = []
+    delivered_at: Optional[datetime] = None
 
 
 class TrackResponse(BaseModel):

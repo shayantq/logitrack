@@ -77,6 +77,113 @@ class DeliveryAttempt(TenantScoped, Base):
     resolution = Column(String(24), nullable=True)
     resolved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resolved_at = Column(DateTime, nullable=True)
+    partial = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    lines = relationship("DeliveryAttemptLine", cascade="all, delete-orphan", order_by="DeliveryAttemptLine.id")
+
+
+class DeliveryAttemptLine(TenantScoped, Base):
+    """مقدار تحویل‌شده و برگشتی هر قلم در یک تلاش تحویل (فقط وقتی تحویل جزئی است)."""
+    __tablename__ = "delivery_attempt_lines"
+    __table_args__ = (CheckConstraint("delivered_quantity >= 0 AND returned_quantity >= 0", name="ck_delivery_attempt_lines_quantity"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    attempt_id = Column(Integer, ForeignKey("delivery_attempts.id", ondelete="CASCADE"), nullable=False, index=True)
+    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    product_name = Column(String(200), nullable=False)
+    delivered_quantity = Column(Integer, nullable=False)
+    returned_quantity = Column(Integer, nullable=False)
+    reason = Column(String(300), nullable=True)
+
+
+class DriverReturn(TenantScoped, Base):
+    """کالایی که باید از راننده به انبار برگردد. موجودی فقط با شمارش انبار (received) تغییر می‌کند."""
+    __tablename__ = "driver_returns"
+    __table_args__ = (CheckConstraint("status IN ('open', 'received')", name="ck_driver_returns_status"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    attempt_id = Column(Integer, ForeignKey("delivery_attempts.id", ondelete="SET NULL"), nullable=True)
+    shipment_id = Column(Integer, ForeignKey("shipments.id", ondelete="SET NULL"), nullable=True, index=True)
+    driver_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String(16), nullable=False, default="open", index=True)
+    reason = Column(String(200), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    received_at = Column(DateTime, nullable=True)
+    received_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    note = Column(String(500), nullable=True)
+
+    lines = relationship("DriverReturnLine", cascade="all, delete-orphan", order_by="DriverReturnLine.id")
+
+
+class DriverReturnLine(TenantScoped, Base):
+    __tablename__ = "driver_return_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    return_id = Column(Integer, ForeignKey("driver_returns.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    product_name = Column(String(200), nullable=False)
+    expected_quantity = Column(Integer, nullable=False)
+    received_quantity = Column(Integer, nullable=True)
+    shortage_reason = Column(String(500), nullable=True)
+
+
+class ContactAttempt(TenantScoped, Base):
+    """تماس با گیرنده: چه کسی، کی، از چه راهی و با چه نتیجه‌ای."""
+    __tablename__ = "contact_attempts"
+    __table_args__ = (
+        CheckConstraint("method IN ('call', 'sms', 'door')", name="ck_contact_attempts_method"),
+        CheckConstraint("outcome IN ('answered', 'no_answer', 'busy', 'wrong_number', 'off')", name="ck_contact_attempts_outcome"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    method = Column(String(8), nullable=False)
+    outcome = Column(String(16), nullable=False)
+    note = Column(String(500), nullable=True)
+    at = Column(DateTime, nullable=False, default=_now)
+
+
+class OrderHandover(TenantScoped, Base):
+    """تحویل بار بین دو راننده؛ سفارش فقط با تأیید راننده مقصد منتقل می‌شود."""
+    __tablename__ = "order_handovers"
+    __table_args__ = (CheckConstraint("status IN ('requested', 'accepted', 'rejected')", name="ck_order_handovers_status"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_driver_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    from_vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="SET NULL"), nullable=True)
+    to_driver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    to_vehicle_id = Column(Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(16), nullable=False, default="requested", index=True)
+    note = Column(String(500), nullable=True)
+    response_note = Column(String(500), nullable=True)
+    requested_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    responded_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    responded_at = Column(DateTime, nullable=True)
+
+
+class CustomerRequest(TenantScoped, Base):
+    """درخواست مشتری از صفحه رهگیری. چیزی مستقیم تغییر نمی‌کند؛ سازمان تصمیم می‌گیرد."""
+    __tablename__ = "customer_requests"
+    __table_args__ = (
+        CheckConstraint("kind IN ('address_change', 'cancel', 'return', 'dispute')", name="ck_customer_requests_kind"),
+        CheckConstraint("status IN ('pending', 'approved', 'rejected')", name="ck_customer_requests_status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(16), nullable=False)
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    note = Column(String(500), nullable=True)
+    payload = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    decided_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    decision_note = Column(String(500), nullable=True)
 
 
 ACTIVE_EXCEPTION_STATUSES = ("open", "in_progress", "waiting")

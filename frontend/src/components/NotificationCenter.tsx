@@ -25,7 +25,7 @@ const KIND_ICON: Record<string, LucideIcon> = {
   ticket_new: MessageSquareText, ticket_reply: MessageSquareText, stocktake_review: ClipboardCheck,
   stocktake_recount: ClipboardCheck, stocktake_approved: ClipboardCheck, driver_application: IdCard,
   driver_request: CalendarClock, application_result: BadgeCheck, request_result: BadgeCheck, low_rating: Star,
-  exception_opened: TimerOff,
+  exception_opened: TimerOff, customer_request: MessageSquareText,
 };
 const CATEGORIES: { id: string; label: string; tone: Tone }[] = [
   { id: "inventory", label: "موجودی", tone: "info" },

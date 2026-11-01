@@ -155,6 +155,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
     mutationFn: () => unwrap(api.PUT("/valuation/settings", { body: {
       valuation_method: value.valuation_method as "fifo", count_approval_value: Number(value.count_approval_value),
       slow_days: Number(value.slow_days), dead_days: Number(value.dead_days), expiry_warning_days: Number(value.expiry_warning_days),
+      proof_required: !!value.proof_required, mission_accept_required: !!value.mission_accept_required, mission_deadline_minutes: Number(value.mission_deadline_minutes),
       reason: form.reason || null } })),
     onSuccess: d => {
       queryClient.setQueryData(["control-settings"], d);
@@ -181,6 +182,15 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
           <Field label="هشدار انقضا (روز)"><Input type="number" min={1} max={365} value={value.expiry_warning_days ?? ""} onChange={set("expiry_warning_days")} /></Field>
           <Field label="کم‌گردش پس از (روز)"><Input type="number" min={7} max={720} value={value.slow_days ?? ""} onChange={set("slow_days")} /></Field>
           <Field label="راکد پس از (روز)"><Input type="number" min={14} max={1460} value={value.dead_days ?? ""} onChange={set("dead_days")} /></Field>
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" className="size-4 accent-[var(--brand)]" checked={!!value.proof_required} onChange={e => setForm(f => ({ ...f, proof_required: e.target.checked }))} data-testid="setting-proof" />
+            نام تحویل‌گیرنده برای ثبت تحویل الزامی باشد
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-[var(--brand)]" checked={!!value.mission_accept_required} onChange={e => setForm(f => ({ ...f, mission_accept_required: e.target.checked }))} data-testid="setting-mission" />
+            راننده مأموریت را قبول یا رد کند
+          </label>
+          <Field label="مهلت پاسخ مأموریت (دقیقه)"><Input type="number" min={5} max={240} value={value.mission_deadline_minutes ?? ""} onChange={set("mission_deadline_minutes")} /></Field>
         </form>
       )}
     </Modal>

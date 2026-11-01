@@ -6,6 +6,7 @@ import { useMe } from "@/auth/AuthContext";
 import { SuggestionList } from "@/components/dispatch/SuggestionList";
 import { OrderRouteCard } from "@/components/map/RouteCard";
 import { DeliveryAttempts, FAILURE_RESOLUTION, FailureResolution } from "./DeliveryPanel";
+import { ContactLog, CustomerRequests, DriverReturns, HandoverPanel } from "./FieldPanel";
 import { OrderSettlement } from "./OrderSettlement";
 import { OrderTimeline } from "./OrderTimeline";
 import { OrderStatusBadge } from "@/components/StatusBadges";
@@ -175,6 +176,12 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
             && <FailureResolution order={order} onDone={refresh} />}
 
           <DeliveryAttempts order={order} />
+          {(isAdmin || me.role === "warehouse_manager") && <>
+            <DriverReturns order={order} />
+            <CustomerRequests order={order} />
+          </>}
+          <ContactLog order={order} />
+          <HandoverPanel order={order} />
 
           <OrderTimeline orderId={order.id} version={`${order.status}-${order.history.length}-${order.priority}-${order.failure_resolution}`} />
         </div>

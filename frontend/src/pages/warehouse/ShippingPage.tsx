@@ -82,6 +82,11 @@ export default function ShippingPage() {
     onSuccess: () => { toast.success("محموله لغو شد."); refresh(); },
     onError: e => toast.error(errorMessage(e)),
   });
+  const closeTrip = useMutation({
+    mutationFn: (id: number) => unwrap(api.POST("/shipping/shipments/{shipment_id}/close", { params: { path: { shipment_id: id } } })),
+    onSuccess: s => { toast.success(`سفر ${s.code} بسته شد.`); refresh(); },
+    onError: e => toast.error(errorMessage(e)),
+  });
   const packed = (queue.data ?? []).filter(o => o.fulfillment_state === "packed" && !o.shipment_id);
   const preview = useQuery({
     queryKey: ["shipment-preview", warehouseId, vehicle, selected],
@@ -163,7 +168,7 @@ export default function ShippingPage() {
                           .then(ok => ok && dispatch.mutate(s.id))}>تحویل به راننده</Button>
                       <Button size="sm" variant="ghost" onClick={() => cancel.mutate(s.id)}>لغو</Button>
                     </div>
-                  )}</td>
+                  )}{s.status === "dispatched" && <Button size="sm" variant="secondary" loading={closeTrip.isPending && closeTrip.variables === s.id} onClick={() => closeTrip.mutate(s.id)} data-testid="shipment-close">بستن سفر</Button>}</td>
                 </tr>
               ))}
             </tbody>

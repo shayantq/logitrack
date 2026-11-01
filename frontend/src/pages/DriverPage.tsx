@@ -13,6 +13,7 @@ import { EMPLOYMENT, WEEK, hhmm, isoDate, pyWeekday } from "@/lib/schedule";
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, cn } from "@/ui/primitives";
 import { useDeepLink } from "@/hooks/useDeepLink";
 import { DeliveryOutcomeModal, type Outcome } from "./driver/DeliveryOutcomeModal";
+import { confirmDialog, promptDialog } from "@/ui/dialogs";
 
 /** مراحل سفر از دید راننده */
 const STEPS: { status: OrderStatus; label: string }[] = [
@@ -57,6 +58,18 @@ function OrderCard({ order, locked = false, flash = false }: { order: Schemas["O
   const steps = locked ? [] : NEXT_STEPS[order.status as OrderStatus] ?? [];
   const canFail = !locked && ["assigned", "picking_up", "picked_up", "in_transit"].includes(order.status);
   const canDeliver = !locked && order.status === "in_transit";
+  const waitingAnswer = order.assignment_state === "pending";
+  const mission = useMutation({
+    mutationFn: (body: { accept: boolean; reason: string | null }) => unwrap(api.POST("/orders/{order_id}/mission", { params: { path: { order_id: order.id } }, body })),
+    onSuccess: (_, body) => { toast.success(body.accept ? "مأموریت را پذیرفتید." : "مأموریت رد شد."); queryClient.invalidateQueries({ queryKey: ["orders"] }); },
+    onError: e => toast.error(errorMessage(e)),
+  });
+  const contact = useMutation({
+    mutationFn: (outcome: "answered" | "no_answer" | "busy" | "wrong_number" | "off") =>
+      unwrap(api.POST("/orders/{order_id}/contacts", { params: { path: { order_id: order.id } }, body: { method: "call", outcome } })),
+    onSuccess: c => toast.success(`تماس ثبت شد: ${c.outcome_label}`),
+    onError: e => toast.error(errorMessage(e)),
+  });
   const [showRoute, setShowRoute] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const outcomeSaved = () => {
@@ -104,7 +117,25 @@ function OrderCard({ order, locked = false, flash = false }: { order: Schemas["O
           <Lock className="size-4 shrink-0" />این سفارش برای {faDate(order.delivery_window_start)} است؛ از همان روز می‌توانید بارگیری و تحویل را ثبت کنید.
         </div>
       )}
-      {(steps.length > 0 || canFail || canDeliver) && (
+      {waitingAnswer && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-warning-soft/40 p-4" data-testid="mission-answer">
+          <span className="w-full text-sm font-medium">این مأموریت منتظر پاسخ شماست{order.assignment_deadline && ` — تا ${faShortDateTime(order.assignment_deadline)}`}</span>
+          <Button className="flex-1" loading={mission.isPending} onClick={() => mission.mutate({ accept: true, reason: null })} data-testid="mission-accept">قبول می‌کنم</Button>
+          <Button variant="outline-danger" onClick={() => {
+            promptDialog({ title: "رد مأموریت", label: "دلیل", required: true, multiline: true, confirmLabel: "رد مأموریت", danger: true })
+              .then(reason => { if (reason?.trim()) mission.mutate({ accept: false, reason: reason.trim() }); });
+          }} data-testid="mission-reject">رد می‌کنم</Button>
+        </div>
+      )}
+      {!locked && canFail && !waitingAnswer && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3 text-sm" data-testid="contact-actions">
+          <span className="text-muted">تماس با گیرنده:</span>
+          <Button size="sm" variant="ghost" onClick={() => contact.mutate("answered")} data-testid="contact-answered">پاسخ داد</Button>
+          <Button size="sm" variant="ghost" onClick={() => contact.mutate("no_answer")} data-testid="contact-no-answer">پاسخ نداد</Button>
+          <Button size="sm" variant="ghost" onClick={() => contact.mutate("wrong_number")}>شماره اشتباه</Button>
+        </div>
+      )}
+      {(steps.length > 0 || canFail || canDeliver) && !waitingAnswer && (
         <div className="flex flex-wrap gap-2 border-t border-border bg-surface-2 p-4">
           {steps.map(([status, label, variant]) => (
             <Button key={status} variant={variant} className="flex-1" loading={change.isPending} onClick={() => change.mutate({ status, note: null })}>{label}</Button>
@@ -168,6 +199,8 @@ export default function DriverPage() {
         </div>
       </Card>
 
+      <IncomingHandovers />
+
       <MySchedule />
 
       <h2 className="mb-3 font-bold">سفارش‌های امروز <span className="text-muted">({faNumber(actionable.length)})</span></h2>
@@ -196,6 +229,37 @@ export default function DriverPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** باری که راننده دیگری می‌خواهد به من تحویل دهد؛ سفارش فقط با تأیید من منتقل می‌شود */
+function IncomingHandovers() {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const { data = [] } = useQuery({ queryKey: ["handovers-mine"], queryFn: () => unwrap(api.GET("/handovers/mine")), refetchInterval: 30_000 });
+  const respond = useMutation({
+    mutationFn: ({ id, accept, note }: { id: number; accept: boolean; note: string | null }) =>
+      unwrap(api.POST("/handovers/{handover_id}/respond", { params: { path: { handover_id: id } }, body: { accept, note } })),
+    onSuccess: () => { toast.success("ثبت شد."); queryClient.invalidateQueries({ queryKey: ["handovers-mine"] }); queryClient.invalidateQueries({ queryKey: ["orders"] }); },
+    onError: e => toast.error(errorMessage(e)),
+  });
+  if (!data.length) return null;
+  return (
+    <Card className="mb-6" data-testid="incoming-handovers">
+      <CardHeader title="بار برای تحویل گرفتن" />
+      <ul className="divide-y divide-border text-sm">
+        {data.map(h => (
+          <li key={h.id} className="space-y-2 px-5 py-3" data-testid="incoming-handover">
+            <div><span className="font-mono font-bold ltr">{h.tracking_code}</span> از {h.from_driver}{h.note && ` — ${h.note}`}</div>
+            <div className="text-text-2">{h.items.map(i => `${i.name} ×${faNumber(i.quantity)}`).join("، ")}</div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => confirmDialog({ title: "بار را شمردید و تحویل گرفتید؟", confirmLabel: "تحویل گرفتم" }).then(ok => ok && respond.mutate({ id: h.id, accept: true, note: null }))} data-testid="handover-accept">تحویل گرفتم</Button>
+              <Button size="sm" variant="ghost" onClick={() => promptDialog({ title: "رد تحویل", label: "دلیل", required: true, confirmLabel: "رد" }).then(note => { if (note?.trim()) respond.mutate({ id: h.id, accept: false, note: note.trim() }); })}>رد می‌کنم</Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

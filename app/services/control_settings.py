@@ -16,10 +16,11 @@ from app.services.exceptions import ConflictError
 VALUATION_METHODS = {"fifo": "اولین صادره از اولین وارده (FIFO)", "weighted_average": "میانگین موزون متحرک",
                      "standard": "بهای استاندارد (آخرین بهای تمام‌شده)"}
 DEFAULTS = {"valuation_method": "weighted_average", "count_approval_value": 5_000_000, "slow_days": 60, "dead_days": 180,
-            "expiry_warning_days": 30}
+            "expiry_warning_days": 30, "proof_required": False, "mission_accept_required": False, "mission_deadline_minutes": 30}
+BOOLEANS = {"proof_required", "mission_accept_required"}
 LIMITS = {"count_approval_value": (0, 100_000_000_000), "slow_days": (7, 720), "dead_days": (14, 1460),
-          "expiry_warning_days": (1, 365)}
-LABELS = {"valuation_method": "روش ارزش‌گذاری", "count_approval_value": "سقف تأیید انبارگردانی",
+          "expiry_warning_days": (1, 365), "mission_deadline_minutes": (5, 240)}
+LABELS = {"proof_required": "مدرک تحویل الزامی", "mission_accept_required": "قبول مأموریت توسط راننده", "mission_deadline_minutes": "مهلت پاسخ مأموریت (دقیقه)", "valuation_method": "روش ارزش‌گذاری", "count_approval_value": "سقف تأیید انبارگردانی",
           "slow_days": "کم‌گردش پس از (روز)", "dead_days": "راکد پس از (روز)", "expiry_warning_days": "هشدار انقضا (روز)"}
 
 
@@ -47,6 +48,8 @@ def update(db: Session, user: User, data: dict, reason: str | None = None) -> di
         if key == "valuation_method":
             if value not in VALUATION_METHODS:
                 raise ConflictError("روش ارزش‌گذاری معتبر نیست.")
+        elif key in BOOLEANS:
+            value = bool(value)
         else:
             low, high = LIMITS[key]
             if not low <= value <= high:

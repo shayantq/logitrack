@@ -105,6 +105,16 @@ def _fail_after_pickup(env, **body) -> dict:
     return res.json()
 
 
+def _receive_all(env, order_id):
+    from app.services.field_service import list_returns, receive_return
+    from app.schemas.field import ReceiveReturnIn
+    env.db.expire_all()
+    for row in list_returns(env.db, env.admin, order_id):
+        if row["status"] == "open":
+            lines = [{"product_id": line["product_id"], "received_quantity": line["expected_quantity"]} for line in row["lines"]]
+            receive_return(env.db, env.admin, order_id, row["id"], ReceiveReturnIn(lines=lines))
+
+
 def _resolve(env, order_id, user=None, **body):
     return env.client.post(f"/orders/{order_id}/resolve-failure", headers=_auth(user or env.admin), json=body)
 
@@ -126,6 +136,7 @@ def test_return_to_warehouse_restocks_exactly_once_and_is_final(env):
     order = _fail_after_pickup(env)
     res = _resolve(env, order["id"], resolution="return_to_warehouse")
     assert res.status_code == 200 and res.json()["failure_resolution"] == "return_to_warehouse"
+    _receive_all(env, order["id"])
     assert _pending_stock(env) == 5
     assert _resolve(env, order["id"], resolution="return_to_warehouse").status_code == 400
     assert _resolve(env, order["id"], resolution="redeliver", **_window()).status_code == 400
@@ -165,6 +176,7 @@ def test_second_failure_needs_a_new_decision(env):
     again = _status(env, order["id"], "failed", failure_reason="refused").json()
     assert again["failure_resolution"] is None and again["delivery_attempt_count"] == 2
     assert _resolve(env, order["id"], resolution="return_to_warehouse").status_code == 200
+    _receive_all(env, order["id"])
     assert _pending_stock(env) == 5
 
 
@@ -180,6 +192,7 @@ def test_dispute_opens_linked_ticket_without_moving_stock_then_can_be_resolved(e
     listed = env.client.get("/orders/", headers=_auth(env.admin), params={"view": "awaiting_resolution"}).json()
     assert [o["id"] for o in listed] == [order["id"]]
     assert _resolve(env, order["id"], resolution="return_to_warehouse").status_code == 200
+    _receive_all(env, order["id"])
     assert _pending_stock(env) == 5
 
 

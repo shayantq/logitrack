@@ -100,6 +100,17 @@ class OrderStatusRequest(BaseModel):
     # تلاش ناموفق (فقط برای failed)؛ بدون دلیل = «سایر»
     failure_reason: Optional[FailureReason] = None
     next_attempt_at: Optional[datetime] = None
+    # تحویل جزئی: فقط قلم‌هایی که کمتر تحویل شده‌اند
+    delivery_lines: Optional[list["DeliveryLineIn"]] = Field(None, max_length=100)
+
+
+class DeliveryLineIn(BaseModel):
+    item_id: int = Field(gt=0)
+    delivered_quantity: int = Field(ge=0, le=100000)
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=300)]
+
+
+OrderStatusRequest.model_rebuild()
 
 
 class ResolveFailureRequest(BaseModel):
@@ -204,6 +215,17 @@ class OrderResponse(BaseModelWithDateFormatting):
     driver_earning: Optional[float] = None
     delivery_attempt_count: int = 0
     failure_resolution: Optional[str] = None
+    assignment_state: Optional[str] = None
+    assignment_deadline: Optional[datetime] = None
+
+
+class AttemptLineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    product_name: str
+    delivered_quantity: int
+    returned_quantity: int
+    reason: Optional[str] = None
 
 
 class DeliveryAttemptOut(BaseModelWithDateFormatting):
@@ -226,6 +248,8 @@ class DeliveryAttemptOut(BaseModelWithDateFormatting):
     resolved_at: Optional[datetime] = None
     has_photo: bool = False
     photo_type: Optional[str] = None
+    partial: bool = False
+    lines: list[AttemptLineOut] = []
 
 
 class OrderDetailResponse(OrderResponse):
