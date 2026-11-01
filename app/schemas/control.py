@@ -54,6 +54,9 @@ class ControlSettings(BaseModel):
     proof_required: bool = False
     mission_accept_required: bool = False
     mission_deadline_minutes: int = 30
+    ticket_first_response_hours: int = 8
+    ticket_resolution_hours: int = 72
+    adjustment_approval_units: int = 0
     valuation_methods: list[CodeLabel] = []
 
 
@@ -66,6 +69,9 @@ class ControlSettingsIn(BaseModel):
     proof_required: Optional[bool] = None
     mission_accept_required: Optional[bool] = None
     mission_deadline_minutes: Optional[int] = Field(None, ge=5, le=240)
+    ticket_first_response_hours: Optional[int] = Field(None, ge=1, le=240)
+    ticket_resolution_hours: Optional[int] = Field(None, ge=1, le=2160)
+    adjustment_approval_units: Optional[int] = Field(None, ge=0, le=10_000_000)
     reason: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]] = None
 
 

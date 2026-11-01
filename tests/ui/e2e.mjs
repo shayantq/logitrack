@@ -2196,6 +2196,43 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
   });
 }
 
+// پاسخگویی: گزارش مشکل راننده، بستن استثنا با کد نتیجه، تأیید دونفره
+{
+  const issueOrder = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین", vehicle_id: routeVehicle.id,
+    customer: { name: "مشتری گزارش", mobile: "09121239882" } });
+  await session("account-driver", "qazvin_driver1", "driver123", async page => {
+    await page.goto(`${BASE}/app/driver`);
+    const card = page.locator("[data-testid=driver-order]", { hasText: issueOrder.tracking_code });
+    await card.locator("[data-testid=report-issue]").click();
+    await page.fill("[data-testid=prompt-input]", "لاستیک پنچر شد");
+    await page.click("[data-testid=dialog-ok]");
+    await page.waitForSelector("[data-testid=my-exception] >> text=لاستیک پنچر شد");
+    check("accountability", "driver reports an issue and sees it", true);
+  }, { viewport: { width: 420, height: 900 } });
+  await session("account-admin", "qazvin_admin", "admin123", async page => {
+    await page.goto(`${BASE}/app/exceptions?status=active`);
+    const card = page.locator("[data-testid=exception-card][data-kind=driver_incident]").first();
+    await card.waitFor();
+    await card.locator("[data-testid=exception-ack]").click();
+    await page.waitForSelector("[data-testid=exception-card][data-kind=driver_incident][data-status=acknowledged]");
+    check("accountability", "exception can be acknowledged", true);
+    await card.locator("[data-testid=exception-resolve]").click();
+    await page.fill("[data-testid=exception-resolution]", "راننده جایگزین رفت");
+    await page.click("[data-testid=exception-close]");
+    await page.waitForSelector("[data-testid=exception-modal] [data-testid=exception-events] >> text=حل‌شده");
+    check("accountability", "exception closes with a result code", true);
+    await page.keyboard.press("Escape");
+  });
+  await apiCall(reliabilityAdmin, "PUT", "/valuation/settings", { adjustment_approval_units: 1 });
+  const big = await apiCall(reliabilityAdmin, "POST", "/inventory/movements", { product_id: stockProduct.id, warehouse_id: issueOrder.warehouse_id, movement_type: "damage", quantity: 2, reason: "شکستگی آزمون" }, false);
+  check("accountability", "large adjustment waits for a second person", big.status === 400, String(big.status));
+  const pending = await apiCall(reliabilityAdmin, "GET", "/adjustment-approvals");
+  check("accountability", "request is listed", pending.length === 1 && pending[0].quantity === 2, JSON.stringify(pending).slice(0, 120));
+  const own = await apiCall(reliabilityAdmin, "POST", `/adjustment-approvals/${pending[0].id}/decide`, { approve: true }, false);
+  check("accountability", "requester cannot approve own request", own.status === 403, String(own.status));
+  await apiCall(reliabilityAdmin, "PUT", "/valuation/settings", { adjustment_approval_units: 0 });
+}
+
 // آخرین سناریوی سفارش است چون کل موجودی آزاد کالا را قرنطینه می‌کند. نگه‌داشت کیفی کالای رزروشده: رزرو آزاد، بارگیری بسته، رزرو دوباره از جزئیات سفارش
 {
   const adminHeaders = { Authorization: `Bearer ${reliabilityAdmin}`, "Content-Type": "application/json" };

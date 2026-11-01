@@ -20,6 +20,11 @@ type Update = Schemas["ExceptionUpdate"];
 
 const SEVERITY_TONE = { low: "muted", medium: "info", high: "warning", critical: "danger" } as const;
 const STATUS_OPTIONS = [["active", "باز"], ["resolved", "حل‌شده"], ["merged", "ادغام‌شده"], ["all", "همه"]] as const;
+const ACTIVE = ["open", "acknowledged", "in_progress", "waiting", "waiting_external"];
+const RESOLUTION_CODES = [
+  ["fixed", "مشکل رفع شد"], ["stock_corrected", "با سند اصلاح شد"], ["rescheduled", "زمان تازه تعیین شد"], ["customer_contacted", "با مشتری هماهنگ شد"],
+  ["supplier_followup", "پیگیری با تأمین‌کننده"], ["driver_followup", "پیگیری با راننده"], ["no_action", "اقدامی لازم نبود"], ["duplicate", "تکراری بود"], ["other", "سایر"],
+] as const;
 const TEAMS = [["warehouse", "انبار"], ["fleet", "ناوگان"], ["support", "پشتیبانی"], ["management", "مدیریت"]] as const;
 const SEVERITIES = [["critical", "بحرانی"], ["high", "زیاد"], ["medium", "متوسط"], ["low", "کم"]] as const;
 
@@ -55,6 +60,7 @@ export default function ExceptionsPage() {
     <>
       <PageHeader eyebrow="عملیات" title="مرکز استثنا" subtitle="کارهایی که از روند عادی خارج شده‌اند؛ هر ۱۵ دقیقه خودکار بررسی می‌شوند."
         actions={<Button variant="secondary" icon={<RefreshCw className="size-4" />} loading={scan.isPending} onClick={() => scan.mutate()} data-testid="exceptions-scan">بررسی دوباره</Button>} />
+      <AdjustmentApprovals />
       <div className="mb-4 flex flex-wrap gap-2">
         <Select value={status} onChange={e => setFilter("status", e.target.value)} className="w-40" aria-label="وضعیت" data-testid="exceptions-status">
           {STATUS_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -78,6 +84,42 @@ export default function ExceptionsPage() {
   );
 }
 
+/** اصلاح موجودی بیشتر از سقف سازمان: ادمینی غیر از درخواست‌کننده تأیید می‌کند و همان موقع اجرا می‌شود */
+function AdjustmentApprovals() {
+  const me = useMe();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const isAdmin = me.role === "org_admin";
+  const { data = [] } = useQuery({ queryKey: ["adjustment-approvals"], queryFn: () => unwrap(api.GET("/adjustment-approvals")), enabled: isAdmin });
+  const decide = useMutation({
+    mutationFn: ({ id, approve, note }: { id: number; approve: boolean; note: string | null }) =>
+      unwrap(api.POST("/adjustment-approvals/{approval_id}/decide", { params: { path: { approval_id: id } }, body: { approve, note } })),
+    onSuccess: () => { toast.success("تصمیم ثبت شد."); queryClient.invalidateQueries({ queryKey: ["adjustment-approvals"] }); queryClient.invalidateQueries({ queryKey: ["action-center"] }); },
+    onError: e => toast.error(errorMessage(e)),
+  });
+  if (!isAdmin || !data.length) return null;
+  return (
+    <Card className="mb-4" data-testid="adjustment-approvals">
+      <ul className="divide-y divide-border text-sm">
+        {data.map(a => (
+          <li key={a.id} className="flex flex-wrap items-center gap-2 px-4 py-3" data-testid="adjustment-approval">
+            <Badge tone="warning">منتظر تأیید دوم</Badge>
+            <span className="font-semibold">{a.product_name}</span>
+            <span className="text-text-2">{faNumber(a.quantity)} واحد{a.warehouse_name && ` · ${a.warehouse_name}`}</span>
+            <span className="text-xs text-muted">{a.requested_by} · {faShortDateTime(a.created_at)}{a.reason && ` — ${a.reason}`}</span>
+            {a.requested_by_id === me.id ? <span className="ms-auto text-xs text-muted">درخواست خودتان؛ ادمین دیگری باید بررسی کند</span> : (
+              <span className="ms-auto flex gap-2">
+                <Button size="sm" loading={decide.isPending} onClick={() => decide.mutate({ id: a.id, approve: true, note: null })} data-testid="approval-accept">تأیید و اجرا</Button>
+                <Button size="sm" variant="ghost" onClick={() => promptDialog({ title: "رد اصلاح", label: "دلیل", required: true, confirmLabel: "رد" }).then(note => { if (note?.trim()) decide.mutate({ id: a.id, approve: false, note: note.trim() }); })}>رد</Button>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 function useUpdate(id: number | null, onChanged: () => void) {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -88,11 +130,9 @@ function useUpdate(id: number | null, onChanged: () => void) {
   });
 }
 
-const askResolution = () => promptDialog({ title: "بستن استثنا", label: "نتیجه", required: true, multiline: true, confirmLabel: "بستن" });
-
 function ExceptionCard({ item, onOpen, onChanged }: { item: Item; onOpen: () => void; onChanged: () => void }) {
   const update = useUpdate(item.id, onChanged);
-  const active = ["open", "in_progress", "waiting"].includes(item.status);
+  const active = ACTIVE.includes(item.status);
   return (
     <Card className="p-4" data-testid="exception-card" data-kind={item.kind} data-status={item.status}>
       <div className="flex flex-wrap items-center gap-2">
@@ -101,10 +141,12 @@ function ExceptionCard({ item, onOpen, onChanged }: { item: Item; onOpen: () => 
         <Badge tone="muted">{item.team_label}</Badge>
         <Badge tone={active ? "brand" : "muted"}>{item.status_label}</Badge>
         {item.overdue && <Badge tone="danger">از مهلت گذشته</Badge>}
+        {item.occurrence_count > 1 && <Badge tone="warning" data-testid="exception-occurrences">{faNumber(item.occurrence_count)} بار</Badge>}
+        {item.escalated_at && <Badge tone="danger">ارجاع به ادمین</Badge>}
       </div>
       <p className="mt-2 text-sm text-text-2">{item.trigger_reason}</p>
       {active && item.suggested_action && <p className="mt-1 text-sm"><span className="text-muted">اقدام پیشنهادی: </span>{item.suggested_action}</p>}
-      {item.resolution && <p className="mt-1 text-sm"><span className="text-muted">نتیجه: </span>{item.resolution}</p>}
+      {item.resolution && <p className="mt-1 text-sm"><span className="text-muted">نتیجه{item.resolution_code_label && ` (${item.resolution_code_label})`}: </span>{item.resolution}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted">
         <span>باز شده: {faShortDateTime(item.opened_at)}</span>
         {item.due_at && <span>مهلت: {faShortDateTime(item.due_at)}</span>}
@@ -117,8 +159,8 @@ function ExceptionCard({ item, onOpen, onChanged }: { item: Item; onOpen: () => 
               پیشنهاد: {item.suggested_owner.name} ({faNumber(item.suggested_owner.open_count)} مورد باز)
             </Button>
           )}
-          {active && <Button size="sm" variant="secondary" data-testid="exception-resolve"
-            onClick={() => askResolution().then(r => { if (r) update.mutate({ status: "resolved", resolution: r }); })}>بستن</Button>}
+          {item.status === "open" && <Button size="sm" variant="ghost" loading={update.isPending} onClick={() => update.mutate({ status: "acknowledged" })} data-testid="exception-ack">دیدم</Button>}
+          {active && <Button size="sm" variant="secondary" onClick={onOpen} data-testid="exception-resolve">بستن</Button>}
         </span>
       </div>
     </Card>
@@ -129,14 +171,17 @@ function ExceptionModal({ id, onClose, onChanged }: { id: number | null; onClose
   const me = useMe();
   const [note, setNote] = useState("");
   const [mergeInto, setMergeInto] = useState("");
-  const update = useUpdate(id, () => { setNote(""); setMergeInto(""); onChanged(); });
+  const [evidence, setEvidence] = useState("");
+  const [resolution, setResolution] = useState("");
+  const [code, setCode] = useState<(typeof RESOLUTION_CODES)[number][0]>("fixed");
+  const update = useUpdate(id, () => { setNote(""); setMergeInto(""); setEvidence(""); setResolution(""); onChanged(); });
   const { data: users = [] } = useUsers(id !== null && me.role === "org_admin");
   const { data } = useQuery({
     queryKey: ["exception", id],
     queryFn: () => unwrap(api.GET("/exceptions/{exception_id}", { params: { path: { exception_id: id! } } })),
     enabled: id !== null,
   });
-  const active = !!data && ["open", "in_progress", "waiting"].includes(data.status);
+  const active = !!data && ACTIVE.includes(data.status);
   return (
     <Modal open={id !== null} onClose={onClose} title={data ? `${data.kind_label} #${faNumber(data.id)}` : "استثنا"} size="lg" testId="exception-modal">
       {!data ? <Skeleton className="h-40" /> : (
@@ -152,17 +197,34 @@ function ExceptionModal({ id, onClose, onChanged }: { id: number | null; onClose
                 </Select>
               )}
               <Select value={data.status} aria-label="وضعیت" data-testid="exception-state" onChange={e => update.mutate({ status: e.target.value as "open" })}>
-                <option value="open">باز</option><option value="in_progress">در حال رسیدگی</option><option value="waiting">منتظر</option>
+                <option value="open">باز</option><option value="acknowledged">دیده شد</option><option value="in_progress">در حال رسیدگی</option>
+                <option value="waiting">منتظر</option><option value="waiting_external">منتظر طرف بیرونی</option>
               </Select>
               <div className="flex gap-2 sm:col-span-2">
                 <Textarea rows={2} placeholder="یادداشت" value={note} onChange={e => setNote(e.target.value)} maxLength={500} data-testid="exception-note" />
                 <Button variant="secondary" disabled={!note.trim()} loading={update.isPending} onClick={() => update.mutate({ note })} data-testid="exception-note-save">ثبت</Button>
               </div>
               <div className="flex gap-2 sm:col-span-2">
+                <Input className="ltr" placeholder="/app/documents?doc=12" value={evidence} onChange={e => setEvidence(e.target.value)} aria-label="پیوند مدرک" data-testid="exception-evidence" />
+                <Button variant="ghost" disabled={!evidence.trim()} onClick={() => update.mutate({ evidence_ref: evidence.trim() })} data-testid="exception-evidence-save">افزودن مدرک</Button>
+              </div>
+              <div className="grid gap-2 rounded-xl border border-border p-3 sm:col-span-2 sm:grid-cols-[12rem_1fr_auto]">
+                <Select value={code} onChange={e => setCode(e.target.value as typeof code)} aria-label="نوع نتیجه" data-testid="exception-code">
+                  {RESOLUTION_CODES.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </Select>
+                <Input placeholder="نتیجه چه شد؟" value={resolution} maxLength={500} onChange={e => setResolution(e.target.value)} data-testid="exception-resolution" />
+                <Button disabled={!resolution.trim()} loading={update.isPending} onClick={() => update.mutate({ status: "resolved", resolution: resolution.trim(), resolution_code: code })} data-testid="exception-close">بستن استثنا</Button>
+              </div>
+              <div className="flex gap-2 sm:col-span-2">
                 <Input placeholder="شماره استثنای مقصد برای ادغام" inputMode="numeric" value={mergeInto} onChange={e => setMergeInto(e.target.value)} aria-label="ادغام در" />
                 <Button variant="ghost" disabled={!Number(mergeInto)} onClick={() => update.mutate({ merged_into_id: Number(mergeInto) })}>ادغام</Button>
               </div>
             </div>
+          )}
+          {data.evidence_refs.length > 0 && (
+            <ul className="space-y-1 text-sm" data-testid="exception-evidence-list">
+              {data.evidence_refs.map(ref => <li key={ref}><Link className="text-brand hover:underline ltr" to={ref}>{ref}</Link></li>)}
+            </ul>
           )}
           <div>
             <h4 className="mb-2 text-sm font-bold">تاریخچه</h4>

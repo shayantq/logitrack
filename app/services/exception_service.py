@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.iran import fa_digits
+from app.core.tenancy import current_tenant
 from app.core.wms import IN_TRANSIT, PENDING
 from app.models import (
     ACTIVE_ORDER_STATUSES, DriverProfile, Inventory, Order, StockMovement, Stocktake, StocktakeLine, Ticket, User, Vehicle,
@@ -26,7 +27,7 @@ from app.models_fulfillment import Backorder, PickLine, TransferOrder, TransferO
 from app.models_operations import InboundReceipt, InboundReceiptLine, PutawayTask
 from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, CustomerRequest, DriverReturn, OperationException, OperationExceptionEvent
 from app.models_wms import StockReservation
-from app.services import assignee_service, dispatch_service, eta_service, notification_service, stock_ledger
+from app.services import assignee_service, control_settings, dispatch_service, eta_service, notification_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
 STAFF = ("org_admin", "warehouse_manager")
@@ -62,16 +63,35 @@ KINDS = {
     "vehicle_down_order": ("بار روی خودروی خارج از سرویس", "fleet", "critical", "بار را به راننده دیگری تحویل دهید."),
     "delivery_dispute": ("اختلاف مشتری روی تحویل", "support", "high", "مدرک تحویل را بررسی و نتیجه را به مشتری اعلام کنید."),
     "customer_request_waiting": ("درخواست مشتری بی‌پاسخ", "support", "medium", "درخواست را در جزئیات سفارش تأیید یا رد کنید."),
+    "driver_incident": ("مشکل گزارش‌شده توسط راننده", "fleet", "high", "با راننده تماس بگیرید و تصمیم بگیرید."),
+    "ticket_first_response": ("تیکت بدون پاسخ پس از مهلت", "support", "high", "به تیکت پاسخ دهید."),
+    "ticket_resolution": ("تیکت از مهلت حل گذشته", "support", "medium", "تیکت را حل کنید یا وضعیت را به مشتری بگویید."),
 }
 # فقط در اجرای تطبیق سنجیده می‌شوند؛ اجرای عادی نباید آن‌ها را به‌اشتباه بسته فرض کند
 RECONCILE_KINDS = {"stock_mismatch", "reservation_orphan", "transit_mismatch"}
 # با رویداد ثبت می‌شوند و فقط انسان می‌تواند بگوید کار فیزیکی انجام شده است
-MANUAL_KINDS = {"pick_return_pending", "return_shortage"}
+MANUAL_KINDS = {"pick_return_pending", "return_shortage", "driver_incident"}
 RETURN_OPEN = timedelta(hours=24)
 REQUEST_WAITING = timedelta(hours=24)
 TEAM_LABELS = {"warehouse": "انبار", "fleet": "ناوگان", "support": "پشتیبانی", "management": "مدیریت"}
 SEVERITY_LABELS = {"low": "کم", "medium": "متوسط", "high": "زیاد", "critical": "بحرانی"}
-STATUS_LABELS = {"open": "باز", "in_progress": "در حال رسیدگی", "waiting": "منتظر", "resolved": "حل‌شده", "merged": "ادغام‌شده"}
+STATUS_LABELS = {"open": "باز", "acknowledged": "دیده شد", "in_progress": "در حال رسیدگی", "waiting": "منتظر", "waiting_external": "منتظر طرف بیرونی",
+                 "resolved": "حل‌شده", "merged": "ادغام‌شده"}
+RESOLUTION_CODES = {
+    "fixed": "مشکل رفع شد", "stock_corrected": "با سند اصلاح شد", "rescheduled": "زمان تازه تعیین شد", "customer_contacted": "با مشتری هماهنگ شد",
+    "supplier_followup": "پیگیری با تأمین‌کننده", "driver_followup": "پیگیری با راننده", "no_action": "اقدامی لازم نبود", "duplicate": "تکراری بود", "other": "سایر",
+}
+REMIND_BEFORE = timedelta(hours=1)
+CRITICAL_ACK = timedelta(minutes=30)
+# برای مشتری فقط یک جمله درباره قدم بعدی، نه متن داخلی
+CUSTOMER_NEXT_ACTION = {
+    "order_stock_held": "آماده‌سازی سفارش شما متوقف شده است؛ فروشنده وضعیت را بررسی می‌کند و با شما تماس می‌گیرد.",
+    "vehicle_down_order": "در ارسال سفارش شما مشکلی پیش آمده و فروشنده در حال جایگزینی خودروست.",
+    "order_at_risk": "ممکن است سفارش شما کمی دیرتر برسد.",
+    "driver_incident": "در ارسال سفارش شما مشکلی گزارش شده و فروشنده پیگیر آن است.",
+    "order_failed_unresolved": "تحویل سفارش انجام نشد؛ فروشنده درباره ادامه کار با شما تماس می‌گیرد.",
+}
+DRIVER_ISSUES = {"breakdown": "خرابی خودرو", "delay": "تأخیر", "customer_unavailable": "در دسترس نبودن مشتری", "damage": "آسیب کالا", "discrepancy": "مغایرت بار", "other": "سایر"}
 URGENT = ("high", "critical")
 LIST_LIMIT = 500
 
@@ -181,6 +201,15 @@ def _warehouse(db: Session, now: datetime) -> list[Found]:
 
 def _others(db: Session, now: datetime) -> list[Found]:
     found = []
+    settings = control_settings.of(db, current_tenant(db)) if current_tenant(db) else None
+    if settings:
+        first_due = now - timedelta(hours=settings["ticket_first_response_hours"])
+        resolve_due = now - timedelta(hours=settings["ticket_resolution_hours"])
+        for t in db.query(Ticket).filter(Ticket.status == "open", Ticket.handler == "org", Ticket.created_at <= first_due).all():
+            if t.first_response_at is None:
+                found.append(Found("ticket_first_response", "ticket", t.id, None, f"تیکت {t.code} پس از {fa_digits(str(settings['ticket_first_response_hours']))} ساعت پاسخی نگرفته است."))
+            elif t.created_at <= resolve_due:
+                found.append(Found("ticket_resolution", "ticket", t.id, None, f"تیکت {t.code} از مهلت {fa_digits(str(settings['ticket_resolution_hours']))} ساعته حل گذشته است."))
     tickets = db.query(Ticket).filter(Ticket.escalated_at.is_not(None), Ticket.status == "open",
                                       Ticket.last_activity_at <= now - TICKET_WAITING).all()
     for t in tickets:
@@ -246,10 +275,22 @@ def _reconcile(db: Session) -> list[Found]:
 
 def record(db: Session, kind: str, entity_type: str, entity_id: int, *, organization_id: int, warehouse_id: int | None, reason: str,
            actor: User | None = None) -> None:
-    """ثبت فوری هنگام رویداد (بدون commit)؛ اگر مورد باز هست چیز تازه‌ای ساخته نمی‌شود."""
-    if db.query(OperationException.id).filter(OperationException.kind == kind, OperationException.entity_type == entity_type,
-                                              OperationException.entity_id == entity_id,
-                                              OperationException.status.in_(ACTIVE_EXCEPTION_STATUSES)).first():
+    """
+    ثبت فوری هنگام رویداد (بدون commit). مورد باز فقط شمار تکرار می‌گیرد؛ مورد بسته‌ای که همین رویداد دوباره رخ داده باز می‌شود
+    (تصمیم ت۳). این تنها راه بازگشایی است و بررسی دوره‌ای هیچ‌وقت مورد بسته را باز نمی‌کند.
+    """
+    same = db.query(OperationException).filter(OperationException.kind == kind, OperationException.entity_type == entity_type,
+                                               OperationException.entity_id == entity_id).order_by(OperationException.id.desc()).first()
+    if same is not None and same.status in ACTIVE_EXCEPTION_STATUSES:
+        same.occurrence_count = (same.occurrence_count or 1) + 1      # متن اصلی می‌ماند؛ هر تکرار در تاریخچه است
+        _add_event(db, same, actor, "تکرار همین مورد", reason[:500])
+        return
+    if same is not None:
+        same.status, same.closed_at, same.resolution, same.resolution_code, same.resolved_by_id = "open", None, None, None, None
+        same.occurrence_count = (same.occurrence_count or 1) + 1
+        same.trigger_reason = reason[:300]
+        same.reminded_at, same.escalated_at, same.acknowledged_at = None, None, None
+        _add_event(db, same, actor, "بازگشایی با رویداد تازه", reason[:500])
         return
     _, team, severity, action = KINDS[kind]
     item = OperationException(organization_id=organization_id, kind=kind, entity_type=entity_type, entity_id=entity_id,
@@ -258,6 +299,26 @@ def record(db: Session, kind: str, entity_type: str, entity_id: int, *, organiza
     db.add(item)
     db.flush()
     _add_event(db, item, actor, "ثبت هنگام رویداد")
+
+
+def _follow_up(db: Session, organization_id: int, now: datetime) -> None:
+    """یادآوری یک‌باره نزدیک مهلت به مسئول، و ارجاع یک‌باره به ادمین وقتی از مهلت گذشت یا مورد بحرانی دیده نشد."""
+    active = db.query(OperationException).filter(OperationException.status.in_(ACTIVE_EXCEPTION_STATUSES)).all()
+    for item in active:
+        label = KINDS.get(item.kind, (item.kind,))[0]
+        ignored_critical = item.severity == "critical" and item.status == "open" and item.opened_at <= now - CRITICAL_ACK
+        overdue = item.due_at is not None and item.due_at <= now
+        if (overdue or ignored_critical) and item.escalated_at is None:
+            item.escalated_at = now
+            notification_service.notify(db, organization_id=organization_id, kind="exception_opened", title=f"ارجاع استثنا: {label}", severity="danger",
+                                        message=item.trigger_reason, link="/app/exceptions?status=active", audience="admin",
+                                        dedupe_key=f"exception:{item.id}:escalation")
+            _add_event(db, item, None, "ارجاع به ادمین")
+        elif not overdue and item.due_at is not None and item.due_at <= now + REMIND_BEFORE and item.reminded_at is None:
+            item.reminded_at = now
+            notification_service.notify(db, organization_id=organization_id, kind="exception_opened", title=f"نزدیک مهلت: {label}", severity="warning",
+                                        message=item.trigger_reason, link="/app/exceptions?status=active", warehouse_id=item.warehouse_id,
+                                        user_id=item.owner_id, dedupe_key=f"exception:{item.id}:reminder")
 
 
 def _add_event(db: Session, item: OperationException, actor: User | None, action: str, note: str | None = None) -> None:
@@ -307,6 +368,7 @@ def detect(db: Session, organization_id: int, now: datetime | None = None, *, re
             db, organization_id=organization_id, kind="exception_opened", title="استثنای تازه در عملیات",
             message=f"{fa_digits(str(count))} مورد تازه از روند عادی خارج شده و مسئول می‌خواهد.", link="/app/exceptions?status=active",
             warehouse_id=warehouse_id, dedupe_key=f"exceptions:{warehouse_id or 'org'}")
+    _follow_up(db, organization_id, now)
     db.commit()
     return {"found": len(found), "created": sum(created.values()), "closed": closed}
 
@@ -343,7 +405,9 @@ def _serialize(db: Session, item: OperationException, names: dict[int, str], sug
         "status": item.status, "status_label": STATUS_LABELS[item.status], "opened_at": item.opened_at, "due_at": item.due_at,
         "closed_at": item.closed_at, "overdue": bool(item.due_at and item.due_at < _now() and item.status in ACTIVE_EXCEPTION_STATUSES),
         "trigger_reason": item.trigger_reason, "suggested_action": item.suggested_action, "resolution": item.resolution,
-        "merged_into_id": item.merged_into_id, "link": _link(item),
+        "merged_into_id": item.merged_into_id, "link": _link(item), "occurrence_count": item.occurrence_count or 1,
+        "acknowledged_at": item.acknowledged_at, "evidence_refs": item.evidence_refs or [], "resolution_code": item.resolution_code,
+        "resolution_code_label": RESOLUTION_CODES.get(item.resolution_code), "escalated_at": item.escalated_at,
         "suggested_owner": suggest(item) if item.owner_id is None and item.status in ACTIVE_EXCEPTION_STATUSES else None,
     }
 
@@ -423,13 +487,58 @@ def update(db: Session, user: User, exception_id: int, data) -> dict:
             if not (data.resolution or "").strip():
                 raise ConflictError("برای بستن، نتیجه را بنویسید.")
             item.resolution, item.closed_at, item.resolved_by_id = data.resolution.strip(), _now(), user.id
+            item.resolution_code = data.resolution_code or "other"
+        if data.status == "acknowledged" and item.acknowledged_at is None:
+            item.acknowledged_at = _now()
         item.status = data.status
         actions.append(f"وضعیت: {STATUS_LABELS[data.status]}")
+    if data.evidence_ref:
+        if not data.evidence_ref.startswith("/app/"):
+            raise ConflictError("مدرک باید پیوند داخلی پسینه باشد (با /app/ شروع شود).")
+        item.evidence_refs = [*(item.evidence_refs or []), data.evidence_ref]
+        actions.append("مدرک افزوده شد")
     if not actions and not data.note:
         raise ConflictError("تغییری ثبت نشد.")
     _add_event(db, item, user, "؛ ".join(actions) or "یادداشت", data.note)
+    # فقط تغییر مسئول یا وضعیت اعلان دارد؛ یادداشت و مدرک سروصدا نمی‌سازند
+    if ("owner_id" in fields or data.status or data.merged_into_id) and item.owner_id and item.owner_id != user.id:
+        notification_service.notify(db, organization_id=item.organization_id, kind="exception_opened", title=f"تغییر در استثنا: {KINDS.get(item.kind, (item.kind,))[0]}",
+                                    message="؛ ".join(actions), link="/app/exceptions?status=active", user_id=item.owner_id, actor=user,
+                                    dedupe_key=f"exception:{item.id}:owner:{item.owner_id}")
     db.commit()
     return get_exception(db, user, item.id)
+
+
+# ---------------------------------------------------------------------------
+# دید راننده و مشتری
+# ---------------------------------------------------------------------------
+def report_incident(db: Session, user: User, data) -> dict:
+    """راننده مشکل را گزارش می‌کند و فقط کارکنان می‌توانند آن را ببندند."""
+    from app.services import order_service
+    order = order_service.get_order(db, user, data.order_id)
+    label = DRIVER_ISSUES[data.issue]
+    record(db, "driver_incident", "order", order.id, organization_id=order.organization_id, warehouse_id=order.warehouse_id, actor=user,
+           reason=f"سفارش {order.tracking_code}: {label}" + (f" — {data.note}" if data.note else ""))
+    db.commit()
+    return {"ok": True}
+
+
+def for_driver(db: Session, user: User) -> list[dict]:
+    """فقط موردهای سفارش‌هایی که الان با همین راننده است؛ بدون مسئول، دلیل بستن و اطلاعات داخلی دیگر."""
+    if user.role != "driver":
+        raise ForbiddenError("این فهرست مخصوص راننده است.")
+    orders = [i for (i,) in db.query(Order.id).filter(Order.driver_id == user.id, Order.status.in_(ACTIVE_ORDER_STATUSES)).all()]
+    rows = db.query(OperationException).filter(OperationException.entity_type == "order", OperationException.entity_id.in_(orders or [-1]),
+                                               OperationException.kind.in_(("driver_incident", "mission_unanswered", "vehicle_down_order", "driver_ineligible")),
+                                               OperationException.status.in_(ACTIVE_EXCEPTION_STATUSES)).order_by(OperationException.id.desc()).all()
+    return [{"id": r.id, "kind_label": KINDS.get(r.kind, (r.kind,))[0], "trigger_reason": r.trigger_reason, "suggested_action": r.suggested_action,
+             "occurrence_count": r.occurrence_count or 1, "order_id": r.entity_id, "opened_at": r.opened_at, "status_label": STATUS_LABELS[r.status]} for r in rows]
+
+
+def customer_next_action(db: Session, order_id: int) -> str | None:
+    rows = db.query(OperationException.kind).filter(OperationException.entity_type == "order", OperationException.entity_id == order_id,
+                                                    OperationException.status.in_(ACTIVE_EXCEPTION_STATUSES)).all()
+    return next((CUSTOMER_NEXT_ACTION[k] for (k,) in rows if k in CUSTOMER_NEXT_ACTION), None)
 
 
 def scan(db: Session, user: User) -> dict:

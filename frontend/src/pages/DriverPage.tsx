@@ -64,6 +64,12 @@ function OrderCard({ order, locked = false, flash = false }: { order: Schemas["O
     onSuccess: (_, body) => { toast.success(body.accept ? "مأموریت را پذیرفتید." : "مأموریت رد شد."); queryClient.invalidateQueries({ queryKey: ["orders"] }); },
     onError: e => toast.error(errorMessage(e)),
   });
+  const report = useMutation({
+    mutationFn: (body: { issue: "breakdown" | "delay" | "customer_unavailable" | "damage" | "discrepancy" | "other"; note: string | null }) =>
+      unwrap(api.POST("/exceptions/report", { body: { order_id: order.id, ...body } })),
+    onSuccess: () => { toast.success("مشکل برای سازمان ثبت شد."); queryClient.invalidateQueries({ queryKey: ["my-exceptions"] }); },
+    onError: e => toast.error(errorMessage(e)),
+  });
   const contact = useMutation({
     mutationFn: (outcome: "answered" | "no_answer" | "busy" | "wrong_number" | "off") =>
       unwrap(api.POST("/orders/{order_id}/contacts", { params: { path: { order_id: order.id } }, body: { method: "call", outcome } })),
@@ -133,6 +139,10 @@ function OrderCard({ order, locked = false, flash = false }: { order: Schemas["O
           <Button size="sm" variant="ghost" onClick={() => contact.mutate("answered")} data-testid="contact-answered">پاسخ داد</Button>
           <Button size="sm" variant="ghost" onClick={() => contact.mutate("no_answer")} data-testid="contact-no-answer">پاسخ نداد</Button>
           <Button size="sm" variant="ghost" onClick={() => contact.mutate("wrong_number")}>شماره اشتباه</Button>
+          <Button size="sm" variant="ghost" className="ms-auto" data-testid="report-issue" onClick={() => {
+            promptDialog({ title: "گزارش خرابی خودرو یا مشکل", label: "چه شده؟", required: true, multiline: true, confirmLabel: "ثبت گزارش" })
+              .then(note => { if (note?.trim()) report.mutate({ issue: "other", note: note.trim() }); });
+          }}>گزارش مشکل</Button>
         </div>
       )}
       {(steps.length > 0 || canFail || canDeliver) && !waitingAnswer && (
@@ -200,6 +210,7 @@ export default function DriverPage() {
       </Card>
 
       <IncomingHandovers />
+      <MyExceptions />
 
       <MySchedule />
 
@@ -229,6 +240,20 @@ export default function DriverPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** مشکل‌های باز سفارش‌های من؛ بستن با سازمان است */
+function MyExceptions() {
+  const { data = [] } = useQuery({ queryKey: ["my-exceptions"], queryFn: () => unwrap(api.GET("/exceptions/mine")), refetchInterval: 60_000 });
+  if (!data.length) return null;
+  return (
+    <Card className="mb-6" data-testid="my-exceptions">
+      <CardHeader title="مشکل‌های باز" subtitle="سازمان پیگیر این موارد است." />
+      <ul className="divide-y divide-border text-sm">
+        {data.map(x => <li key={x.id} className="px-5 py-3" data-testid="my-exception"><b>{x.kind_label}</b><p className="mt-0.5 text-text-2">{x.trigger_reason}</p></li>)}
+      </ul>
+    </Card>
   );
 }
 

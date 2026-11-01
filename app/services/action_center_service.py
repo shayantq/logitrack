@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.iran import fa_digits
 from app.models import PLATFORM_ROLES, User
 from app.services import (
-    backorder_service, dispatch_service, driver_portal_service, driver_service, exception_service, order_service, organization_request_service,
+    approval_service, backorder_service, dispatch_service, driver_portal_service, driver_service, exception_service, order_service, organization_request_service,
     picking_service, putaway_service, receiving_service, replenishment_service, shipping_service, ticket_service,
     transfer_order_service,
 )
@@ -171,6 +171,11 @@ def _org_cards(db: Session, user: User) -> list[Card]:
         ]
     if role == "org_admin":
         cards += [
+            Card("adjustment_approvals", "warning", 88, "اصلاح‌های موجودی منتظر تأیید دوم",
+                 "این اصلاح‌ها از سقف سازمان بیشتر بوده‌اند و تا تأیید شما اجرا نمی‌شوند.", "ادمین سازمان", "مدرک را بررسی و تأیید یا رد کنید.", "بررسی درخواست‌ها",
+                 link="/app/exceptions", api="/adjustment-approvals", query={"status": "pending"},
+                 **_listed(lambda: approval_service.list_approvals(db, user, "pending"),
+                           lambda a: {"id": a["id"], "label": a["product_name"], "sub": f"{fa_digits(str(a['quantity']))} واحد", "link": "/app/exceptions"})),
             Card("driver_applications", "info", 50, "پرونده‌های راننده منتظر بررسی",
                  "راننده تا تأیید نشود سفارش نمی‌گیرد.", "ادمین سازمان", "مدارک را بررسی و تأیید یا رد کنید.", "بررسی پرونده‌ها",
                  link="/app/drivers", api="/drivers/applications", query={"status": "submitted"},

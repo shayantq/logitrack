@@ -156,6 +156,8 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       valuation_method: value.valuation_method as "fifo", count_approval_value: Number(value.count_approval_value),
       slow_days: Number(value.slow_days), dead_days: Number(value.dead_days), expiry_warning_days: Number(value.expiry_warning_days),
       proof_required: !!value.proof_required, mission_accept_required: !!value.mission_accept_required, mission_deadline_minutes: Number(value.mission_deadline_minutes),
+      ticket_first_response_hours: Number(value.ticket_first_response_hours), ticket_resolution_hours: Number(value.ticket_resolution_hours),
+      adjustment_approval_units: Number(value.adjustment_approval_units),
       reason: form.reason || null } })),
     onSuccess: d => {
       queryClient.setQueryData(["control-settings"], d);
@@ -191,6 +193,10 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             راننده مأموریت را قبول یا رد کند
           </label>
           <Field label="مهلت پاسخ مأموریت (دقیقه)"><Input type="number" min={5} max={240} value={value.mission_deadline_minutes ?? ""} onChange={set("mission_deadline_minutes")} /></Field>
+          <Field label="مهلت اولین پاسخ تیکت (ساعت)"><Input type="number" min={1} max={240} value={value.ticket_first_response_hours ?? ""} onChange={set("ticket_first_response_hours")} data-testid="setting-first-response" /></Field>
+          <Field label="مهلت حل تیکت (ساعت)"><Input type="number" min={1} max={2160} value={value.ticket_resolution_hours ?? ""} onChange={set("ticket_resolution_hours")} /></Field>
+          <Field label="سقف اصلاح موجودی بدون تأیید دوم (واحد)" hint="صفر یعنی خاموش. اصلاح و ضایعات بیشتر از این مقدار تأیید ادمین دیگری را می‌خواهد." className="sm:col-span-2">
+            <Input type="number" min={0} value={value.adjustment_approval_units ?? ""} onChange={set("adjustment_approval_units")} data-testid="setting-approval" /></Field>
         </form>
       )}
     </Modal>

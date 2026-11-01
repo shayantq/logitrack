@@ -2340,6 +2340,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exceptions/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🚚 مشکل‌های باز سفارش‌های من (راننده) */
+        get: operations["mine_exceptions_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exceptions/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🚚 گزارش مشکل توسط راننده */
+        post: operations["report_exceptions_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exceptions/scan": {
         parameters: {
             query?: never;
@@ -2373,6 +2407,40 @@ export interface paths {
         head?: never;
         /** ✏️ تعیین مسئول، تغییر وضعیت، یادداشت یا ادغام */
         patch: operations["update_exceptions__exception_id__patch"];
+        trace?: never;
+    };
+    "/adjustment-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** ✅ اصلاح‌های موجودی منتظر تأیید دوم */
+        get: operations["list_approvals_adjustment_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/adjustment-approvals/{approval_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✅ تأیید یا رد اصلاح موجودی (غیر از درخواست‌کننده) */
+        post: operations["decide_approval_adjustment_approvals__approval_id__decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/orders/{order_id}/driver-returns": {
@@ -4982,6 +5050,47 @@ export interface components {
             /** Skipped */
             skipped: number;
         };
+        /** ApprovalDecisionIn */
+        ApprovalDecisionIn: {
+            /** Approve */
+            approve: boolean;
+            /** Note */
+            note?: string | null;
+        };
+        /** ApprovalOut */
+        ApprovalOut: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Product Id */
+            product_id: number;
+            /** Product Name */
+            product_name: string;
+            /** Warehouse Name */
+            warehouse_name?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+            /** Requested By */
+            requested_by?: string | null;
+            /** Requested By Id */
+            requested_by_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided By */
+            decided_by?: string | null;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Decision Note */
+            decision_note?: string | null;
+        };
         /** ApproveIn */
         ApproveIn: {
             /**
@@ -5492,6 +5601,21 @@ export interface components {
              */
             mission_deadline_minutes: number;
             /**
+             * Ticket First Response Hours
+             * @default 8
+             */
+            ticket_first_response_hours: number;
+            /**
+             * Ticket Resolution Hours
+             * @default 72
+             */
+            ticket_resolution_hours: number;
+            /**
+             * Adjustment Approval Units
+             * @default 0
+             */
+            adjustment_approval_units: number;
+            /**
              * Valuation Methods
              * @default []
              */
@@ -5515,6 +5639,12 @@ export interface components {
             mission_accept_required?: boolean | null;
             /** Mission Deadline Minutes */
             mission_deadline_minutes?: number | null;
+            /** Ticket First Response Hours */
+            ticket_first_response_hours?: number | null;
+            /** Ticket Resolution Hours */
+            ticket_resolution_hours?: number | null;
+            /** Adjustment Approval Units */
+            adjustment_approval_units?: number | null;
             /** Reason */
             reason?: string | null;
         };
@@ -6001,6 +6131,28 @@ export interface components {
             /** Uploaded At */
             uploaded_at?: string | null;
         };
+        /** DriverExceptionOut */
+        DriverExceptionOut: {
+            /** Id */
+            id: number;
+            /** Kind Label */
+            kind_label: string;
+            /** Trigger Reason */
+            trigger_reason: string;
+            /** Suggested Action */
+            suggested_action?: string | null;
+            /** Occurrence Count */
+            occurrence_count: number;
+            /** Order Id */
+            order_id: number;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Status Label */
+            status_label: string;
+        };
         /** DriverInviteCreate */
         DriverInviteCreate: {
             /** Label */
@@ -6403,6 +6555,24 @@ export interface components {
             /** Link */
             link?: string | null;
             suggested_owner?: components["schemas"]["SuggestedOwner"] | null;
+            /**
+             * Occurrence Count
+             * @default 1
+             */
+            occurrence_count: number;
+            /** Acknowledged At */
+            acknowledged_at?: string | null;
+            /**
+             * Evidence Refs
+             * @default []
+             */
+            evidence_refs: string[];
+            /** Resolution Code */
+            resolution_code?: string | null;
+            /** Resolution Code Label */
+            resolution_code_label?: string | null;
+            /** Escalated At */
+            escalated_at?: string | null;
             /** Events */
             events: components["schemas"]["ExceptionEventOut"][];
         };
@@ -6478,6 +6648,24 @@ export interface components {
             /** Link */
             link?: string | null;
             suggested_owner?: components["schemas"]["SuggestedOwner"] | null;
+            /**
+             * Occurrence Count
+             * @default 1
+             */
+            occurrence_count: number;
+            /** Acknowledged At */
+            acknowledged_at?: string | null;
+            /**
+             * Evidence Refs
+             * @default []
+             */
+            evidence_refs: string[];
+            /** Resolution Code */
+            resolution_code?: string | null;
+            /** Resolution Code Label */
+            resolution_code_label?: string | null;
+            /** Escalated At */
+            escalated_at?: string | null;
         };
         /** ExceptionScanOut */
         ExceptionScanOut: {
@@ -6493,11 +6681,15 @@ export interface components {
             /** Owner Id */
             owner_id?: number | null;
             /** Status */
-            status?: ("open" | "in_progress" | "waiting" | "resolved") | null;
+            status?: ("open" | "acknowledged" | "in_progress" | "waiting" | "waiting_external" | "resolved") | null;
             /** Note */
             note?: string | null;
             /** Resolution */
             resolution?: string | null;
+            /** Resolution Code */
+            resolution_code?: ("fixed" | "stock_corrected" | "rescheduled" | "customer_contacted" | "supplier_followup" | "driver_followup" | "no_action" | "duplicate" | "other") | null;
+            /** Evidence Ref */
+            evidence_ref?: string | null;
             /** Merged Into Id */
             merged_into_id?: number | null;
         };
@@ -6826,6 +7018,18 @@ export interface components {
             stock_mode: string;
             /** Preview */
             preview: components["schemas"]["ImportPreviewRow"][];
+        };
+        /** IncidentIn */
+        IncidentIn: {
+            /** Order Id */
+            order_id: number;
+            /**
+             * Issue
+             * @enum {string}
+             */
+            issue: "breakdown" | "delay" | "customer_unavailable" | "damage" | "discrepancy" | "other";
+            /** Note */
+            note?: string | null;
         };
         /** InspectionCreate */
         InspectionCreate: {
@@ -9620,6 +9824,17 @@ export interface components {
              * @default false
              */
             overdue: boolean;
+            /** First Response At */
+            first_response_at?: string | null;
+            /** First Response Due */
+            first_response_due?: string | null;
+            /** Resolution Due */
+            resolution_due?: string | null;
+            /**
+             * Sla Breached
+             * @default false
+             */
+            sla_breached: boolean;
             suggested_assignee?: components["schemas"]["SuggestedAssignee"] | null;
             /** Escalation Reason */
             escalation_reason?: string | null;
@@ -11653,6 +11868,17 @@ export interface components {
              * @default false
              */
             overdue: boolean;
+            /** First Response At */
+            first_response_at?: string | null;
+            /** First Response Due */
+            first_response_due?: string | null;
+            /** Resolution Due */
+            resolution_due?: string | null;
+            /**
+             * Sla Breached
+             * @default false
+             */
+            sla_breached: boolean;
             suggested_assignee?: components["schemas"]["SuggestedAssignee"] | null;
             /** Escalation Reason */
             escalation_reason?: string | null;
@@ -11739,6 +11965,17 @@ export interface components {
              * @default false
              */
             overdue: boolean;
+            /** First Response At */
+            first_response_at?: string | null;
+            /** First Response Due */
+            first_response_due?: string | null;
+            /** Resolution Due */
+            resolution_due?: string | null;
+            /**
+             * Sla Breached
+             * @default false
+             */
+            sla_breached: boolean;
         };
         /** TicketUpdate */
         TicketUpdate: {
@@ -11867,6 +12104,8 @@ export interface components {
             requests: components["schemas"]["CustomerRequestPublicOut"][];
             /** Delivered At */
             delivered_at?: string | null;
+            /** Next Action */
+            next_action?: string | null;
         };
         /** TrackDriver */
         TrackDriver: {
@@ -17450,7 +17689,7 @@ export interface operations {
     list_exceptions_exceptions__get: {
         parameters: {
             query?: {
-                status?: "active" | "all" | "open" | "in_progress" | "waiting" | "resolved" | "merged";
+                status?: "active" | "all" | "open" | "acknowledged" | "in_progress" | "waiting" | "waiting_external" | "resolved" | "merged";
                 team?: ("warehouse" | "fleet" | "support" | "management") | null;
                 severity?: ("low" | "medium" | "high" | "critical") | null;
                 urgent?: boolean;
@@ -17470,6 +17709,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExceptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mine_exceptions_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DriverExceptionOut"][];
+                };
+            };
+        };
+    };
+    report_exceptions_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IncidentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -17556,6 +17850,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExceptionDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_approvals_adjustment_approvals_get: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_approval_adjustment_approvals__approval_id__decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                approval_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
                 };
             };
             /** @description Validation Error */

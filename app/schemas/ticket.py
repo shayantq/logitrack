@@ -30,6 +30,10 @@ class TicketSummary(BaseModel):
     resolved_at: Optional[datetime] = None
     organization_name: Optional[str] = None
     overdue: bool = False
+    first_response_at: Optional[datetime] = None
+    first_response_due: Optional[datetime] = None
+    resolution_due: Optional[datetime] = None
+    sla_breached: bool = False
 
 
 class TicketMessageOut(BaseModel):

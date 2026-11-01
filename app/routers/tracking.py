@@ -45,6 +45,7 @@ class TrackDetails(BaseModel):
     rating_token: Optional[str] = None
     requests: list[CustomerRequestPublicOut] = []
     delivered_at: Optional[datetime] = None
+    next_action: Optional[str] = None
 
 
 class TrackResponse(BaseModel):

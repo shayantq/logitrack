@@ -14,7 +14,7 @@ from app.core.rate_limit import RateLimiter
 from app.core.tenancy import SKIP_TENANT_FILTER, set_tenant
 from app.models import Customer, DriverRating, Order, OrderStatusHistory, Organization, User, Vehicle
 from app.models_productivity import DeliveryAttempt
-from app.services import commission_service, customer_request_service, route_service
+from app.services import commission_service, customer_request_service, exception_service, route_service
 from app.services.exceptions import ConflictError, NotFoundError
 
 # ۵ تلاش اشتباه ۴ رقم موبایل برای هر کد در ساعت — حدس زدن ۱۰٬۰۰۰ حالت عملاً ممکن نیست
@@ -163,6 +163,7 @@ def track(db: Session, code: str, phone_last4: str | None = None) -> dict:
             "items": [{"id": i.product_id, "name": i.product_name, "quantity": i.quantity,
                        "delivered_quantity": delivered.get(i.id, i.quantity) if order.status == "delivered" else None} for i in order.items],
             "requests": customer_request_service.for_public(db, order),
+            "next_action": exception_service.customer_next_action(db, order.id),
             "delivered_at": order.delivered_at,
             "total_weight_kg": order.total_weight_kg,
             "rating_token": order.rating_token if can_rate else None,

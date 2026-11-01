@@ -38,6 +38,7 @@ KINDS = {
     "low_rating": ("drivers", "danger"),
     "exception_opened": ("orders", "warning"),
     "customer_request": ("orders", "info"),
+    "approval_needed": ("inventory", "warning"),
 }
 RETENTION_DAYS = 90
 LIST_LIMIT = 60

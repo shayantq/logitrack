@@ -186,7 +186,7 @@ class CustomerRequest(TenantScoped, Base):
     decision_note = Column(String(500), nullable=True)
 
 
-ACTIVE_EXCEPTION_STATUSES = ("open", "in_progress", "waiting")
+ACTIVE_EXCEPTION_STATUSES = ("open", "acknowledged", "in_progress", "waiting", "waiting_external")
 
 
 class OperationException(TenantScoped, Base):
@@ -195,10 +195,11 @@ class OperationException(TenantScoped, Base):
     __table_args__ = (
         CheckConstraint("severity IN ('low', 'medium', 'high', 'critical')", name="ck_operation_exceptions_severity"),
         CheckConstraint("team IN ('warehouse', 'fleet', 'support', 'management')", name="ck_operation_exceptions_team"),
-        CheckConstraint("status IN ('open', 'in_progress', 'waiting', 'resolved', 'merged')", name="ck_operation_exceptions_status"),
+        CheckConstraint("status IN ('open', 'acknowledged', 'in_progress', 'waiting', 'waiting_external', 'resolved', 'merged')",
+                        name="ck_operation_exceptions_status"),
         Index("uq_operation_exceptions_active", "organization_id", "kind", "entity_type", "entity_id", unique=True,
-              postgresql_where=text("status IN ('open', 'in_progress', 'waiting')"),
-              sqlite_where=text("status IN ('open', 'in_progress', 'waiting')")),
+              postgresql_where=text("status IN ('open', 'acknowledged', 'in_progress', 'waiting', 'waiting_external')"),
+              sqlite_where=text("status IN ('open', 'acknowledged', 'in_progress', 'waiting', 'waiting_external')")),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -218,6 +219,12 @@ class OperationException(TenantScoped, Base):
     resolution = Column(String(500), nullable=True)
     resolved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)   # خالی = حل خودکار سیستم
     merged_into_id = Column(Integer, ForeignKey("operation_exceptions.id", ondelete="SET NULL"), nullable=True)
+    occurrence_count = Column(Integer, nullable=False, default=1, server_default="1")
+    acknowledged_at = Column(DateTime, nullable=True)
+    evidence_refs = Column(JSON, nullable=True)                # پیوند داخلی به سند، عکس یا رویداد
+    resolution_code = Column(String(24), nullable=True)
+    reminded_at = Column(DateTime, nullable=True)
+    escalated_at = Column(DateTime, nullable=True)
 
 
 class OperationExceptionEvent(TenantScoped, Base):
@@ -279,3 +286,26 @@ class TaskFailure(Base):
     created_at = Column(DateTime, nullable=False, default=_now, index=True)
     replayed_at = Column(DateTime, nullable=True)
     replayed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class AdjustmentApproval(TenantScoped, Base):
+    """اصلاح موجودی بیشتر از سقف سازمان که منتظر تأیید شخص دوم است (app/services/approval_service.py)."""
+    __tablename__ = "adjustment_approvals"
+    __table_args__ = (
+        CheckConstraint("kind IN ('movement', 'set_balance')", name="ck_adjustment_approvals_kind"),
+        CheckConstraint("status IN ('pending', 'approved', 'rejected')", name="ck_adjustment_approvals_status"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    kind = Column(String(16), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True)
+    quantity = Column(Integer, nullable=False)
+    payload = Column(JSON, nullable=False)
+    reason = Column(String(500), nullable=True)
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    requested_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    decided_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    decision_note = Column(String(500), nullable=True)

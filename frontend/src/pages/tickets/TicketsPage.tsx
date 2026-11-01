@@ -204,6 +204,7 @@ function TicketListRow({ t, side, mode, active, onClick, picking = false, picked
         {t.status !== "open" ? <Badge tone={TICKET_STATUS[t.status].tone}>{TICKET_STATUS[t.status].label}</Badge>
           : waiting && <Badge tone={waiting.mine ? "brand" : "muted"} dot={waiting.mine}>{waiting.label}</Badge>}
         {t.overdue && waiting?.mine && <Badge tone="danger"><Clock className="size-3" />بیش از ۲۴ ساعت</Badge>}
+        {t.sla_breached && mode === "org" && <span data-testid="ticket-sla-breached"><Badge tone="danger">از مهلت گذشته</Badge></span>}
         {t.escalated_at && mode === "org" && <Badge tone="violet">ارجاع به پشتیبانی</Badge>}
       </div>
     </button>
@@ -319,6 +320,7 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
                 <Package className="size-3.5" />سفارش <span className="font-mono ltr">{t.order_tracking_code}</span></button>
             : <span className="inline-flex items-center gap-1"><Package className="size-3.5" />سفارش <span className="font-mono ltr">{t.order_tracking_code}</span></span>)}
           <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{faShortDateTime(t.created_at)}</span>
+          {t.status === "open" && t.first_response_due && !t.first_response_at && <span className={t.sla_breached ? "font-semibold text-danger" : ""} data-testid="ticket-sla">مهلت پاسخ: {faShortDateTime(t.first_response_due)}</span>}
           {t.can_manage && (
             <div className="ms-auto flex items-center gap-1.5">
               <Select value={t.priority} onChange={e => action.mutate(() => unwrap(api.PATCH("/tickets/{ticket_id}", { ...path, body: { priority: e.target.value as "normal", unassign: false } })))}

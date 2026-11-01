@@ -62,6 +62,7 @@ export function CustomerRequestForm({ track, phone }: { track: Track; phone: str
           ))}
         </ul>
       )}
+      {details?.next_action && <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning" data-testid="next-action">{details.next_action}</p>}
       {done && <p className="rounded-xl bg-success-soft px-4 py-3 text-sm text-success" data-testid="request-sent">درخواست ثبت شد. نتیجه را همین‌جا می‌بینید.</p>}
       {!kinds.length ? <p className="text-sm text-muted">در این مرحله از سفارش درخواستی ممکن نیست. اگر مشکلی هست از پشتیبانی کمک بگیرید.</p> : (
         <>

@@ -121,10 +121,24 @@ def reply_options(ticket: Ticket, side: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # خروجی
 # ---------------------------------------------------------------------------
+def _sla(db: Session, ticket: Ticket) -> dict:
+    """مهلت‌ها از تنظیمات همان سازمان (تصمیم ت۵)؛ تیکت حل‌شده دیگر از مهلت نمی‌گذرد."""
+    from app.services import control_settings
+    settings = control_settings.of(db, ticket.organization_id)
+    created = ticket.created_at.replace(tzinfo=None) if ticket.created_at else _now()
+    response_due = created + timedelta(hours=settings["ticket_first_response_hours"])
+    resolution_due = created + timedelta(hours=settings["ticket_resolution_hours"])
+    now = _now()
+    active = ticket.status == "open"
+    breached = active and ((ticket.first_response_at is None and now > response_due) or now > resolution_due)
+    return {"first_response_at": ticket.first_response_at, "first_response_due": response_due, "resolution_due": resolution_due, "sla_breached": breached}
+
+
 def _summary(db: Session, ticket: Ticket, org_names: dict[int, str] | None = None) -> dict:
     order = db.get(Order, ticket.order_id) if ticket.order_id else None
     assignee = db.get(User, ticket.assignee_id) if ticket.assignee_id else None
     return {
+        **_sla(db, ticket),
         "id": ticket.id, "code": ticket.code, "subject": ticket.subject, "category": ticket.category,
         "category_label": CATEGORY_LABELS.get(ticket.category, ticket.category), "priority": ticket.priority,
         "source": ticket.source, "handler": ticket.handler, "status": ticket.status, "waiting_on": ticket.waiting_on,
@@ -196,6 +210,8 @@ def _add(db: Session, ticket: Ticket, side: str, body: str, visibility: str, use
                             body=body or "(تصویر)", visibility=visibility, attachment_path=path, attachment_type=media_type)
     db.add(message)
     ticket.last_activity_at = _now()
+    if side in ("org", "platform") and visibility != "side" and ticket.first_response_at is None:
+        ticket.first_response_at = _now()
     return message
 
 

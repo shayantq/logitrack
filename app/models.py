@@ -833,6 +833,7 @@ class Ticket(TenantScoped, Base):
     escalated_at = Column(DateTime, nullable=True)
     escalation_reason = Column(String(1000), nullable=True)
     resolved_at = Column(DateTime, nullable=True)
+    first_response_at = Column(DateTime, nullable=True)      # اولین پاسخ کارکنان که طرف مقابل می‌بیند
 
     messages = relationship("TicketMessage", back_populates="ticket", cascade="all, delete-orphan",
                             order_by="TicketMessage.id")
@@ -1040,7 +1041,7 @@ from app.models_fulfillment import (  # noqa: E402,F401
 from app.models_control import CutoverCheck, LabelPrint, RolePermission  # noqa: E402,F401
 # بهره‌وری عملیات: نماهای ذخیره‌شده فهرست‌ها
 from app.models_productivity import (  # noqa: E402,F401
-    ContactAttempt, CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn, DriverReturnLine, OperationException,
+    AdjustmentApproval, ContactAttempt, CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn, DriverReturnLine, OperationException,
     OperationExceptionEvent, OrderHandover, OutboundMessage, SavedView, TaskFailure,
 )
 # ثبت محافظ دفتر گردش کالا (before_flush) — باید بعد از تعریف همه مدل‌ها import شود

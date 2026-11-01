@@ -22,6 +22,7 @@ from app.models import (
 from app.schemas.product import (
     LocationMoveCreate, ProductCreate, StatusChangeCreate, StockMovementCreate, StockTransferCreate, StockUpdate,
 )
+from app.services import approval_service
 from app.services import (
     allocation_service, audit_service, catalog_service, location_service, permission_service, quality_service, receiving_service,
     stock_document_service, stock_ledger, warehouse_service,
@@ -225,14 +226,19 @@ def _stock_status(inventory: Inventory) -> dict:
     return {"message": "✅ موجودی انبار بروزرسانی شد", "status": status_msg, "current_stock": inventory.quantity}
 
 
-def update_stock(db: Session, user: User, product_id: int, stock_data: StockUpdate) -> dict:
+def update_stock(db: Session, user: User, product_id: int, stock_data: StockUpdate, *, approved: bool = False) -> dict:
     """موجودی سالم را به یک عدد شمارش‌شده می‌رساند؛ اختلاف به‌عنوان سند «اصلاحیه موجودی» ثبت می‌شود."""
     _require_stock_role(user)
-    _get_product(db, product_id)
+    product = _get_product(db, product_id)
     try:
         warehouse_id = _resolve_warehouse(db, user, product_id, stock_data.warehouse_id, AVAILABLE)
         warehouse_service.get(db, warehouse_id)
         inventory = stock_ledger.lock_bucket(db, product_id, warehouse_id, reorder_point=stock_data.reorder_point)
+        change = stock_data.quantity - (inventory.quantity or 0)
+        if not approved and approval_service.over_limit(db, product.organization_id, change):
+            db.rollback()
+            approval_service.request(db, user, kind="set_balance", product_id=product_id, warehouse_id=warehouse_id, quantity=abs(change),
+                                     payload=stock_data.model_dump(mode="json"), reason=stock_data.reason)
         inventory.reorder_point = stock_data.reorder_point
         if stock_data.quantity < (inventory.reserved_quantity or 0):
             raise ConflictError(f"{inventory.reserved_quantity} عدد از این کالا برای سفارش‌های باز رزرو است؛ "
@@ -268,11 +274,16 @@ def _supplier(db: Session, partner_id: int | None) -> Partner | None:
     return partner
 
 
-def record_movement(db: Session, user: User, data: StockMovementCreate, idempotency_key: str | None = None) -> StockMovement:
+def record_movement(db: Session, user: User, data: StockMovementCreate, idempotency_key: str | None = None, *, approved: bool = False) -> StockMovement:
     _require_stock_role(user)
     if data.movement_type != "receipt":
         permission_service.ensure(db, user, "stock.adjust")
     product = _get_product(db, data.product_id)
+    if data.movement_type != "receipt" and not approved:
+        units = catalog_service.to_base(product, abs(data.quantity), data.uom)
+        if approval_service.over_limit(db, product.organization_id, units):
+            approval_service.request(db, user, kind="movement", product_id=product.id, warehouse_id=data.warehouse_id, quantity=units,
+                                     payload=data.model_dump(mode="json"), reason=data.reason)
 
     def create(key, digest):
         try:
