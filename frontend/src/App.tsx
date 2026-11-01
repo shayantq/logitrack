@@ -12,6 +12,8 @@ const JoinPage = lazy(() => import("./pages/public/JoinPage"));
 const RatePage = lazy(() => import("./pages/public/RatePage"));
 const TrackPage = lazy(() => import("./pages/public/TrackPage"));
 const AboutPage = lazy(() => import("./pages/public/AboutPage"));
+const MarketingPage = lazy(() => import("./pages/public/MarketingPage"));
+const MyTasksPage = lazy(() => import("./pages/warehouse/MyTasksPage"));
 const SupportPage = lazy(() => import("./pages/public/SupportPage"));
 const OrgTicketsPage = lazy(() => import("./pages/tickets/TicketsPage").then(m => ({ default: m.OrgTicketsPage })));
 const DriverSupportPage = lazy(() => import("./pages/tickets/TicketsPage").then(m => ({ default: m.DriverSupportPage })));
@@ -154,6 +156,9 @@ export function App() {
           <Route path="/track" element={fade(<TrackPage />)} />
           <Route path="/track/:code" element={fade(<TrackPage />)} />
           <Route path="/about" element={fade(<AboutPage />)} />
+          {(["solutions", "industries", "features", "integrations", "security", "guide"] as const).map(page => (
+            <Route key={page} path={`/${page}`} element={fade(<MarketingPage page={page} />)} />
+          ))}
           <Route path="/faq" element={fade(<FaqPage />)} />
           <Route path="/terms" element={fade(<TermsPage />)} />
           <Route path="/privacy" element={fade(<PrivacyPage />)} />
@@ -180,6 +185,7 @@ export function App() {
             <Route path="receipts" element={guard(ORG_STAFF, <ReceiptsPage />)} />
             <Route path="quality" element={guard(ORG_STAFF, <QualityPage />)} />
             <Route path="putaway" element={guard(ORG_STAFF, <PutawayPage />)} />
+            <Route path="my-tasks" element={guard(ORG_STAFF, <MyTasksPage />)} />
             <Route path="picking" element={guard(ORG_STAFF, <PickingPage />)} />
             <Route path="shipping" element={guard(ORG_STAFF, <ShippingPage />)} />
             <Route path="transfers" element={guard(ORG_STAFF, <TransfersPage />)} />

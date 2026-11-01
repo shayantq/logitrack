@@ -5,6 +5,9 @@ import { AlertTriangle, ArrowLeft, Boxes, ChevronDown, Package, PackageCheck, Pi
 import { api, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { ActionCenter } from "@/components/ActionCenter";
+import { UpdatedAt } from "@/components/UpdatedAt";
+import { BusinessHome } from "@/pages/home/BusinessHome";
+import { WarehouseHome } from "@/pages/home/WarehouseHome";
 import { OrderStatusBadge } from "@/components/StatusBadges";
 import { ACTIVE_ORDER_STATUSES, orderStatusLabel, orderStatusTone, VEHICLE_STATUS, VEHICLE_STATUS_TONE } from "@/lib/labels";
 import { faNumber, faShortDateTime } from "@/lib/format";
@@ -47,12 +50,15 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader eyebrow="نمای کلی" title={`${greeting()}، ${me.full_name || me.username}`} subtitle="وضعیت لحظه‌ای سفارش‌ها، ناوگان و موجودی — هر ۱۵ ثانیه به‌روز می‌شود." />
+      <PageHeader eyebrow="نمای کلی" title={`${greeting()}، ${me.full_name || me.username}`} subtitle="کارهای نیازمند اقدام و وضعیت سازمان" />
+      {me.role === "warehouse_manager" && <WarehouseHome />}
       <ActionCenter />
+      {me.role === "org_admin" && <BusinessHome />}
 
       <button type="button" onClick={() => setOverviewOpen(o => !o)} aria-expanded={overviewOpen} data-testid="overview-toggle"
         className="mb-3 flex w-full items-center justify-between gap-3 text-start">
         <h2 className="text-base font-bold">نمای کلی</h2>
+        <span className="ms-auto"><UpdatedAt at={stats.dataUpdatedAt} /></span>
         <ChevronDown className={cn("size-5 text-muted transition-transform duration-200", overviewOpen && "rotate-180")} />
       </button>
       {overviewOpen && <div className="animate-fade">

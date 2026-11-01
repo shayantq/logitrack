@@ -11,7 +11,7 @@ import { usePartners } from "@/hooks/data";
 import { DISPOSITION_ACTIONS, STOCK_STATUS, type StockStatus } from "@/lib/labels";
 import { faDateTime, faNumber } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton } from "@/ui/primitives";
 import { StatusBadge, WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type Balance = Schemas["StockBalanceOut"];
@@ -41,7 +41,7 @@ export default function DispositionsPage() {
           <div className="w-64"><WarehousePicker choice={choice} /></div>
           <SegmentedControl value={status} onChange={setStatus} options={HELD.map(s => ({ value: s, label: STOCK_STATUS[s].label }))} />
         </div>
-        {balances.isLoading ? <TableSkeleton /> : !balances.data?.length ? (
+        {balances.isLoading ? <TableSkeleton /> : balances.error ? <ErrorState error={balances.error} onRetry={balances.refetch} /> : !balances.data?.length ? (
           <EmptyState icon={<Recycle className="size-5" />} title={`کالای «${STOCK_STATUS[status].label}» نیست`} />
         ) : (
           <Table testId="held-table">

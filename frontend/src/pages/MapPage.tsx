@@ -1,4 +1,5 @@
 /** نقشه ارسال‌ها (مرحله ۱۰): همه محموله‌ها روی نقشه ایران با پیشرفت هر مسیر؛ به‌روزرسانی خودکار هر ۱۵ ثانیه */
+import { UpdatedAt } from "@/components/UpdatedAt";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ export default function MapPage() {
   const [detailId, setDetailId] = useState<number | null>(null);
   const [q, setQ] = useState("");
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["map-orders", scope],
     queryFn: () => unwrap(api.GET("/map/orders", { params: { query: { scope } } })),
     placeholderData: keepPreviousData,
@@ -39,7 +40,7 @@ export default function MapPage() {
 
   return (
     <>
-      <PageHeader eyebrow="عملیات" title="نقشه ارسال‌ها" subtitle="مسیر شهربه‌شهر هر محموله و پیشرفت آن بر اساس گزارش رانندگان"
+      <PageHeader eyebrow="عملیات" title="نقشه ارسال‌ها" subtitle="مسیر شهربه‌شهر هر محموله بر اساس آخرین گزارش رانندگان؛ موقعیت زنده GPS نیست"
         actions={<SegmentedControl value={scope} onChange={v => { setScope(v); setSelected(null); }} options={[
           { value: "active", label: "فعال" }, { value: "in_transit", label: "در مسیر" }, { value: "today", label: "امروز" },
         ]} />} />
@@ -67,6 +68,7 @@ export default function MapPage() {
                 className="h-[52vh] min-h-[380px] lg:h-[62vh]" testId="map-page-map" />
             )}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
+              <UpdatedAt at={dataUpdatedAt} label="دریافت از سرور" />
               <Legend className="bg-brand" label="در مسیر" /><Legend className="bg-warning" label="منتظر حرکت" />
               <Legend className="bg-success" label="تحویل‌شده" /><Legend className="bg-danger" label="ناموفق / لغو" />
               <span>بخش پررنگ هر مسیر = پیموده‌شده؛ نقطه‌چین = باقی‌مانده</span>
@@ -134,6 +136,11 @@ function OrderRow({ order: o, active, onClick }: { order: MapOrder; active: bool
         </div>
       ) : <div className="mt-1.5 text-xs text-warning">روی نقشه نیست — {o.reason}</div>}
       <div className="mt-1 text-xs text-muted">{o.driver_name ?? "بدون راننده"}{o.plate ? ` · ${o.plate}` : ""}</div>
+      {o.status === "in_transit" && (
+        <div className="mt-1 text-xs text-muted" data-testid="map-last-report">
+          {o.progress.last_report ? `آخرین گزارش راننده: ${faShortDateTime(o.progress.last_report.at)}` : "راننده هنوز گزارشی نداده است"}
+        </div>
+      )}
     </button>
   );
 }

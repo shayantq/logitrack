@@ -11,6 +11,12 @@ import { ScrollTrigger, gsap, useReducedMotion } from "./motion";
 export const SITE_PAGES = [
   { to: "/about", label: "درباره ما" },
   { to: "/pricing", label: "تعرفه‌ها" },
+  { to: "/solutions", label: "راهکارها" },
+  { to: "/industries", label: "صنایع" },
+  { to: "/features", label: "قابلیت‌ها" },
+  { to: "/integrations", label: "یکپارچگی" },
+  { to: "/security", label: "امنیت و پایداری" },
+  { to: "/guide", label: "راهنما و آموزش" },
   { to: "/faq", label: "سوالات متداول" },
   { to: "/terms", label: "قوانین و مقررات" },
   { to: "/privacy", label: "حریم خصوصی" },

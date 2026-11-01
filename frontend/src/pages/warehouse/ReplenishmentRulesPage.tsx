@@ -11,7 +11,7 @@ import { useToast } from "@/components/Toast";
 import { useProducts } from "@/hooks/data";
 import { faDate, faNumber } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, Select, Table, TableSkeleton, type Tone } from "@/ui/primitives";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, type Tone } from "@/ui/primitives";
 import { LocationSelect, WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 const ABC_TONE: Record<string, Tone> = { A: "danger", B: "warning", C: "muted" };
@@ -59,7 +59,7 @@ export default function ReplenishmentRulesPage() {
             <Button size="sm" variant="secondary" icon={<RefreshCw className="size-4" />} loading={generate.isPending} onClick={() => generate.mutate()} data-testid="replenish-generate">بررسی و ساخت وظایف</Button>
             <Button size="sm" icon={<Plus className="size-4" />} onClick={() => setCreating(true)} data-testid="rule-new">قاعده جدید</Button>
           </div>} />
-        {rules.isLoading ? <TableSkeleton /> : !rules.data?.length ? <EmptyState title="قاعده‌ای تعریف نشده" text="برای هر کالا در هر محل برداشت حداقل و حداکثر تعیین کنید." /> : (
+        {rules.isLoading ? <TableSkeleton /> : rules.error ? <ErrorState error={rules.error} onRetry={rules.refetch} /> : !rules.data?.length ? <EmptyState title="قاعده‌ای تعریف نشده" text="برای هر کالا در هر محل برداشت حداقل و حداکثر تعیین کنید." /> : (
           <Table testId="rules-table">
             <thead><tr><th>محل</th><th>کالا</th><th>حداقل / حداکثر</th><th>موجود</th><th>در راه (وظیفه)</th><th>وضعیت</th><th className="w-1" /></tr></thead>
             <tbody>{rules.data.map(r => (
@@ -79,7 +79,7 @@ export default function ReplenishmentRulesPage() {
         <CardHeader title="طبقه‌بندی ABC و شمارش دوره‌ای" icon={<BarChart3 className="size-4" />}
           subtitle="A: ۸۰٪ ارزش مصرف (شمارش هر ۳۰ روز)، B: ۱۵٪ بعدی (۹۰ روز)، C: بقیه (۱۸۰ روز)."
           actions={me.role === "org_admin" && <Button size="sm" variant="secondary" loading={classify.isPending} onClick={() => classify.mutate()} data-testid="abc-run">محاسبه دوباره</Button>} />
-        {abc.isLoading ? <TableSkeleton /> : !abc.data?.length ? <EmptyState title="کالایی نیست" /> : (
+        {abc.isLoading ? <TableSkeleton /> : abc.error ? <ErrorState error={abc.error} onRetry={abc.refetch} /> : !abc.data?.length ? <EmptyState title="کالایی نیست" /> : (
           <Table testId="abc-table">
             <thead><tr><th>کلاس</th><th>کالا</th><th>ارزش مصرف (ریال)</th><th>سهم</th><th>آخرین شمارش</th><th>شمارش بعدی</th></tr></thead>
             <tbody>{abc.data.map(r => (

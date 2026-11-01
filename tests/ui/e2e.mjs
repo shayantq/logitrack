@@ -195,12 +195,17 @@ await session("org_admin", "qazvin_admin", "admin123", async page => {
 
 // ---------------- مدیر انبار ----------------
 await session("manager", "manager_tehran", "manager123", async page => {
-  check("manager", "lands on inventory", page.url().endsWith("/app/inventory"), page.url());
+  check("manager", "lands on warehouse home", page.url().endsWith("/app"), page.url());
+  await page.waitForSelector("[data-testid=warehouse-home]");
+  check("manager", "today's work cards", await page.locator("[data-testid^=wh-today-]:not([data-testid=wh-today-count])").count() === 7);
+  check("manager", "business view hidden", await page.locator("[data-testid=business-home]").count() === 0);
+  check("manager", "freshness label", await page.locator("[data-testid=updated-at]").count() > 0);
+  await page.goto(`${BASE}/app/inventory`);
   await page.waitForSelector("[data-testid=products-table] tbody tr");
   const menu = await page.locator("[data-testid=app-nav]").first().textContent();
   check("manager", "no fleet/users menu", !menu.includes("ناوگان") && !menu.includes("کاربران"));
   await page.goto(`${BASE}/app/users`);
-  await page.waitForURL(/\/app\/inventory$/);
+  await page.waitForURL(/\/app$/);
   check("manager", "forbidden page redirects home", true);
   await page.click("[data-testid=app-nav] >> text=سفارش‌ها");
   await page.waitForSelector("[data-testid=orders-table] tbody tr");
@@ -1034,7 +1039,7 @@ await session("users-first-login", null, null, async page => {
   await page.fill("[data-testid=password-new]", "OpsNew2026");
   await page.fill("[data-testid=password-repeat]", "OpsNew2026");
   await page.click("[data-testid=password-submit]");
-  await page.waitForURL(/\/app\/inventory$/);
+  await page.waitForURL(/\/app$/);
   check("users", "after change lands on manager home", true);
   // تغییر رمز از منوی کاربر
   await page.click("[data-testid=user-menu]");
@@ -1046,7 +1051,7 @@ await session("users-first-login", null, null, async page => {
   await page.waitForSelector("[data-testid=password-modal]", { state: "detached" });
   await page.reload();
   await page.waitForSelector("[data-testid=org-name]");
-  check("users", "session survives own password change (fresh token)", page.url().endsWith("/app/inventory"), page.url());
+  check("users", "session survives own password change (fresh token)", page.url().endsWith("/app"), page.url());
 });
 await session("users-manage", "qazvin_admin", "admin123", async page => {
   await page.goto(`${BASE}/app/users`);
@@ -1925,10 +1930,11 @@ await session("tour", "qazvin_manager", "manager123", async page => {
   await page.reload();
   await page.waitForSelector("[data-testid=org-name]");
   await page.waitForTimeout(2000);
-  // راهنمای اصلی دوباره باز نمی‌شود؛ صفحه خانه مدیر انبار (انبار و کالاها) راهنمای خودش را دارد که حالا نوبت آن است
+  // راهنمای اصلی دوباره باز نمی‌شود؛ صفحه انبار و کالاها راهنمای خودش را دارد
   check("tour", "skipped tour does not reopen", (await page.locator("[data-testid=tour][data-tour-id=main-manager]").count()) === 0);
-  const homeTour = await page.getAttribute("[data-testid=tour]", "data-tour-id", { timeout: 3000 }).catch(() => null);
-  check("tour", "home page tour follows the main tour", homeTour === "page-inventory", String(homeTour));
+  await page.goto(`${BASE}/app/inventory`);
+  const homeTour = await page.getAttribute("[data-testid=tour]", "data-tour-id", { timeout: 5000 }).catch(() => null);
+  check("tour", "page tour follows the main tour", homeTour === "page-inventory", String(homeTour));
   if (homeTour) await page.click("[data-testid=tour-skip]");
   await page.goto(`${BASE}/app/reorder`);
   await page.waitForSelector("[data-testid=tour][data-tour-id=page-reorder]", { timeout: 10000 });
@@ -2060,6 +2066,46 @@ await session("productivity-platform", "superadmin", "superadmin123", async page
   check("platform", "organization admin shows plan and usage", (await page.textContent("[data-testid=org-plan]")).includes("سفارش این ماه"));
   await page.keyboard.press("Escape");
 });
+
+// ---------------- صف کار موبایل ----------------
+const taskOrder = await apiCall(adminToken, "POST", "/orders/", {
+  items: [{ product_id: opsProduct.id, quantity: 1 }], customer: { name: "مشتری صف کار", mobile: "09121112233" },
+  destination_province: "قزوین", destination_city: "قزوین", destination_address: "خیابان صف، پلاک ۴", size: "m", priority: false,
+  delivery_window_start: `${iranDate(0)}T00:00:00+03:30`, delivery_window_end: `${iranDate(0)}T23:59:00+03:30`,
+  warehouse_id: opsWarehouse, auto_assign: false,
+});
+const taskList = await apiCall(opsToken, "POST", "/picking/lists", { warehouse_id: opsWarehouse, strategy: "single", order_ids: [taskOrder.id],
+  staging_location_id: (await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`)).find(l => l.code === stgCode).id });
+const taskLine = taskList.lines[0];
+await session("my-tasks", "qazvin_manager", "manager123", async page => {
+  await page.goto(`${BASE}/app/my-tasks`);
+  const card = page.locator("[data-kind=pick]", { hasText: taskOrder.tracking_code }).first();
+  await card.waitFor();
+  check("my-tasks", "task shows location, item and quantity", (await card.textContent()).includes(taskLine.product_name));
+  await card.locator("[data-testid=task-start]").click();
+  await page.waitForSelector("[data-testid=task-run]");
+  check("my-tasks", "steps are numbered", (await page.textContent("[data-testid=task-progress]")).includes("قدم"));
+  const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+  check("my-tasks", "fits a phone screen", noOverflow);
+  await page.fill("[data-testid=task-input]", taskLine.location_code ?? taskList.warehouse_code);
+  await page.keyboard.press("Enter");
+  await page.fill("[data-testid=task-input]", "WRONG-ITEM");
+  await page.click("[data-testid=task-submit]");
+  if (taskLine.lot_number) { await page.fill("[data-testid=task-input]", taskLine.lot_number); await page.click("[data-testid=task-submit]"); }
+  await page.click("[data-testid=task-submit]");
+  await page.waitForSelector("[data-testid=toast]");
+  const stillOpen = (await apiCall(opsToken, "GET", `/picking/lists/${taskList.id}`)).lines[0].status === "open";
+  check("my-tasks", "wrong scan is rejected and picks nothing", stillOpen && await page.locator("[data-testid=task-run]").count() === 1);
+  await page.click("[data-testid=task-back]");
+  if (taskLine.lot_number) await page.click("[data-testid=task-back]");
+  await page.fill("[data-testid=task-input]", opsProduct.sku);
+  await page.click("[data-testid=task-submit]");
+  if (taskLine.lot_number) await page.click("[data-testid=task-submit]");
+  await page.click("[data-testid=task-submit]");
+  await page.waitForSelector("[data-testid=task-run]", { state: "detached", timeout: 10000 });
+  const line = (await apiCall(opsToken, "GET", `/picking/lists/${taskList.id}`)).lines[0];
+  check("my-tasks", "steps record the pick", line.status === "picked" && line.picked_quantity === 1, JSON.stringify(line));
+}, { viewport: { width: 390, height: 844 } });
 
 // ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------
 const reliabilityAdmin = await apiToken("qazvin_admin", "admin123");
@@ -2298,6 +2344,42 @@ const redelivered = await (await fetch(`${BASE}/public/track/${failOrder.trackin
 check("reliability", "customer sees redelivery text", redelivered.status_text.includes("تلاش دوباره"), redelivered.status_text);
 
 // ---------------- مسیرهای قدیمی و ورود ناموفق ----------------
+// ---------------- خانه نقش‌ها، صف کار موبایل و صفحه‌های معرفی ----------------
+await session("role-home", "qazvin_admin", "admin123", async page => {
+  await page.waitForSelector("[data-testid=business-home]");
+  check("role-home", "admin lands on business health", page.url().endsWith("/app"), page.url());
+  check("role-home", "figures are labeled an estimate", (await page.textContent("[data-testid=biz-money-estimate]")).includes("برآورد"));
+  check("role-home", "calculation time is shown", await page.locator("[data-testid=business-home] [data-testid=updated-at]").count() === 1);
+  check("role-home", "finished organization has no setup list", await page.locator("[data-testid=setup-checklist]").count() === 0);
+  await page.click("[data-testid=biz-kpi-fill_rate]");
+  await page.waitForURL(/\/app\/backorders$/);
+  check("role-home", "kpi drills down to its list", true);
+  await page.goto(`${BASE}/app`);
+  await page.click("[data-testid=biz-late]");
+  await page.waitForURL(/view=late/);
+  check("role-home", "late count drills down to late orders", true);
+  await page.goto(`${BASE}/app/map`);
+  await page.waitForSelector("[data-testid=updated-at]");
+  const map = await page.textContent("main");
+  check("role-home", "dispatch board shows received time, never claims live", await page.locator("[data-testid=updated-at]").count() === 1 && !map.includes("لحظه‌ای") && map.includes("موقعیت زنده GPS نیست"));
+});
+
+await session("marketing", null, null, async page => {
+  for (const name of ["solutions", "industries", "features", "integrations", "security", "guide"]) {
+    await page.goto(`${BASE}/${name}`);
+    await page.waitForSelector(`[data-testid=marketing-${name}]`);
+    const fits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+    check("marketing", `${name} page renders on a phone`, fits && await page.locator("[data-testid=marketing-item]").count() > 0);
+  }
+  await page.goto(`${BASE}/integrations`);
+  await page.waitForSelector("[data-testid=marketing-integrations]");
+  check("marketing", "states what is not supported", (await page.textContent("main")).includes("فعلاً نداریم"));
+  await page.goto(`${BASE}/`);
+  await page.locator("[data-testid=footer-site-pages] >> text=قابلیت‌ها").click();
+  await page.waitForSelector("[data-testid=marketing-features]");
+  check("marketing", "footer links to the new pages", true);
+}, { viewport: { width: 390, height: 844 } });
+
 await session("public", null, null, async page => {
   await page.goto(`${BASE}/dashboard`);
   await page.waitForURL(/\/app\/login$/);

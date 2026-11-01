@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from app.database import db_dependency
 from app.dependencies import current_user_dependency, user_dependency
 from app.schemas.action_center import ActionCenterOut, SavedViewIn, SavedViewOut, SavedViewPage, SearchOut
-from app.services import action_center_service, saved_view_service, search_service
+from app.schemas.home import BusinessHome, WarehouseToday
+from app.services import action_center_service, home_service, saved_view_service, search_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(tags=["🎯 مرکز اقدام و جستجو"])
@@ -22,6 +23,16 @@ def _call(fn, *args, **kwargs):
 @router.get("/action-center", response_model=ActionCenterOut, summary="🎯 کارهایی که الان اقدام می‌خواهند (بر اساس نقش)")
 def action_center(db: db_dependency, user: current_user_dependency):
     return _call(action_center_service.action_center, db, user)
+
+
+@router.get("/home/business", response_model=BusinessHome, summary="📈 سلامت کسب‌وکار برای ادمین سازمان")
+def home_business(db: db_dependency, user: user_dependency):
+    return _call(home_service.business, db, user)
+
+
+@router.get("/home/warehouse", response_model=WarehouseToday, summary="📦 کار امروز انبار")
+def home_warehouse(db: db_dependency, user: user_dependency):
+    return _call(home_service.warehouse_today, db, user)
 
 
 @router.get("/search", response_model=SearchOut, summary="🔎 جستجوی سراسری: سفارش، کالا، محموله، انتقال، تیکت، راننده، خودرو")

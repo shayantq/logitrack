@@ -55,6 +55,7 @@ export const NAV: NavItem[] = [
   { to: "/app/receipts", label: "رسید و دریافت", icon: PackageOpen, roles: STAFF, group: "operations" },
   { to: "/app/quality", label: "بازرسی کیفی", icon: FlaskConical, roles: STAFF, group: "operations" },
   { to: "/app/putaway", label: "جانمایی", icon: ScanLine, roles: STAFF, group: "operations" },
+  { to: "/app/my-tasks", label: "صف کار من", icon: ScanLine, roles: STAFF, group: "operations" },
   { to: "/app/picking", label: "پیکینگ", icon: ListChecks, roles: STAFF, group: "operations" },
   { to: "/app/shipping", label: "بسته‌بندی و ارسال", icon: PackageCheck, roles: STAFF, group: "operations" },
   { to: "/app/transfers", label: "سفارش انتقال", icon: ArrowLeftRight, roles: STAFF, group: "operations" },
@@ -107,7 +108,7 @@ export const NAV: NavItem[] = [
 ];
 
 /** نسخه نمایشی خصوصی فقط بخش‌های اصلی را دارد (سرور هم بقیه را رد می‌کند — app/core/demo.py) */
-const DEMO_PATHS = ["/app", "/app/analytics", "/app/map", "/app/receipts", "/app/quality", "/app/putaway", "/app/picking", "/app/shipping",
+const DEMO_PATHS = ["/app", "/app/analytics", "/app/map", "/app/receipts", "/app/quality", "/app/putaway", "/app/my-tasks", "/app/picking", "/app/shipping",
   "/app/stocktakes", "/app/inventory", "/app/orders", "/app/backorders", "/app/schedules", "/app/drivers", "/app/driver-requests", "/app/tickets"];
 
 export function demoAllows(path: string): boolean {

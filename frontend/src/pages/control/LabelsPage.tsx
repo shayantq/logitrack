@@ -11,7 +11,7 @@ import { useToast } from "@/components/Toast";
 import { useProducts } from "@/hooks/data";
 import { faDateTime, faNumber } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
-import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, PageHeader, SegmentedControl, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Table, TableSkeleton } from "@/ui/primitives";
 import { WarehousePicker, useWarehouseChoice } from "../warehouse/shared";
 
 type Kind = "product" | "location" | "package";
@@ -105,7 +105,9 @@ export default function LabelsPage() {
           <Button icon={<Printer className="size-4" />} disabled={!picked.size} loading={busy} onClick={run} data-testid="labels-print">
             چاپ {picked.size ? faNumber(picked.size) : ""} برچسب</Button>
         </div>
-        {(kind === "location" && locations.isLoading) || (kind === "package" && queue.isLoading) ? <TableSkeleton /> : !filtered.length ? (
+        {(kind === "location" && locations.isLoading) || (kind === "package" && queue.isLoading) ? <TableSkeleton />
+          : (kind === "location" ? locations.error : queue.error) ? <ErrorState error={kind === "location" ? locations.error : queue.error} onRetry={() => (kind === "location" ? locations : queue).refetch()} />
+          : !filtered.length ? (
           <EmptyState icon={<Tags className="size-5" />} title={kind === "package" ? "سفارش بسته‌بندی‌شده‌ای نیست" : "موردی پیدا نشد"} />
         ) : (
           <Table testId="labels-table">

@@ -2873,6 +2873,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/home/business": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📈 سلامت کسب‌وکار برای ادمین سازمان */
+        get: operations["home_business_home_business_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/home/warehouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📦 کار امروز انبار */
+        get: operations["home_warehouse_home_warehouse_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/search": {
         parameters: {
             query?: never;
@@ -5639,6 +5673,22 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** BusinessHome */
+        BusinessHome: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Kpis */
+            kpis: components["schemas"]["HomeKpi"][];
+            delays: components["schemas"]["DelaySummary"];
+            exceptions: components["schemas"]["ExceptionSummary"];
+            stock: components["schemas"]["StockSummary"];
+            money: components["schemas"]["MoneyEstimate"];
+            /** Setup */
+            setup: components["schemas"]["SetupStep"][];
+        };
         /** CancelIn */
         CancelIn: {
             /** Reason */
@@ -6063,6 +6113,26 @@ export interface components {
             shifts: string[];
             /** Off */
             off: boolean;
+        };
+        /** DelayCause */
+        DelayCause: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+            /** Link */
+            link: string;
+        };
+        /** DelaySummary */
+        DelaySummary: {
+            /** Late */
+            late: number;
+            /** At Risk */
+            at_risk: number;
+            /** Causes */
+            causes: components["schemas"]["DelayCause"][];
         };
         /** DeliveryAttemptOut */
         DeliveryAttemptOut: {
@@ -6909,6 +6979,15 @@ export interface components {
             /** Closed */
             closed: number;
         };
+        /** ExceptionSummary */
+        ExceptionSummary: {
+            /** Critical */
+            critical: number;
+            /** High */
+            high: number;
+            /** Link */
+            link: string;
+        };
         /** ExceptionUpdate */
         ExceptionUpdate: {
             /** Owner Id */
@@ -7289,6 +7368,29 @@ export interface components {
             expiring_value: number;
             /** Summary */
             summary: string;
+        };
+        /** HomeKpi */
+        HomeKpi: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value?: number | null;
+            /** Previous */
+            previous?: number | null;
+            /** Unit */
+            unit: string;
+            /** Target */
+            target: number;
+            /** Status */
+            status: string;
+            /** Hint */
+            hint: string;
+            /** Higher Better */
+            higher_better: boolean;
+            /** Link */
+            link: string;
         };
         /** ImportPreview */
         ImportPreview: {
@@ -7979,6 +8081,15 @@ export interface components {
             /** Speed Kmh */
             speed_kmh: number;
         };
+        /** MarginProduct */
+        MarginProduct: {
+            /** Product Id */
+            product_id: number;
+            /** Name */
+            name: string;
+            /** Margin */
+            margin: number;
+        };
         /**
          * MeResponse
          * @description کاربر جاری به‌همراه سازمانش (برای نمایش نام سازمان در پنل‌ها).
@@ -8112,6 +8223,31 @@ export interface components {
             accept: boolean;
             /** Reason */
             reason?: string | null;
+        };
+        /** MoneyEstimate */
+        MoneyEstimate: {
+            /** Estimated */
+            estimated: boolean;
+            /** Window Days */
+            window_days: number;
+            /** Trips */
+            trips: number;
+            /** Fare */
+            fare: number;
+            /** Driver Share */
+            driver_share: number;
+            /** Company Share */
+            company_share: number;
+            /** Goods Sales */
+            goods_sales: number;
+            /** Goods Margin */
+            goods_margin: number;
+            /** Cost Coverage Lines */
+            cost_coverage_lines: number;
+            /** Total Lines */
+            total_lines: number;
+            /** Top Products */
+            top_products: components["schemas"]["MarginProduct"][];
         };
         /**
          * MovementLineOut
@@ -11223,6 +11359,17 @@ export interface components {
             /** Groups */
             groups: components["schemas"]["SearchGroup"][];
         };
+        /** SetupStep */
+        SetupStep: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Done */
+            done: boolean;
+            /** Link */
+            link: string;
+        };
         /** ShiftIn */
         ShiftIn: {
             /**
@@ -11786,6 +11933,15 @@ export interface components {
              * @default 0
              */
             free: number;
+        };
+        /** StockSummary */
+        StockSummary: {
+            /** Out */
+            out: number;
+            /** Low */
+            low: number;
+            /** Link */
+            link: string;
         };
         /** StockTransferCreate */
         StockTransferCreate: {
@@ -13189,6 +13345,29 @@ export interface components {
              * @default false
              */
             has_locations: boolean;
+        };
+        /** WarehouseToday */
+        WarehouseToday: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /** Items */
+            items: components["schemas"]["WarehouseTodayItem"][];
+        };
+        /** WarehouseTodayItem */
+        WarehouseTodayItem: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+            /** Link */
+            link: string;
         };
         /** WorkflowOut */
         WorkflowOut: {
@@ -19306,6 +19485,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionCenterOut"];
+                };
+            };
+        };
+    };
+    home_business_home_business_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessHome"];
+                };
+            };
+        };
+    };
+    home_warehouse_home_warehouse_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseToday"];
                 };
             };
         };
