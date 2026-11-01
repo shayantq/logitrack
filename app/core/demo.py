@@ -16,6 +16,8 @@ from functools import lru_cache
 from fastapi import HTTPException, Request
 from jose import JWTError, jwt
 from sqlalchemy import create_engine
+
+from app.database import connect_args
 from sqlalchemy.orm import sessionmaker
 
 from app.core.security import ALGORITHM, SECRET_KEY
@@ -67,7 +69,8 @@ def token_matches(candidate: str) -> bool:
 @lru_cache(maxsize=1)
 def session_factory():
     # pool_pre_ping: هر ۳۰ دقیقه دیتابیس دمو از نو ساخته می‌شود و اتصال‌های قبلی قطع می‌شوند
-    return sessionmaker(autocommit=False, autoflush=False, bind=create_engine(database_url(), pool_pre_ping=True, pool_size=3))
+    return sessionmaker(autocommit=False, autoflush=False, bind=create_engine(database_url(), pool_pre_ping=True, pool_size=3,
+                                                                                  connect_args=connect_args(database_url())))
 
 
 def is_demo_request(request: Request | None) -> bool:

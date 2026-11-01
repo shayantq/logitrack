@@ -27,6 +27,12 @@ celery_app.conf.update(
     timezone="Asia/Tehran",
     enable_utc=True,
     result_expires=3600,  # نتیجه هر گزارش فقط ۱ ساعت در Redis نگه داشته می‌شود
+    # هر process فقط وظیفه‌ای را که اجرا می‌کند برمی‌دارد؛ گزارش سنگین وظیفه‌های پیش‌گرفته را پشت خودش نگه نمی‌دارد.
+    worker_prefetch_multiplier=1,
+    # وظیفه گیرکرده worker را برای همیشه اشغال نمی‌کند
+    task_soft_time_limit=300,
+    task_time_limit=360,
+    broker_connection_retry_on_startup=True,
 )
 
 # زمان‌بندی تسک‌های دوره‌ای (Celery Beat)
@@ -58,6 +64,18 @@ celery_app.conf.beat_schedule = {
     "detect-exceptions-quarter-hourly": {
         "task": "tasks.detect_exceptions",
         "schedule": crontab(minute="*/15"),
+    },
+    "publish-messages": {
+        "task": "tasks.publish_messages",
+        "schedule": 15.0,  # پیام‌های بیرونی ثبت‌شده در outbound_messages
+    },
+    "reconcile-stock-hourly": {
+        "task": "tasks.reconcile_stock",
+        "schedule": crontab(minute=40),
+    },
+    "purge-operations-records-daily": {
+        "task": "tasks.purge_operations_records",
+        "schedule": crontab(hour=21, minute=30),
     },
     "reset-demo-half-hourly": {
         "task": "tasks.reset_demo",

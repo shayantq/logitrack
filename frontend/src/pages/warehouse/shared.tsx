@@ -110,20 +110,21 @@ export function InspectModal({ target, onClose }: { target: InspectTarget | null
   });
   const [rows, setRows] = useState<{ status: string; quantity: string; reason: string }[]>([]);
   const [note, setNote] = useState("");
+  const [release, setRelease] = useState(false);
   const [key, setKey] = useState(newIdempotencyKey);
   const allowed = transitions.filter(t => t.from === target?.from_status && t.allowed).map(t => t.to);
   const lines = rows.length ? rows : target ? [{ status: allowed.includes("available") ? "available" : allowed[0] ?? "", quantity: String(target.quantity), reason: "" }] : [];
   const total = lines.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
   const update = (i: number, patch: Partial<typeof lines[number]>) => setRows(lines.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
-  function close() { setRows([]); setNote(""); setKey(newIdempotencyKey()); onClose(); }
+  function close() { setRows([]); setNote(""); setRelease(false); setKey(newIdempotencyKey()); onClose(); }
   const save = useMutation({
     mutationFn: () => unwrap(api.POST("/quality/inspections", {
       params: { header: { "Idempotency-Key": key } },
       body: {
         product_id: target!.product_id, warehouse_id: target!.warehouse_id, from_status: target!.from_status as StockStatus,
         location_id: target!.location_id ?? null, lot_number: target!.lot_number ?? null, receipt_id: target!.receipt_id ?? null,
-        note: note || null,
+        note: note || null, release_reservations: release,
         results: lines.map(r => ({ status: r.status as StockStatus, quantity: Number(r.quantity), reason: r.reason || null })),
       },
     })),
@@ -139,6 +140,12 @@ export function InspectModal({ target, onClose }: { target: InspectTarget | null
         <Button type="submit" form="inspect-form" loading={save.isPending} disabled={!allowed.length || total <= 0 || (target != null && total > target.quantity)}>ثبت نتیجه بازرسی</Button></>}>
       {target && !allowed.length ? <p className="text-sm text-danger">برای نقش شما تغییری از این وضعیت مجاز نیست؛ ادمین سازمان باید تصمیم بگیرد.</p> : (
         <form id="inspect-form" className="space-y-3" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
+          {target?.from_status === "available" && (
+            <label className="flex items-start gap-2 rounded-xl bg-warning-soft px-3 py-2 text-sm" data-testid="inspect-release">
+              <input type="checkbox" className="mt-1 size-4 accent-[var(--brand)]" checked={release} onChange={e => setRelease(e.target.checked)} />
+              <span>اگر این کالا برای سفارشی رزرو شده، رزرو آزاد شود. آن سفارش تا رزرو دوباره بارگیری نمی‌شود.</span>
+            </label>
+          )}
           {lines.map((r, i) => (
             <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_7rem_1.4fr_auto]" data-testid="inspect-row">
               <Field label="نتیجه">

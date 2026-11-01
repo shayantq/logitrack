@@ -145,6 +145,14 @@ def resolve_failure(data: ResolveFailureRequest, db: db_dependency, user: user_d
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
+@router.post('/{order_id}/re-reserve', response_model=OrderDetailResponse, summary="🔒 رزرو دوباره سفارش نگه‌داشته‌شده در بازرسی")
+def re_reserve(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0)):
+    try:
+        return OrderDetailResponse.from_order(order_service.re_reserve(db, user, order_id))
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
 @router.get('/{order_id}/attempts', response_model=list[DeliveryAttemptOut], summary="🚪 تلاش‌های تحویل سفارش و مدرک هر کدام")
 def delivery_attempts(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0)):
     try:

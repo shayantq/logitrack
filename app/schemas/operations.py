@@ -253,6 +253,8 @@ class InspectionCreate(BaseModel):
     lot_number: Optional[LotNumber] = None
     receipt_id: Optional[int] = Field(None, gt=0)
     note: Optional[Text] = None
+    # کالای سالمی که رزرو شده: رزرو سفارش‌ها آزاد و سفارش‌ها «نگه‌داشته» می‌شوند
+    release_reservations: bool = False
     results: list[InspectionResultIn] = Field(min_length=1, max_length=7)
 
     @model_validator(mode="after")

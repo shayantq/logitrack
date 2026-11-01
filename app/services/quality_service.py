@@ -18,7 +18,9 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.wms import AVAILABLE, PENDING, STOCK_STATUS_LABELS, quality_roles
-from app.models import InboundReceipt, Inventory, Product, QualityInspection, QualityInspectionResult, StockDocument, User
+from app.models import (
+    InboundReceipt, Inventory, Order, Product, QualityInspection, QualityInspectionResult, StockDocument, StockReservation, User,
+)
 from app.services import (
     event_bus, location_service, putaway_service, receiving_service, stock_document_service, stock_ledger,
 )
@@ -56,6 +58,20 @@ def resolve_warehouse(db: Session, user: User, product_id: int, warehouse_id: in
     raise ConflictError("این کالا در چند انبار (یا هیچ انباری) با این وضعیت موجودی دارد؛ انبار را مشخص کنید.")
 
 
+def _release_for_hold(db: Session, user: User, source: Inventory, total: int, note: str | None) -> None:
+    """کمترین رزرو لازم آزاد می‌شود: اول سفارش‌های غیرفوری با دیرترین بازه. رزرو سفارش معوق دست نمی‌خورد."""
+    from app.services import order_service
+    shortage = total - source.free_quantity
+    rows = db.query(StockReservation, Order).join(Order, Order.id == StockReservation.reference_id).filter(
+        StockReservation.inventory_id == source.id, StockReservation.status == "active", StockReservation.reference_type == "order",
+    ).order_by(Order.priority, Order.delivery_window_start.desc(), Order.id.desc()).with_for_update().all()
+    for reservation, order in rows:
+        if shortage <= 0:
+            break
+        shortage -= reservation.quantity
+        order_service.hold_for_quality(db, user, order, reservation, note or "کالای رزروشده در بازرسی کنار گذاشته شد")
+
+
 def inspect(db: Session, user: User, data, idempotency_key: str | None = None) -> dict:
     product = db.get(Product, data.product_id)
     if product is None:
@@ -74,6 +90,8 @@ def inspect(db: Session, user: User, data, idempotency_key: str | None = None) -
                 if receipt is None or receipt.warehouse_id != warehouse_id:
                     raise NotFoundError("رسید مرجع در این انبار یافت نشد.")
             source = stock_ledger.lock_bucket(db, product.id, warehouse_id, data.from_status, create=False)
+            if source is not None and source.free_quantity < total and data.release_reservations and data.from_status == AVAILABLE:
+                _release_for_hold(db, user, source, total, data.note)
             if source is None or source.free_quantity < total:
                 raise ConflictError(f"موجودی «{STOCK_STATUS_LABELS[data.from_status]}» این کالا کافی نیست "
                                     f"(موجود: {source.free_quantity if source else 0}، بازرسی‌شده: {total}).")

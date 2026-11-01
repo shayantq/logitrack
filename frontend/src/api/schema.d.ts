@@ -887,6 +887,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{order_id}/re-reserve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔒 رزرو دوباره سفارش نگه‌داشته‌شده در بازرسی */
+        post: operations["re_reserve_orders__order_id__re_reserve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/{order_id}/attempts": {
         parameters: {
             query?: never;
@@ -1455,6 +1472,57 @@ export interface paths {
         put?: never;
         /** ⛔ رد درخواست با ذکر دلیل */
         post: operations["reject_organization_request_platform_organization_requests__request_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🩺 پیام‌ها و وظایف پس‌زمینه ناموفق (بدون متن پیام) */
+        get: operations["operations_platform_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/operations/messages/{message_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔁 ارسال دوباره پیام ناموفق غیرحساس */
+        post: operations["retry_message_platform_operations_messages__message_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/operations/tasks/{failure_id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔁 اجرای دوباره وظیفه دوره‌ای */
+        post: operations["replay_task_platform_operations_tasks__failure_id__replay_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6332,6 +6400,11 @@ export interface components {
             receipt_id?: number | null;
             /** Note */
             note?: string | null;
+            /**
+             * Release Reservations
+             * @default false
+             */
+            release_reservations: boolean;
             /** Results */
             results: components["schemas"]["InspectionResultIn"][];
         };
@@ -7004,6 +7077,33 @@ export interface components {
              */
             is_demo: boolean;
         };
+        /** MessageFailureOut */
+        MessageFailureOut: {
+            /** Id */
+            id: number;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "sms" | "email";
+            /** Recipient */
+            recipient: string;
+            /** Organization Id */
+            organization_id?: number | null;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Last Error */
+            last_error?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Replayable */
+            replayable: boolean;
+        };
         /** MessageResponse */
         MessageResponse: {
             /** Message */
@@ -7113,6 +7213,15 @@ export interface components {
             product_id?: number | null;
             /** Warehouse Id */
             warehouse_id?: number | null;
+        };
+        /** OperationsOverview */
+        OperationsOverview: {
+            /** Pending */
+            pending: number;
+            /** Messages */
+            messages: components["schemas"]["MessageFailureOut"][];
+            /** Tasks */
+            tasks: components["schemas"]["TaskFailureOut"][];
         };
         /** OrderAssignRequest */
         OrderAssignRequest: {
@@ -9565,6 +9674,11 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** ReplayIn */
+        ReplayIn: {
+            /** Reason */
+            reason: string;
+        };
         /** ReplenishmentRuleIn */
         ReplenishmentRuleIn: {
             /** Location Id */
@@ -10946,6 +11060,26 @@ export interface components {
              * @default false
              */
             is_preferred: boolean;
+        };
+        /** TaskFailureOut */
+        TaskFailureOut: {
+            /** Id */
+            id: number;
+            /** Task Name */
+            task_name: string;
+            /** Organization Id */
+            organization_id?: number | null;
+            /** Error */
+            error: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Status */
+            status: string;
+            /** Replayable */
+            replayable: boolean;
         };
         /** TicketDetail */
         TicketDetail: {
@@ -13763,6 +13897,37 @@ export interface operations {
             };
         };
     };
+    re_reserve_orders__order_id__re_reserve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delivery_attempts_orders__order_id__attempts_get: {
         parameters: {
             query?: never;
@@ -14923,6 +15088,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrganizationRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    operations_platform_operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationsOverview"];
+                };
+            };
+        };
+    };
+    retry_message_platform_operations_messages__message_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageFailureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replay_task_platform_operations_tasks__failure_id__replay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                failure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskFailureOut"];
                 };
             };
             /** @description Validation Error */

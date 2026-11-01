@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app.database import db_dependency
 from app.core.http_security import SecurityHeadersMiddleware, build_csp, install_access_log_redaction
@@ -230,6 +230,14 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
     message = next((m for name, m in _CONSTRAINT_MESSAGES.items() if name in str(exc.orig)),
                    "این تغییر با داده‌ای که هم‌زمان ثبت شد تداخل دارد؛ دوباره تلاش کنید.")
     return JSONResponse(status_code=409, content=_error_body(409, message))
+
+
+@app.exception_handler(OperationalError)
+async def database_busy_handler(request: Request, exc: OperationalError):
+    # پایان مهلت قفل یا کوئری (app/database.py): موفقیت ساختگی نشان نمی‌دهیم و کاربر می‌تواند دوباره امتحان کند
+    if type(exc.orig).__name__ in ("LockNotAvailable", "QueryCanceled"):
+        return JSONResponse(status_code=503, content=_error_body(503, "سرور الان مشغول است؛ چند لحظه دیگر دوباره امتحان کنید."))
+    raise exc
 
 
 # ------------------------------------------------------------------------------

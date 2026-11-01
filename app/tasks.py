@@ -27,6 +27,8 @@ from bidi.algorithm import get_display
 
 from sqlalchemy.orm import joinedload, selectinload
 
+from celery.signals import task_failure
+
 from app.celery_app import celery_app
 from app.core.tenancy import set_tenant
 from app.database import SessionLocal
@@ -67,11 +69,38 @@ def _dataframe_to_base64_xlsx(df: pd.DataFrame, sheet_name: str) -> str:
     return base64.b64encode(output.read()).decode("utf-8")
 
 
+class TaskContextError(RuntimeError):
+    """وظیفه بدون سازمان معتبر اجرا نمی‌شود (دوباره هم تلاش نمی‌شود)."""
+
+
 def _tenant_session(organization_id: int):
-    """Session محدود به یک سازمان — گزارش هر سازمان فقط داده‌های خودش را دارد."""
+    """Session محدود به یک سازمان — گزارش هر سازمان فقط داده‌های خودش را دارد. سازمان از ورودی وظیفه دوباره سنجیده می‌شود."""
+    from app.models import Organization
+    if not isinstance(organization_id, int) or isinstance(organization_id, bool) or organization_id <= 0:
+        raise TaskContextError("وظیفه بدون شناسه سازمان معتبر اجرا نمی‌شود.")
     db = SessionLocal()
-    set_tenant(db, organization_id)
+    try:
+        organization = db.get(Organization, organization_id)
+        if organization is None or organization.is_active is False:
+            raise TaskContextError(f"سازمان {organization_id} برای اجرای وظیفه معتبر نیست.")
+        set_tenant(db, organization_id)
+    except Exception:
+        db.close()
+        raise
     return db
+
+
+@task_failure.connect
+def _record_task_failure(sender=None, task_id=None, exception=None, **_):
+    """هر وظیفه شکست‌خورده برای کارکنان پلتفرم دیده می‌شود؛ خطای ثبت نباید خطای اصلی را بپوشاند."""
+    from app.services import outbox_service
+    db = SessionLocal()
+    try:
+        outbox_service.record_failure(db, getattr(sender, "name", "unknown"), exception, task_id=task_id)
+    except Exception:
+        logger.exception("ثبت شکست وظیفه ناموفق بود")
+    finally:
+        db.close()
 
 
 def _inventory_rows(db, warehouse_id=None):
@@ -301,7 +330,7 @@ def recalculate_reorder_points_task():
     return {"organizations": len(org_ids), "inventories": total}
 
 
-def _each_organization(work, label: str) -> dict:
+def _each_organization(work, label: str, task_name: str) -> dict:
     from app.models import Organization
     db = SessionLocal()
     try:
@@ -314,12 +343,25 @@ def _each_organization(work, label: str) -> dict:
         try:
             work(db)
             done += 1
-        except Exception:
+        except Exception as error:
             db.rollback()
             logger.exception("%s سازمان %s ناموفق بود", label, org_id)
+            _record_organization_failure(task_name, error, org_id)
         finally:
             db.close()
     return {"organizations": done}
+
+
+def _record_organization_failure(task_name: str, error: Exception, organization_id: int) -> None:
+    """شکست یک سازمان بقیه را متوقف نمی‌کند، ولی باید دیده شود."""
+    from app.services import outbox_service
+    db = SessionLocal()
+    try:
+        outbox_service.record_failure(db, task_name, error, organization_id=organization_id)
+    except Exception:
+        logger.exception("ثبت شکست وظیفه ناموفق بود")
+    finally:
+        db.close()
 
 
 @celery_app.task(name="tasks.check_replenishment_rules")
@@ -332,7 +374,7 @@ def check_replenishment_rules_task():
         ids = {lid for (lid,) in db.query(ReplenishmentRule.location_id).filter(ReplenishmentRule.is_active.is_(True)).all()}
         replenishment_rule_service.check(db, None, ids)
         db.commit()
-    return _each_organization(work, "تأمین مجدد")
+    return _each_organization(work, "تأمین مجدد", "tasks.check_replenishment_rules")
 
 
 @celery_app.task(name="tasks.detect_exceptions")
@@ -341,14 +383,44 @@ def detect_exceptions_task():
     from app.services import exception_service
     from app.core.tenancy import current_tenant
 
-    return _each_organization(lambda db: exception_service.detect(db, current_tenant(db)), "تشخیص استثنا")
+    return _each_organization(lambda db: exception_service.detect(db, current_tenant(db)), "تشخیص استثنا", "tasks.detect_exceptions")
+
+
+@celery_app.task(name="tasks.reconcile_stock")
+def reconcile_stock_task():
+    """هر ساعت: دفتر گردش، مانده، رزرو و موجودی در راه تطبیق می‌شوند. فقط گزارش می‌دهد و هرگز داده را اصلاح نمی‌کند."""
+    from app.services import exception_service
+    from app.core.tenancy import current_tenant
+
+    return _each_organization(lambda db: exception_service.detect(db, current_tenant(db), reconcile=True), "تطبیق موجودی", "tasks.reconcile_stock")
+
+
+@celery_app.task(name="tasks.publish_messages", soft_time_limit=240, time_limit=280, ignore_result=True)
+def publish_messages_task():
+    """هر ۱۵ ثانیه: پیام‌های موعدرسیده ارسال می‌شوند؛ Lease مانع برداشتن هم‌زمان یک پیام است."""
+    from app.services import outbox_service
+    db = SessionLocal()
+    try:
+        return outbox_service.publish_due(db)
+    finally:
+        db.close()
+
+
+@celery_app.task(name="tasks.purge_operations_records")
+def purge_operations_records_task():
+    from app.services import outbox_service
+    db = SessionLocal()
+    try:
+        return outbox_service.purge_old(db)
+    finally:
+        db.close()
 
 
 @celery_app.task(name="tasks.classify_abc")
 def classify_abc_task():
     """هر هفته: طبقه‌بندی ABC کالاها از ارزش مصرف یک سال اخیر (مبنای دوره شمارش)."""
     from app.services import replenishment_rule_service
-    return _each_organization(lambda db: replenishment_rule_service.classify(db, None), "طبقه‌بندی ABC")
+    return _each_organization(lambda db: replenishment_rule_service.classify(db, None), "طبقه‌بندی ABC", "tasks.classify_abc")
 
 
 # ---------------------------------------------------------------------------
@@ -382,27 +454,30 @@ def generate_report_task(organization_id, user_id, report, fmt, params=None):
     from app.models import User
     db = _tenant_session(organization_id)
     try:
-        return build_report_file(db, organization_id, db.get(User, user_id), report, fmt, params or {})
+        user = db.get(User, user_id)
+        if user is None or user.organization_id != organization_id:
+            raise TaskContextError("سازنده گزارش عضو این سازمان نیست.")
+        return build_report_file(db, organization_id, user, report, fmt, params or {})
     finally:
         db.close()
 
 
 # ---------------------------------------------------------------------------
-# پیامک و ایمیل خودکار (app/services/messaging.py) — با چند تلاش دوباره اگر سرویس بیرونی موقتاً جواب نداد
+# فقط برای پیام‌هایی که پیش از به‌روزرسانی در صف Redis مانده‌اند؛ ارسال تازه از outbound_messages است.
 # ---------------------------------------------------------------------------
-@celery_app.task(name="tasks.send_sms", autoretry_for=(Exception,), retry_backoff=30, max_retries=3)
+@celery_app.task(name="tasks.send_sms", autoretry_for=(Exception,), retry_backoff=30, retry_backoff_max=600, max_retries=3)
 def send_sms_task(mobile: str, text: str):
     from app.services import messaging
     return messaging.deliver_sms(mobile, text)
 
 
-@celery_app.task(name="tasks.send_email", autoretry_for=(Exception,), retry_backoff=30, max_retries=3)
+@celery_app.task(name="tasks.send_email", autoretry_for=(Exception,), retry_backoff=30, retry_backoff_max=600, max_retries=3)
 def send_email_task(to: str, subject: str, text: str):
     from app.services import messaging
     return messaging.deliver_email(to, subject, text)
 
 
-@celery_app.task(name="tasks.reset_demo")
+@celery_app.task(name="tasks.reset_demo", soft_time_limit=900, time_limit=960)
 def reset_demo_task():
     """نسخه نمایشی خصوصی هر ۳۰ دقیقه از روی قالب از نو ساخته می‌شود (تا DEMO_ACCESS_TOKEN تنظیم نشود، کاری نمی‌کند)."""
     from app import demo_db

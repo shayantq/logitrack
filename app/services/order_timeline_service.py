@@ -165,6 +165,8 @@ def _blocker(order, backorders, tickets, eta, open_exception) -> str | None:
     open_backorders = [b for b in backorders if b.status in ("open", "allocated")]
     if open_backorders:
         return f"کمبود موجودی: {fa_digits(str(len(open_backorders)))} قلم معوق"
+    if order.stock_state == "held":
+        return "رزرو به‌خاطر نگه‌داشت کیفی آزاد شده؛ رزرو دوباره لازم است"
     if order.status == "failed" and order.failure_resolution is None:
         return "تحویل ناموفق؛ منتظر تصمیم"
     if order.status == "failed" and order.failure_resolution == "dispute":

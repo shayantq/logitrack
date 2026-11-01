@@ -11,8 +11,9 @@ from app.schemas.organization import (
     OrganizationApproved, OrganizationCreate, OrganizationProfileResponse, OrganizationRequestApprove,
     OrganizationRequestReject, OrganizationRequestResponse, OrganizationStats, OrganizationUpdate,
 )
+from app.schemas.operations_health import MessageFailureOut, OperationsOverview, ReplayIn, TaskFailureOut
 from app.schemas.user import UserResponse
-from app.services import organization_request_service, organization_service
+from app.services import organization_request_service, organization_service, outbox_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -123,5 +124,27 @@ def reject_organization_request(data: OrganizationRequestReject, db: db_dependen
                                 request_id: int = Path(gt=0), reviewer=Depends(platform_admin)):
     try:
         return organization_request_service.reject_request(db, reviewer, request_id, data)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/operations", response_model=OperationsOverview, summary="🩺 پیام‌ها و وظایف پس‌زمینه ناموفق (بدون متن پیام)")
+def operations(db: db_dependency, _=Depends(platform_staff)):
+    return outbox_service.overview(db)
+
+
+@router.post("/operations/messages/{message_id}/retry", response_model=MessageFailureOut, summary="🔁 ارسال دوباره پیام ناموفق غیرحساس")
+def retry_message(data: ReplayIn, db: db_dependency, message_id: int = Path(gt=0), user=Depends(platform_admin)):
+    try:
+        return outbox_service.retry_message(db, user, message_id, data.reason)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/operations/tasks/{failure_id}/replay", response_model=TaskFailureOut, summary="🔁 اجرای دوباره وظیفه دوره‌ای")
+def replay_task(data: ReplayIn, db: db_dependency, failure_id: int = Path(gt=0), user=Depends(platform_admin)):
+    from app.celery_app import celery_app
+    try:
+        return outbox_service.replay_task(db, user, failure_id, data.reason, celery_app.send_task)
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)

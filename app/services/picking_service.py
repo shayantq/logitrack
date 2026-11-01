@@ -453,11 +453,20 @@ def mark_issued(db: Session, order: Order) -> None:
 
 def cancel_for_order(db: Session, user: User | None, order: Order) -> None:
     """لغو سفارش پیش از خروج: سطرهای باز لغو و کالای منتقل‌شده به آماده‌سازی با وظیفه جانمایی به قفسه برمی‌گردد."""
-    from app.services import putaway_service
+    from app.services import exception_service, putaway_service
     staged: dict[tuple, int] = defaultdict(int)
+    lists: set[int] = set()
     for line in db.query(PickLine).filter(PickLine.order_id == order.id, PickLine.issued.is_(False)).all():
+        lists.add(line.pick_list_id)
         if line.status == "open":
             line.status = "canceled"
+        if line.staged_location_id is None and line.picked_quantity:
+            # در دفتر هنوز در همان محل است ولی فیزیکی نزد انباردار است؛ فقط انسان می‌تواند بگوید برگردانده شده
+            location = db.get(Location, line.location_id) if line.location_id else None
+            exception_service.record(db, "pick_return_pending", "pick_line", line.id, organization_id=order.organization_id,
+                                     warehouse_id=line.warehouse_id, actor=user,
+                                     reason=f"برداشت سفارش {order.tracking_code} متوقف شد؛ {line.picked_quantity} عدد را به "
+                                            f"{location.code if location else 'محل اصلی'} برگردانید.")
         if line.staged_location_id is not None and line.picked_quantity:
             staged[(line.product_id, line.warehouse_id, line.staged_location_id, line.lot_number, line.expiry_date)] += line.picked_quantity
         line.issued = True
@@ -467,8 +476,14 @@ def cancel_for_order(db: Session, user: User | None, order: Order) -> None:
                                         quantity=quantity, stock_status=AVAILABLE,
                                         scope={"location_id": location_id, "owner_id": None, "lot_number": lot,
                                                "expiry_date": expiry},
-                                        note=f"برگشت به قفسه: سفارش {order.tracking_code} لغو شد")
+                                        note=f"برگشت به قفسه: برداشت سفارش {order.tracking_code} متوقف شد")
     order.fulfillment_state = "open"
+    # سطر لغوشده دیگر برداشت نمی‌شود (_lock_line)؛ فهرستی که سطر بازی ندارد بسته می‌شود
+    for pick_list in db.query(PickList).filter(PickList.id.in_(lists or {-1})).all():
+        if all(line.status == "canceled" for line in pick_list.lines):
+            pick_list.status, pick_list.completed_at = "canceled", _now()
+        else:
+            _refresh_list(pick_list)
 
 
 # ---------------------------------------------------------------------------

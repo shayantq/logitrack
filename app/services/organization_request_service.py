@@ -57,9 +57,9 @@ def submit_request(db: Session, data: OrganizationRequestCreate, requester_ip: s
         **data.model_dump(exclude={"company_fax"}),
     )
     db.add(request)
+    messaging.organization_request_received(db, request)
     db.commit()
     db.refresh(request)
-    messaging.organization_request_received(request)
     return request
 
 
@@ -141,13 +141,13 @@ def approve_request(db: Session, reviewer: User, request_id: int, data: Organiza
         request.reviewed_at = datetime.now(timezone.utc)
         request.reviewed_by_id = reviewer.id
         request.organization_id = org.id
+        messaging.organization_request_approved(db, request, username, temporary_password)
         db.commit()
         db.refresh(org)
     except Exception:
         db.rollback()
         raise
 
-    messaging.organization_request_approved(request, username, temporary_password)
     return {
         "organization": organization_service.get_organization(db, org.id),
         "admin_username": username,
@@ -161,7 +161,7 @@ def reject_request(db: Session, reviewer: User, request_id: int, data: Organizat
     request.rejection_reason = data.reason
     request.reviewed_at = datetime.now(timezone.utc)
     request.reviewed_by_id = reviewer.id
+    messaging.organization_request_rejected(db, request)
     db.commit()
     db.refresh(request)
-    messaging.organization_request_rejected(request)
     return request

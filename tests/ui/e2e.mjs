@@ -2043,6 +2043,9 @@ await session("productivity-platform", "superadmin", "superadmin123", async page
   await page.fill("[data-testid=search-input]", "قزوین");
   await page.waitForSelector("[data-testid=search-group-organization], [data-testid=search-empty]");
   check("platform", "global search for platform staff", true);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("[data-testid=operations-health]");
+  check("platform", "background health card is visible", true);
 });
 
 // ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------
@@ -2132,6 +2135,32 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
   await page.waitForSelector("[data-testid=exceptions-status]");
   check("reliability", "exception filters live in the URL", (await page.textContent("[data-testid=exceptions-status]")).includes("حل‌شده"));
 });
+// نگه‌داشت کیفی کالای رزروشده: رزرو آزاد، بارگیری بسته، رزرو دوباره از جزئیات سفارش
+{
+  const adminHeaders = { Authorization: `Bearer ${reliabilityAdmin}`, "Content-Type": "application/json" };
+  const held = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین",
+    customer: { name: "مشتری نگه‌داشت", mobile: "09121239879" }, vehicle_id: routeVehicle.id });
+  const item = held.items[0];
+  const position = await apiCall(reliabilityAdmin, "GET", `/inventory/products`);
+  const productRow = position.find(p => p.id === item.product_id);
+  // سنجش بازرسی روی موجودی منهای رزرو است (شامل کالای غیرقابل تخصیص هم می‌شود)
+  const row = productRow.stock_by_warehouse.find(w => w.warehouse_id === held.warehouse_id);
+  const free = row.quantity - row.reserved;
+  const body = { product_id: item.product_id, warehouse_id: held.warehouse_id, from_status: "available",
+    results: [{ status: "quarantine", quantity: Math.max(free, 0) + item.quantity, reason: "بررسی آزمون" }] };
+  const refused = await fetch(`${BASE}/quality/inspections`, { method: "POST", headers: adminHeaders, body: JSON.stringify(body) });
+  check("reliability", "reserved stock is not held without consent", refused.status === 400, String(refused.status));
+  const accepted = await fetch(`${BASE}/quality/inspections`, { method: "POST", headers: adminHeaders, body: JSON.stringify({ ...body, release_reservations: true }) });
+  check("reliability", "holding reserved stock is accepted with consent", accepted.ok, String(accepted.status));
+  const afterHold = await apiCall(reliabilityAdmin, "GET", `/orders/${held.id}`);
+  check("reliability", "affected order becomes held", afterHold.stock_state === "held", afterHold.stock_state);
+  await session("reliability-held", "qazvin_admin", "admin123", async page => {
+    await page.goto(`${BASE}/app/orders?order=${held.id}`);
+    await page.waitForSelector("[data-testid=stock-held]");
+    check("reliability", "held order shows a clear banner", true);
+  });
+}
+
 const redelivered = await (await fetch(`${BASE}/public/track/${failOrder.tracking_code}`)).json();
 check("reliability", "customer sees redelivery text", redelivered.status_text.includes("تلاش دوباره"), redelivered.status_text);
 

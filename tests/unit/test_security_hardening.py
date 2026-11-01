@@ -25,10 +25,10 @@ def test_unconfigured_messaging_never_logs_message_body(channels_off, caplog):
     caplog.set_level(logging.DEBUG)
     request = SimpleNamespace(contact_mobile="09121231087", contact_email="owner@example.com", name="فروشگاه آزمون",
                               contact_name="علی", tracking_code="RQ-1")
-    messaging.organization_request_approved(request, "shop_admin", TEMP_PASSWORD)
+    messaging.organization_request_approved(None, request, "shop_admin", TEMP_PASSWORD)
     user = SimpleNamespace(mobile="09121231087", email="owner@example.com")
-    messaging.password_reset_code(user, OTP, "sms")
-    messaging.password_reset_code(user, OTP, "email")
+    messaging.password_reset_code(None, user, OTP, "sms")
+    messaging.password_reset_code(None, user, OTP, "email")
     messaging.deliver_sms("09121231087", f"رمز موقت: {TEMP_PASSWORD}")
     messaging.deliver_email("owner@example.com", "موضوع", f"کد: {OTP}")
 

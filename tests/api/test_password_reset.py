@@ -23,8 +23,8 @@ def env(api_env, monkeypatch):
     password_reset_request_limiter.reset()
     password_reset_confirm_limiter.reset()
     sent = []
-    monkeypatch.setattr(messaging, "queue_sms", lambda mobile, text: bool(mobile) and not sent.append(("sms", mobile, text)))
-    monkeypatch.setattr(messaging, "queue_email", lambda to, subject, text: bool(to) and not sent.append(("email", to, text)))
+    monkeypatch.setattr(messaging, "queue_sms", lambda db, mobile, text, **_: bool(mobile) and not sent.append(("sms", mobile, text)))
+    monkeypatch.setattr(messaging, "queue_email", lambda db, to, subject, text, **_: bool(to) and not sent.append(("email", to, text)))
     db = Session()
     org = Organization(name="فروشگاه آزمون", slug="test")
     db.add(org)

@@ -296,8 +296,8 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
         _add_history(db, order, None, status, user,
                      "ثبت سفارش" + (f" و تخصیص خودرو {vehicle.license_plate or vehicle.id}" if vehicle else ""))
         notification_service.order_assigned(db, order)
+        messaging.order_created(db, order, _organization_name(db, order))
         db.commit()
-        messaging.order_created(order, _organization_name(db, order))
         return order
     except Exception:
         db.rollback()
@@ -556,7 +556,7 @@ def _restore_stock(db: Session, order: Order, user: User | None, reason: str) ->
     اگر از انبار خارج شده بود، با «سند برگشت از سفارش» و وضعیت «در انتظار بازرسی» به انبار مبدأ برمی‌گردد —
     کالای برگشتی پیش از بازرسی کیفی قابل تخصیص نیست (فصل ۱۵).
     """
-    if order.stock_state == "reserved":
+    if order.stock_state in ("reserved", "held"):
         for reservation in allocation_service.active_for(db, "order", order.id):
             allocation_service.release(db, reservation, user=user, reason=reason)
         from app.services import picking_service
@@ -635,6 +635,8 @@ def _apply_status(db: Session, order: Order, new_status: str, user: User | None,
     if new_status in ('delivered', 'failed'):
         _record_attempt(db, order, new_status, details)
     if new_status in ISSUE_STATUSES:
+        if order.stock_state == 'held':
+            raise ConflictError(f"رزرو سفارش {order.tracking_code} به‌خاطر نگه‌داشت کیفی آزاد شده است؛ پیش از بارگیری رزرو دوباره بزنید.")
         _issue_stock(db, order, user)
     if new_status in RESTOCK_STATUSES:
         _restore_stock(db, order, user, f"برگشت به انبار: سفارش {order.tracking_code} {STATUS_LABELS[new_status]}")
@@ -698,10 +700,58 @@ def update_order_status(db: Session, user: User, order_id: int, status_request: 
 
     try:
         _apply_status(db, target_order, new_status, user, status_request.note, status_request)
-        db.commit()
         if new_status == 'delivered':
-            messaging.order_delivered(target_order, _organization_name(db, target_order))
+            messaging.order_delivered(db, target_order, _organization_name(db, target_order))
+        db.commit()
         return get_order(db, user, target_order.id)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def hold_for_quality(db: Session, user: User, order: Order, reservation: StockReservation, reason: str) -> None:
+    """
+    کالای رزروشده در بازرسی کنار گذاشته شد (بدون commit): رزرو آزاد، برداشت و محموله باز متوقف و سفارش «نگه‌داشته» می‌شود
+    تا بارگیری نشود. اقلام دیگر سفارش رزروشان را نگه می‌دارند. با re_reserve برمی‌گردد.
+    """
+    from app.services import exception_service, picking_service
+    allocation_service.release(db, reservation, user=user, reason=reason)
+    picking_service.cancel_for_order(db, user, order)
+    shipment = db.get(Shipment, order.shipment_id) if order.shipment_id else None
+    if shipment is not None and shipment.status == 'open':
+        order.shipment_id = None
+    order.stock_state = 'held'
+    _add_history(db, order, order.status, order.status, user, f"نگه‌داشت کیفی: {reason}"[:500])
+    exception_service.record(db, "order_stock_held", "order", order.id, organization_id=order.organization_id,
+                             warehouse_id=order.warehouse_id, actor=user,
+                             reason=f"رزرو سفارش {order.tracking_code} به‌خاطر نگه‌داشت کیفی آزاد شد و تا رزرو دوباره بارگیری نمی‌شود.")
+
+
+def re_reserve(db: Session, user: User, order_id: int) -> Order:
+    """رزرو دوباره سفارش نگه‌داشته. اگر موجودی کافی نباشد هیچ چیزی تغییر نمی‌کند."""
+    if user.role not in ('org_admin', 'warehouse_manager'):
+        raise ForbiddenError()
+    try:
+        order = db.query(Order).options(selectinload(Order.items)).filter(Order.id == order_id).with_for_update().first()
+        if order is None:
+            raise NotFoundError('سفارش مورد نظر یافت نشد.')
+        if user.role == 'warehouse_manager' and order.warehouse_id != user.warehouse_id:
+            raise ForbiddenError('این سفارش از انبار شما ارسال نمی‌شود.')
+        if order.stock_state != 'held':
+            raise ConflictError('این سفارش نگه‌داشته نیست.')
+        held = {r.product_id: r.quantity for r in allocation_service.active_for(db, "order", order.id)}
+        for item in sorted(order.items, key=lambda i: i.product_id or 0):
+            missing = item.quantity - held.get(item.product_id, 0)
+            if not item.product_id or missing <= 0:
+                continue
+            inventory = stock_ledger.lock_bucket(db, item.product_id, order.warehouse_id, AVAILABLE, create=False)
+            if inventory is None:
+                raise ConflictError(f"موجودی سالم «{item.product_name}» در این انبار نیست.")
+            allocation_service.reserve(db, inventory, missing, reference_type="order", reference_id=order.id, user=user)
+        order.stock_state = 'reserved'
+        _add_history(db, order, order.status, order.status, user, "رزرو دوباره پس از نگه‌داشت کیفی")
+        db.commit()
+        return get_order(db, user, order.id)
     except Exception:
         db.rollback()
         raise

@@ -68,6 +68,11 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
     onSuccess: o => { toast.success("خودرو به سفارش تخصیص داده شد."); refresh(o); },
     onError: e => toast.error(errorMessage(e)),
   });
+  const reReserve = useMutation({
+    mutationFn: () => unwrap(api.POST("/orders/{order_id}/re-reserve", { params: { path: { order_id: orderId! } } })),
+    onSuccess: o => { toast.success("سفارش دوباره رزرو شد."); refresh(o); },
+    onError: e => toast.error(errorMessage(e)),
+  });
   const remove = useMutation({
     mutationFn: () => unwrap(api.DELETE("/orders/{order_id}", { params: { path: { order_id: orderId! } } })),
     onSuccess: () => { toast.success("سفارش حذف شد."); refresh(); onClose(); },
@@ -155,6 +160,13 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
               </Select>
               <Input placeholder="توضیح (اختیاری)" value={note} onChange={e => setNote(e.target.value)} />
               <Button disabled={!nextStatus} loading={changeStatus.isPending} onClick={() => changeStatus.mutate()} data-testid="apply-status">ثبت</Button>
+            </div>
+          )}
+
+          {order.stock_state === "held" && (isAdmin || me.role === "warehouse_manager") && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning-soft/40 p-4 text-sm" data-testid="stock-held">
+              <span className="font-semibold text-warning">رزرو این سفارش به‌خاطر نگه‌داشت کیفی آزاد شده و تا رزرو دوباره بارگیری نمی‌شود.</span>
+              <Button size="sm" loading={reReserve.isPending} onClick={() => reReserve.mutate()} data-testid="re-reserve">رزرو دوباره</Button>
             </div>
           )}
 

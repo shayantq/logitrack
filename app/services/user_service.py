@@ -495,8 +495,8 @@ def request_password_reset(db: Session, identifier: str) -> None:
     audit_service.log(db, None, "auth.reset_requested",
                       f"درخواست کد بازیابی رمز ({'پیامک' if channel == 'sms' else 'ایمیل'})", target=user,
                       organization_id=user.organization_id)
+    messaging.password_reset_code(db, user, code, channel)
     db.commit()
-    messaging.password_reset_code(user, code, channel)
 
 
 INVALID_RESET = "کد نامعتبر است یا منقضی شده؛ دوباره درخواست کد بدهید."

@@ -3,10 +3,14 @@
   • SavedView — نمای ذخیره‌شده یک فهرست (فیلترهای همان آدرس صفحه)؛ برای خود کاربر یا مشترک با یک نقش
   • DeliveryAttempt — هر تلاش تحویل: مدرک تحویل موفق، یا دلیل و تعیین تکلیف تلاش ناموفق
   • OperationException — کاری که از روند عادی خارج شده، با مسئول، مهلت و تاریخچه
+  • OutboundMessage — پیامک و ایمیل در صف پایدار (همان تراکنش عملیات)
+  • TaskFailure — وظیفه پس‌زمینه شکست‌خورده، برای دیدن و اجرای دوباره
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import (
+    JSON, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
+)
 from sqlalchemy.orm import relationship
 
 from app.core.tenancy import TenantScoped
@@ -119,3 +123,52 @@ class OperationExceptionEvent(TenantScoped, Base):
     action = Column(String(120), nullable=False)
     note = Column(String(500), nullable=True)
     at = Column(DateTime, nullable=False, default=_now)
+
+
+MESSAGE_ACTIVE_STATUSES = ("pending", "sending")
+
+
+class OutboundMessage(Base):
+    """
+    پیام بیرونی در صف پایدار. سازمانی نیست چون پیام‌های درخواست سازمان و بازیابی رمز به هیچ سازمانی وابسته نیستند
+    و ناشر برای همه سازمان‌ها کار می‌کند. متن فقط تا پایان ارسال می‌ماند (app/services/outbox_service.py).
+    """
+    __tablename__ = "outbound_messages"
+    __table_args__ = (
+        CheckConstraint("channel IN ('sms', 'email')", name="ck_outbound_messages_channel"),
+        CheckConstraint("status IN ('pending', 'sending', 'sent', 'skipped', 'failed', 'expired')", name="ck_outbound_messages_status"),
+        Index("ix_outbound_messages_due", "status", "next_attempt_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel = Column(String(8), nullable=False)
+    recipient = Column(String(254), nullable=False)
+    subject = Column(String(300), nullable=True)
+    body = Column(Text, nullable=True)
+    sensitive = Column(Boolean, nullable=False, default=False, server_default="false")
+    dedupe_key = Column(String(120), nullable=True, unique=True)
+    status = Column(String(16), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at = Column(DateTime, nullable=False, default=_now)
+    lease_until = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+    sent_at = Column(DateTime, nullable=True)
+    last_error = Column(String(300), nullable=True)
+
+
+class TaskFailure(Base):
+    """وظیفه‌ای که شکست خورد. ورودی‌های وظیفه عمداً ذخیره نمی‌شوند تا داده شخصی اینجا نیاید."""
+    __tablename__ = "task_failures"
+    __table_args__ = (CheckConstraint("status IN ('failed', 'replayed')", name="ck_task_failures_status"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_name = Column(String(80), nullable=False, index=True)
+    task_id = Column(String(64), nullable=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    error = Column(String(300), nullable=False)
+    status = Column(String(16), nullable=False, default="failed", index=True)
+    created_at = Column(DateTime, nullable=False, default=_now, index=True)
+    replayed_at = Column(DateTime, nullable=True)
+    replayed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

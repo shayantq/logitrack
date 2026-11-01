@@ -13,7 +13,18 @@ SQLALCHEMY_DATABASE_URL = os.getenv('DATABASE_URL', "postgresql+psycopg://postgr
 if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
+def connect_args(url: str) -> dict:
+    """سقف زمان هر کوئری، انتظار قفل و تراکنش بیکار (میلی‌ثانیه)؛ مایگریشن و ساخت دمو موتور جدای خودشان را دارند."""
+    if "postgresql" not in url:
+        return {}
+    statement = os.getenv("DB_STATEMENT_TIMEOUT_MS", "30000")
+    lock = os.getenv("DB_LOCK_TIMEOUT_MS", "10000")
+    idle = os.getenv("DB_IDLE_TX_TIMEOUT_MS", "120000")
+    return {"options": f"-c statement_timeout={statement} -c lock_timeout={lock} -c idle_in_transaction_session_timeout={idle}"}
+
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args(SQLALCHEMY_DATABASE_URL))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

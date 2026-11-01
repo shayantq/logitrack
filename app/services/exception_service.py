@@ -10,6 +10,7 @@
 آستانه‌ها طبق تصمیم ۷ سند ثابت در کد هستند. این‌ها با داده فعلی قابل تشخیص نیستند: تأخیر واقعی در مسیر و خرابی
 خودرو (GPS نداریم)، و مهلت پاسخ تیکت بر اساس SLA زمانی (SLA تعریف نشده است).
 """
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -17,14 +18,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.iran import fa_digits
-from app.core.wms import PENDING
+from app.core.wms import IN_TRANSIT, PENDING
 from app.models import (
     ACTIVE_ORDER_STATUSES, DriverProfile, Inventory, Order, StockMovement, Stocktake, StocktakeLine, Ticket, User,
 )
-from app.models_fulfillment import Backorder, PickLine, TransferOrder
+from app.models_fulfillment import Backorder, PickLine, TransferOrder, TransferOrderLine
 from app.models_operations import InboundReceipt, InboundReceiptLine, PutawayTask
 from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, OperationException, OperationExceptionEvent
-from app.services import assignee_service, dispatch_service, eta_service, notification_service
+from app.models_wms import StockReservation
+from app.services import assignee_service, dispatch_service, eta_service, notification_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
 STAFF = ("org_admin", "warehouse_manager")
@@ -49,7 +51,16 @@ KINDS = {
     "driver_ineligible": ("راننده یا خودرو دیگر واجد شرایط نیست", "fleet", "critical", "سفارش را به راننده دیگری بسپارید."),
     "ticket_escalated_waiting": ("تیکت ارجاع‌شده منتظر پاسخ", "support", "medium", "با پشتیبانی پسینه پیگیری کنید."),
     "stocktake_variance": ("انبارگردانی با اختلاف منتظر تأیید", "management", "medium", "اختلاف‌ها را بررسی و تأیید کنید."),
+    "stock_mismatch": ("مغایرت دفتر گردش و مانده", "warehouse", "critical", "علت را بررسی کنید و با سند اصلاحی رفع کنید؛ سیستم خودکار اصلاح نمی‌کند."),
+    "reservation_orphan": ("رزرو باز برای سفارش پایان‌یافته", "warehouse", "high", "علت را بررسی کنید؛ این رزرو موجودی آزاد را کم نشان می‌دهد."),
+    "transit_mismatch": ("مغایرت موجودی در راه با انتقال‌ها", "warehouse", "high", "انتقال‌های باز این کالا را با موجودی در راه مقایسه کنید."),
+    "order_stock_held": ("سفارش بدون رزرو به‌خاطر نگه‌داشت کیفی", "warehouse", "high", "پس از تأمین کالا رزرو دوباره بزنید یا سفارش را لغو کنید."),
+    "pick_return_pending": ("کالای برداشت‌شده باید به قفسه برگردد", "warehouse", "medium", "کالا را به محل ذکرشده برگردانید و این مورد را ببندید."),
 }
+# فقط در اجرای تطبیق سنجیده می‌شوند؛ اجرای عادی نباید آن‌ها را به‌اشتباه بسته فرض کند
+RECONCILE_KINDS = {"stock_mismatch", "reservation_orphan", "transit_mismatch"}
+# با رویداد ثبت می‌شوند و فقط انسان می‌تواند بگوید کار فیزیکی انجام شده است
+MANUAL_KINDS = {"pick_return_pending"}
 TEAM_LABELS = {"warehouse": "انبار", "fleet": "ناوگان", "support": "پشتیبانی", "management": "مدیریت"}
 SEVERITY_LABELS = {"low": "کم", "medium": "متوسط", "high": "زیاد", "critical": "بحرانی"}
 STATUS_LABELS = {"open": "باز", "in_progress": "در حال رسیدگی", "waiting": "منتظر", "resolved": "حل‌شده", "merged": "ادغام‌شده"}
@@ -91,6 +102,9 @@ def _orders(db: Session, now: datetime) -> list[Found]:
             found.append(Found("order_failed_unresolved", "order", o.id, o.warehouse_id,
                                f"تحویل سفارش {o.tracking_code} ناموفق بود و بیش از {_hours(FAILED_UNRESOLVED)} ساعت بی‌تکلیف مانده است.",
                                now))
+    for o in db.query(Order).filter(Order.stock_state == "held", Order.status.in_((*ACTIVE_ORDER_STATUSES, "failed"))).all():
+        found.append(Found("order_stock_held", "order", o.id, o.warehouse_id,
+                           f"رزرو سفارش {o.tracking_code} به‌خاطر نگه‌داشت کیفی آزاد شده و تا رزرو دوباره بارگیری نمی‌شود."))
     active = db.query(Order).filter(Order.status.in_(ACTIVE_ORDER_STATUSES), Order.driver_id.is_not(None)).all()
     driver_ids = {o.driver_id for o in active}
     drivers = {u.id: u for u in db.query(User).filter(User.id.in_(driver_ids or {-1})).all()}
@@ -156,15 +170,83 @@ def _others(db: Session, now: datetime) -> list[Found]:
     return found
 
 
+def _reconcile(db: Session) -> list[Found]:
+    """تطبیق موجودی. فقط گزارش می‌دهد و هیچ داده‌ای را عوض نمی‌کند."""
+    found = []
+    inventories = {i.id: i for i in db.query(Inventory).all()}
+    for row in stock_ledger.find_mismatches(db):
+        if row["kind"] == "inventory":
+            found.append(Found("stock_mismatch", "inventory", row["inventory_id"], row["warehouse_id"],
+                               f"موجودی {row['quantity']}، جمع گردش {row['ledger_total']}، جمع ریز {row['detail_total']}، "
+                               f"رزرو {row['reserved_quantity']} در برابر رزرو فعال {row['reserved_total']}."))
+        elif row["kind"] == "balance":
+            found.append(Found("stock_mismatch", "balance", row["balance_id"], None,
+                               f"مانده ردیف ریز {row['quantity']} با جمع گردش‌هایش {row['ledger_total']} برابر نیست."))
+        else:
+            found.append(Found("stock_mismatch", "movement", row["movement_id"], None,
+                               f"گردش {row['quantity_change']} با جمع ردیف‌های ریزش {row['lines_total']} برابر نیست."))
+
+    reservations = db.query(StockReservation).filter(StockReservation.status == "active",
+                                                     StockReservation.reference_type.in_(("order", "backorder"))).all()
+    orders = {o.id: o for o in db.query(Order).filter(Order.id.in_(
+        {r.reference_id for r in reservations if r.reference_type == "order"} or {-1})).all()}
+    backorders = {b.id: b for b in db.query(Backorder).filter(Backorder.id.in_(
+        {r.reference_id for r in reservations if r.reference_type == "backorder"} or {-1})).all()}
+    for r in reservations:
+        if r.reference_type == "order":
+            order = orders.get(r.reference_id)
+            stale = (order is None or order.status in ("canceled", "expired", "delivered")
+                     or (order.status == "failed" and order.failure_resolution in ("return_to_warehouse", "legacy")))
+            label = f"سفارش {order.tracking_code if order else r.reference_id}"
+        else:
+            backorder = backorders.get(r.reference_id)
+            stale = backorder is None or backorder.status != "allocated"
+            label = f"سفارش معوق {r.reference_id}"
+        if stale:
+            found.append(Found("reservation_orphan", "reservation", r.id, r.warehouse_id,
+                               f"{fa_digits(str(r.quantity))} عدد برای {label} رزرو مانده در حالی که کار آن تمام شده است."))
+
+    expected: dict[tuple, int] = defaultdict(int)
+    lines = db.query(TransferOrderLine, TransferOrder.to_warehouse_id).join(TransferOrder, TransferOrder.id == TransferOrderLine.transfer_id) \
+        .filter(TransferOrder.status == "in_transit").all()
+    for line, warehouse_id in lines:
+        expected[(line.product_id, warehouse_id)] += line.in_transit
+    actual = {(i.product_id, i.warehouse_id): i for i in inventories.values() if i.stock_status == IN_TRANSIT}
+    for key in set(expected) | set(actual):
+        row = actual.get(key)
+        quantity = row.quantity if row else 0
+        if quantity != expected.get(key, 0):
+            found.append(Found("transit_mismatch", "inventory" if row else "product", row.id if row else key[0], key[1],
+                               f"موجودی در راه {fa_digits(str(quantity))}، ولی جمع انتقال‌های باز {fa_digits(str(expected.get(key, 0)))} است."))
+    return found
+
+
+def record(db: Session, kind: str, entity_type: str, entity_id: int, *, organization_id: int, warehouse_id: int | None, reason: str,
+           actor: User | None = None) -> None:
+    """ثبت فوری هنگام رویداد (بدون commit)؛ اگر مورد باز هست چیز تازه‌ای ساخته نمی‌شود."""
+    if db.query(OperationException.id).filter(OperationException.kind == kind, OperationException.entity_type == entity_type,
+                                              OperationException.entity_id == entity_id,
+                                              OperationException.status.in_(ACTIVE_EXCEPTION_STATUSES)).first():
+        return
+    _, team, severity, action = KINDS[kind]
+    item = OperationException(organization_id=organization_id, kind=kind, entity_type=entity_type, entity_id=entity_id,
+                              warehouse_id=warehouse_id, severity=severity, team=team, status="open", opened_at=_now(),
+                              trigger_reason=reason[:300], suggested_action=action)
+    db.add(item)
+    db.flush()
+    _add_event(db, item, actor, "ثبت هنگام رویداد")
+
+
 def _add_event(db: Session, item: OperationException, actor: User | None, action: str, note: str | None = None) -> None:
     db.add(OperationExceptionEvent(organization_id=item.organization_id, exception_id=item.id, actor_id=actor.id if actor else None,
                                    action=action[:120], note=note, at=_now()))
 
 
-def detect(db: Session, organization_id: int, now: datetime | None = None) -> dict:
-    """همه انواع را بررسی می‌کند و باز/بسته می‌کند؛ commit می‌زند."""
+def detect(db: Session, organization_id: int, now: datetime | None = None, *, reconcile: bool = False) -> dict:
+    """همه انواع را بررسی می‌کند و باز/بسته می‌کند؛ commit می‌زند. reconcile: تطبیق موجودی هم اجرا شود."""
     now = now or _now()
-    found = {(f.kind, f.entity_type, f.entity_id): f for f in _orders(db, now) + _warehouse(db, now) + _others(db, now)}
+    candidates = _orders(db, now) + _warehouse(db, now) + _others(db, now) + (_reconcile(db) if reconcile else [])
+    found = {(f.kind, f.entity_type, f.entity_id): f for f in candidates}
     active = db.query(OperationException).filter(OperationException.status.in_(ACTIVE_EXCEPTION_STATUSES)).all()
     active_keys = {(e.kind, e.entity_type, e.entity_id) for e in active}
     decided = {(e.kind, e.entity_type, e.entity_id) for e in db.query(OperationException).filter(
@@ -172,6 +254,8 @@ def detect(db: Session, organization_id: int, now: datetime | None = None) -> di
 
     closed = 0
     for item in active:
+        if item.kind in MANUAL_KINDS or (item.kind in RECONCILE_KINDS and not reconcile):
+            continue
         if (item.kind, item.entity_type, item.entity_id) not in found:
             item.status, item.closed_at, item.resolution = "resolved", now, "رفع خودکار: شرط دیگر برقرار نیست."
             _add_event(db, item, None, "حل‌شده (سیستم)")
@@ -211,7 +295,8 @@ def _link(item: OperationException) -> str | None:
     return {
         "order": f"/app/orders?order={item.entity_id}", "backorder": "/app/backorders", "receipt": f"/app/receipts?receipt={item.entity_id}",
         "inventory": "/app/quality", "putaway": "/app/putaway", "pick_line": "/app/picking", "transfer": "/app/transfers?status=in_transit",
-        "ticket": f"/app/tickets/{item.entity_id}", "stocktake": "/app/stocktakes",
+        "ticket": f"/app/tickets/{item.entity_id}", "stocktake": "/app/stocktakes", "balance": "/app/ledger", "movement": "/app/ledger",
+        "reservation": "/app/inventory", "product": "/app/transfers?status=in_transit",
     }.get(item.entity_type)
 
 
@@ -325,7 +410,7 @@ def update(db: Session, user: User, exception_id: int, data) -> dict:
 
 def scan(db: Session, user: User) -> dict:
     _ensure_staff(user)
-    return detect(db, user.organization_id)
+    return detect(db, user.organization_id, reconcile=True)
 
 
 def active_for_order(db: Session, order_id: int) -> list[OperationException]:
