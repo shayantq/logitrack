@@ -153,6 +153,8 @@ def _close(reservation: StockReservation, status: str, user: User | None, reason
 
 def release(db: Session, reservation: StockReservation, *, user: User | None = None, reason: str | None = None) -> None:
     _close(reservation, "released", user, reason)
+    from app.services import replenishment_rule_service
+    replenishment_rule_service.check_product(db, user, reservation.product_id, reservation.warehouse_id)
 
 
 def transfer(db: Session, reservation: StockReservation, *, reference_type: str, reference_id: int,

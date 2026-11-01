@@ -11,8 +11,8 @@ import { faDate, faNumber, faShortDateTime } from "@/lib/format";
 import { Link } from "react-router-dom";
 import { EMPLOYMENT, WEEK, hhmm, isoDate, pyWeekday } from "@/lib/schedule";
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, cn } from "@/ui/primitives";
-import { promptDialog } from "@/ui/dialogs";
 import { useDeepLink } from "@/hooks/useDeepLink";
+import { DeliveryOutcomeModal, type Outcome } from "./driver/DeliveryOutcomeModal";
 
 /** مراحل سفر از دید راننده */
 const STEPS: { status: OrderStatus; label: string }[] = [
@@ -24,7 +24,6 @@ const NEXT_STEPS: Partial<Record<OrderStatus, [OrderStatus, string, "primary" | 
   picking_up: [["picked_up", "بار را تحویل گرفتم", "primary"]],
   // تحویل فقط پس از ثبت حرکت — تا مسیر روی نقشه و زمان سفر ثبت شود
   picked_up: [["in_transit", "حرکت به سمت مقصد", "primary"]],
-  in_transit: [["delivered", "تحویل داده شد", "primary"]],
 };
 const DRIVER_VEHICLE_STATUSES = ["available", "on_route", "maintenance", "inactive"] as const;
 
@@ -57,7 +56,15 @@ function OrderCard({ order, locked = false, flash = false }: { order: Schemas["O
   // سفارش روزهای آینده تا روز تحویل قفل است (سرور هم همین را اجبار می‌کند)
   const steps = locked ? [] : NEXT_STEPS[order.status as OrderStatus] ?? [];
   const canFail = !locked && ["assigned", "picking_up", "picked_up", "in_transit"].includes(order.status);
+  const canDeliver = !locked && order.status === "in_transit";
   const [showRoute, setShowRoute] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const outcomeSaved = () => {
+    setOutcome(null);
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
+    queryClient.invalidateQueries({ queryKey: ["vehicles"] });
+    queryClient.invalidateQueries({ queryKey: ["action-center"] });
+  };
 
   return (
     <Card className={cn("overflow-hidden", flash && "focus-flash")} data-testid="driver-order" data-focus={`order-${order.id}`}>
@@ -97,17 +104,16 @@ function OrderCard({ order, locked = false, flash = false }: { order: Schemas["O
           <Lock className="size-4 shrink-0" />این سفارش برای {faDate(order.delivery_window_start)} است؛ از همان روز می‌توانید بارگیری و تحویل را ثبت کنید.
         </div>
       )}
-      {(steps.length > 0 || canFail) && (
+      {(steps.length > 0 || canFail || canDeliver) && (
         <div className="flex flex-wrap gap-2 border-t border-border bg-surface-2 p-4">
           {steps.map(([status, label, variant]) => (
             <Button key={status} variant={variant} className="flex-1" loading={change.isPending} onClick={() => change.mutate({ status, note: null })}>{label}</Button>
           ))}
-          {canFail && <Button variant="outline-danger" onClick={() => {
-            promptDialog({ title: "ثبت تحویل ناموفق", label: "علت عدم تحویل", placeholder: "مثلاً مشتری در دسترس نبود", required: false,
-              multiline: true, confirmLabel: "ثبت ناموفق", danger: true }).then(note => { if (note !== null) change.mutate({ status: "failed", note: note || null }); });
-          }}>ناموفق</Button>}
+          {canDeliver && <Button className="flex-1" onClick={() => setOutcome("delivered")} data-testid="driver-deliver">تحویل داده شد</Button>}
+          {canFail && <Button variant="outline-danger" onClick={() => setOutcome("failed")} data-testid="driver-fail">ناموفق</Button>}
         </div>
       )}
+      <DeliveryOutcomeModal order={order} outcome={outcome} onClose={() => setOutcome(null)} onSaved={outcomeSaved} />
     </Card>
   );
 }

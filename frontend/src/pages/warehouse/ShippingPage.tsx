@@ -18,6 +18,34 @@ import { WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./
 type QueueOrder = Schemas["PackingQueueOut"];
 type Slip = Schemas["PackingSlipOut"];
 
+function UsageBar({ label, pct, value, limit, unit }: { label: string; pct: number | null | undefined; value: number; limit: number | null | undefined; unit: string }) {
+  const over = (pct ?? 0) > 100;
+  return (
+    <div className="min-w-48 flex-1">
+      <div className="mb-1 flex justify-between gap-2 text-xs">
+        <span className="text-muted">{label}</span>
+        <span className={over ? "font-semibold text-danger" : ""}>{faNumber(value)}{limit ? ` از ${faNumber(limit)}` : ""} {unit}{pct != null && ` (٪${faNumber(pct)})`}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-surface-2"><div className={`h-full rounded-full ${over ? "bg-danger" : "bg-brand"}`} style={{ width: `${Math.min(pct ?? 0, 100)}%` }} /></div>
+    </div>
+  );
+}
+
+/** خلاصه ظرفیت پیش از ساخت محموله: همان سنجشی که هنگام ساخت و تحویل به راننده اجرا می‌شود */
+function CapacitySummary({ data }: { data: Schemas["ShipmentPreviewOut"] }) {
+  return (
+    <div className="basis-full space-y-2 rounded-xl border border-border bg-surface-2 p-3" data-testid="shipment-preview" data-ok={data.ok}>
+      <div className="flex flex-wrap gap-4">
+        <UsageBar label="وزن" pct={data.weight_pct} value={data.weight_kg + data.other_weight_kg} limit={data.max_weight_kg} unit="کیلوگرم" />
+        <UsageBar label="حجم" pct={data.volume_pct} value={data.volume_m3 + data.other_volume_m3} limit={data.max_volume_m3} unit="مترمکعب" />
+      </div>
+      {(data.other_weight_kg > 0 || data.other_volume_m3 > 0) && <p className="text-xs text-muted">شامل بار محموله‌های باز دیگر همین خودرو</p>}
+      {data.message && <p className="text-sm font-medium text-danger">{data.message}</p>}
+      {data.over_orders.length > 0 && <p className="text-xs text-danger" data-testid="shipment-over">سبب اضافه‌بار: {data.over_orders.map(o => o.tracking_code).join("، ")}</p>}
+    </div>
+  );
+}
+
 export default function ShippingPage() {
   const toast = useToast();
   const invalidate = useInvalidateOperations();
@@ -55,6 +83,11 @@ export default function ShippingPage() {
     onError: e => toast.error(errorMessage(e)),
   });
   const packed = (queue.data ?? []).filter(o => o.fulfillment_state === "packed" && !o.shipment_id);
+  const preview = useQuery({
+    queryKey: ["shipment-preview", warehouseId, vehicle, selected],
+    queryFn: () => unwrap(api.POST("/shipping/shipments/preview", { body: { warehouse_id: warehouseId, vehicle_id: Number(vehicle), order_ids: selected } })),
+    enabled: !!vehicle && selected.length > 0,
+  });
 
   return (
     <>
@@ -104,6 +137,7 @@ export default function ShippingPage() {
             <Button icon={<Truck className="size-4" />} disabled={!vehicle || !selected.length} loading={create.isPending} onClick={() => create.mutate()} data-testid="shipment-create">
               محموله با {faNumber(selected.length)} سفارش
             </Button>
+            {preview.data && <CapacitySummary data={preview.data} />}
           </div>
         )}
       </Card>

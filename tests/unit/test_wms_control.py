@@ -293,7 +293,7 @@ def test_kpi_dashboard_and_new_reports(site):
     stocktake_service.approve(db, admin, st["id"], {})
     data = analytics_service.kpis(db, admin)
     by_key = {k["key"]: k for k in data["kpis"]}
-    assert len(data["kpis"]) == 9
+    assert len(data["kpis"]) == 10
     assert by_key["inventory_accuracy"]["value"] == 100.0 and by_key["inventory_accuracy"]["status"] == "good"
     assert by_key["capacity_utilization"]["value"] == 50.0                 # ۱ از ۲ خانه نگهداری
     assert len(data["trend"]) == 30 and data["snapshot"]["on_hand_units"] == 20

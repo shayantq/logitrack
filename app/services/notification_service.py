@@ -36,6 +36,7 @@ KINDS = {
     "application_result": ("drivers", "success"),
     "request_result": ("drivers", "success"),
     "low_rating": ("drivers", "danger"),
+    "exception_opened": ("orders", "warning"),
 }
 RETENTION_DAYS = 90
 LIST_LIMIT = 60
@@ -248,10 +249,10 @@ def _order_details(db: Session, order: Order) -> list[tuple[str, object]]:
 
 
 def order_event(db: Session, order: Order, status: str, actor: User | None, note: str | None) -> None:
-    """سفارش ناموفق یا منقضی ← ادمین و مدیر انبار مبدأ."""
+    """سفارش ناموفق یا منقضی ← ادمین و مدیر انبار مبدأ؛ تکرار یک رویداد برای یک سفارش همان اعلان را تازه می‌کند."""
     if status == "failed":
         kind, title = "order_failed", "تحویل سفارش ناموفق بود"
-        message = f"سفارش {order.tracking_code} به «{order.recipient_name or 'گیرنده'}» تحویل داده نشد؛ کالاها به انبار برگشت."
+        message = f"سفارش {order.tracking_code} به «{order.recipient_name or 'گیرنده'}» تحویل داده نشد و منتظر تصمیم شماست (تحویل دوباره، برگشت به انبار یا اختلاف)."
     elif status == "expired":
         kind, title = "order_expired", "سفارش منقضی شد"
         message = f"بازه تحویل سفارش {order.tracking_code} گذشت و سفارش ارسال نشد؛ موجودی به انبار برگشت و خودرو آزاد شد."
@@ -260,6 +261,7 @@ def order_event(db: Session, order: Order, status: str, actor: User | None, note
     reason = note if status == "failed" else None
     notify(db, organization_id=order.organization_id, kind=kind, title=title, message=message,
            link=f"/app/orders?order={order.id}", warehouse_id=order.warehouse_id, actor=actor,
+           dedupe_key=f"order:{order.id}:{status}",
            details=_order_details(db, order) + [("علت", _preview(reason, 80) if reason else None)])
 
 
@@ -268,6 +270,7 @@ def order_assigned(db: Session, order: Order) -> None:
     if not order.driver_id:
         return
     notify(db, organization_id=order.organization_id, kind="order_assigned", user_id=order.driver_id,
+           dedupe_key=f"order:{order.id}:assigned:{order.driver_id}",
            title="سفارش تازه به شما سپرده شد",
            message=f"سفارش {order.tracking_code} برای تحویل در {order.destination_city} — {_local_time(order.delivery_window_start)}.",
            link="/app/driver", severity="danger" if order.priority else "info",

@@ -9,7 +9,8 @@
   • ماشین وضعیت و تاریخچه کامل تغییرات وضعیت
   • وضعیت کالای سفارش (stock_state) جدا از وضعیت حمل:
         ثبت ← رزرو | بارگیری ← حواله خروج (مصرف رزرو) | لغو/انقضا قبل از بارگیری ← آزادسازی رزرو
-        عدم تحویل بعد از بارگیری ← سند برگشت از سفارش
+        لغو/انقضا/«برگشت به انبار» بعد از بارگیری ← سند برگشت از سفارش
+  • تحویل ناموفق «منتظر تصمیم» است و کالا تا تصمیم سر جایش می‌ماند (resolve_failure)
   • کلید یکتایی (Idempotency-Key): تکرار درخواست ثبت، سفارش دوم نمی‌سازد
 
 روتر (app/routers/orders.py) فقط این توابع را صدا می‌زند.
@@ -22,14 +23,15 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import (
-    ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderItem, OrderStatusHistory, Organization, Product, StockReservation, User,
-    Vehicle, Warehouse,
+    ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderCheckpoint, OrderItem, OrderStatusHistory, Organization, Product,
+    Shipment, StockReservation, User, Vehicle, Warehouse,
 )
-from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest
+from app.models_productivity import DeliveryAttempt
+from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest, ResolveFailureRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
 from app.core.wms import AVAILABLE, PENDING
 from app.services import (
-    allocation_service, audit_service, catalog_service, commission_service, dispatch_service, messaging,
+    allocation_service, audit_service, capacity_service, catalog_service, commission_service, dispatch_service, messaging,
     notification_service, stock_document_service, stock_ledger, warehouse_service,
 )
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -48,8 +50,9 @@ DRIVER_ALLOWED_STATUSES = {'picking_up', 'picked_up', 'in_transit', 'delivered',
 MANAGER_ALLOWED_STATUSES = {'picked_up', 'canceled'}
 # وضعیت‌هایی که «انجام کار» هستند و پیش از روز تحویل سفارش مجاز نیستند
 WORK_STATUSES = {'picking_up', 'picked_up', 'in_transit', 'delivered', 'failed'}
-# کالا تحویل نشده → به انبار برمی‌گردد (رزرو آزاد می‌شود یا کالای خارج‌شده با سند برگشت)
-RESTOCK_STATUSES = {'failed', 'canceled', 'expired'}
+# کالا تحویل نشده → به انبار برمی‌گردد (رزرو آزاد می‌شود یا کالای خارج‌شده با سند برگشت).
+# «ناموفق» اینجا نیست: کالا هنوز نزد راننده است و برگشت فقط با تصمیم «برگشت به انبار» ثبت می‌شود.
+RESTOCK_STATUSES = {'canceled', 'expired'}
 # بارگیری = خروج فیزیکی کالا از انبار (حواله خروج و مصرف رزرو)
 ISSUE_STATUSES = {'picked_up'}
 # پایان کار خودرو برای این سفارش
@@ -154,9 +157,16 @@ def _lock_inventories(db: Session, products: dict[int, Product], quantities: dic
 
 
 def _dispatch_args(weight: float, window_start, window_end, destination_city: str, destination_province: str | None,
-                   exclude_order_id: int | None = None) -> dict:
+                   exclude_order_id: int | None = None, volume: float | None = None) -> dict:
     return dict(weight=weight, window_start=window_start, window_end=window_end, destination_city=destination_city,
-                destination_province=destination_province, exclude_order_id=exclude_order_id)
+                destination_province=destination_province, exclude_order_id=exclude_order_id, volume=volume)
+
+
+def _order_dispatch(db: Session, order: Order, start=None, end=None) -> dict:
+    """ورودی موتور تخصیص برای سفارشی که ثبت شده (با حجم از بسته‌ها یا ابعاد کالا)."""
+    return _dispatch_args(order.total_weight_kg, start or order.delivery_window_start, end or order.delivery_window_end,
+                          order.destination_city, order.destination_province, exclude_order_id=order.id,
+                          volume=capacity_service.order_volumes(db, [order.id]).get(order.id))
 
 
 def _auto_assign_vehicle(db: Session, **dispatch) -> Vehicle:
@@ -221,7 +231,8 @@ def _create_order(db: Session, user: User, order_request: OrderRequest, idempote
 
         total_weight = sum((products[pid].weight_kg or 0) * qty for pid, qty in quantities.items())
         dispatch = _dispatch_args(total_weight, order_request.delivery_window_start, order_request.delivery_window_end,
-                                  order_request.destination_city, order_request.destination_province)
+                                  order_request.destination_city, order_request.destination_province,
+                                  volume=capacity_service.items_volume(db, quantities))
         vehicle = None
         if order_request.vehicle_id is not None:
             vehicle = _validate_manual_vehicle(db, order_request.vehicle_id, **dispatch)
@@ -364,10 +375,12 @@ ORDER_VIEWS = {
     "late": "از بازه تحویل گذشته و هنوز تحویل نشده",
     "today": "سفارش‌های فعال امروز",
     "needs_update": "زمان شروع کار رسیده و هنوز حرکت ثبت نشده",
+    "awaiting_resolution": "تحویل ناموفق و منتظر تعیین تکلیف",
+    "at_risk": "هنوز از بازه نگذشته ولی برآورد رسیدن بعد از پایان بازه است",
 }
 
 
-def _view_filter(view: str):
+def _view_filter(db: Session, view: str):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if view == "late":
         return and_(Order.status.in_(ACTIVE_ORDER_STATUSES), Order.delivery_window_end < now)
@@ -378,6 +391,11 @@ def _view_filter(view: str):
                     Order.delivery_window_start < start + timedelta(days=1))
     if view == "needs_update":
         return and_(Order.status.in_(("assigned", "picking_up")), Order.delivery_window_start <= now)
+    if view == "awaiting_resolution":
+        return and_(Order.status == "failed", or_(Order.failure_resolution.is_(None), Order.failure_resolution == "dispute"))
+    if view == "at_risk":
+        from app.services import eta_service
+        return Order.id.in_(eta_service.at_risk_ids(db) or [-1])
     raise ConflictError("نمای سفارش نامعتبر است.")
 
 
@@ -391,7 +409,7 @@ def _orders_query(db: Session, user: User, order_status: str | None = None, prov
     query = db.query(Order)
 
     if view:
-        query = query.filter(_view_filter(view))
+        query = query.filter(_view_filter(db, view))
     if ids is not None:
         query = query.filter(Order.id.in_(ids or [-1]))
 
@@ -476,8 +494,7 @@ def assign_vehicle(db: Session, user: User, order_id: int, request: OrderAssignR
         if order.status != 'pending':
             raise ConflictError('فقط به سفارش «در انتظار تخصیص» می‌توان خودرو اختصاص داد.')
 
-        dispatch = _dispatch_args(order.total_weight_kg, order.delivery_window_start, order.delivery_window_end,
-                                  order.destination_city, order.destination_province, exclude_order_id=order.id)
+        dispatch = _order_dispatch(db, order)
         vehicle = (_validate_manual_vehicle(db, request.vehicle_id, **dispatch) if request.vehicle_id
                    else _auto_assign_vehicle(db, **dispatch))
         order.vehicle_id = vehicle.id
@@ -587,9 +604,36 @@ def _release_vehicle(db: Session, order: Order) -> None:
         vehicle.status = 'available'
 
 
-def _apply_status(db: Session, order: Order, new_status: str, user: User | None, note: str | None) -> None:
+def _record_attempt(db: Session, order: Order, outcome: str, details: OrderStatusRequest | None) -> DeliveryAttempt:
+    next_at = details.next_attempt_at if details else None
+    delivered = outcome == 'delivered'
+    order.delivery_attempt_count = (order.delivery_attempt_count or 0) + 1
+    attempt = DeliveryAttempt(
+        organization_id=order.organization_id, order_id=order.id, attempt_no=order.delivery_attempt_count, outcome=outcome,
+        driver_id=order.driver_id, vehicle_id=order.vehicle_id, at=datetime.now(timezone.utc).replace(tzinfo=None),
+        recipient_name=(details.recipient_name or None) if details and delivered else None,
+        recipient_role=details.recipient_role if details and delivered else None,
+        exception_note=details.exception_note if details and delivered else None,
+        failure_reason=None if delivered else ((details.failure_reason if details else None) or 'other'),
+        note=details.note if details else None,
+        next_attempt_at=dispatch_service.to_utc_naive(next_at) if next_at and not delivered else None,
+    )
+    db.add(attempt)
+    return attempt
+
+
+def _apply_status(db: Session, order: Order, new_status: str, user: User | None, note: str | None,
+                  details: OrderStatusRequest | None = None) -> None:
     old_status = order.status
     order.status = new_status
+    if new_status == 'failed':
+        # تصمیم تازه لازم است؛ محموله‌ای که هنوز تحویل راننده نشده این سفارش را بار نمی‌زند
+        order.failure_resolution = None
+        shipment = db.get(Shipment, order.shipment_id) if order.shipment_id else None
+        if shipment is not None and shipment.status == 'open':
+            order.shipment_id = None
+    if new_status in ('delivered', 'failed'):
+        _record_attempt(db, order, new_status, details)
     if new_status in ISSUE_STATUSES:
         _issue_stock(db, order, user)
     if new_status in RESTOCK_STATUSES:
@@ -653,11 +697,73 @@ def update_order_status(db: Session, user: User, order_id: int, status_request: 
                                 "تا آن روز نمی‌توان آن را بارگیری یا تحویل کرد.")
 
     try:
-        _apply_status(db, target_order, new_status, user, status_request.note)
+        _apply_status(db, target_order, new_status, user, status_request.note, status_request)
         db.commit()
         if new_status == 'delivered':
             messaging.order_delivered(target_order, _organization_name(db, target_order))
         return get_order(db, user, target_order.id)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _open_failure(db: Session, user: User, order_id: int, resolution: str) -> Order:
+    if user.role not in ('org_admin', 'warehouse_manager'):
+        raise ForbiddenError()
+    order = db.query(Order).options(selectinload(Order.items)).filter(Order.id == order_id).with_for_update().first()
+    if order is None:
+        raise NotFoundError('سفارش مورد نظر یافت نشد.')
+    if user.role == 'warehouse_manager':
+        if order.warehouse_id != user.warehouse_id:
+            raise ForbiddenError('این سفارش از انبار شما ارسال نمی‌شود.')
+        if resolution != 'return_to_warehouse':
+            raise ForbiddenError('مدیر انبار فقط می‌تواند «برگشت به انبار» را ثبت کند.')
+    if order.status != 'failed' or order.failure_resolution not in (None, 'dispute'):
+        raise ConflictError('این سفارش منتظر تعیین تکلیف تحویل ناموفق نیست.')
+    if resolution == 'dispute' and order.failure_resolution == 'dispute':
+        raise ConflictError('این سفارش از قبل در حال رسیدگی به اختلاف است.')
+    return order
+
+
+def _redeliver(db: Session, user: User, order: Order, data: ResolveFailureRequest) -> None:
+    """تلاش تازه: بازه و خودروی تازه با همان موتور ظرفیت. کالای خارج‌شده خارج می‌ماند و بارگیری دوباره حواله نمی‌زند."""
+    start, end = dispatch_service.to_utc_naive(data.delivery_window_start), dispatch_service.to_utc_naive(data.delivery_window_end)
+    if end <= datetime.now(timezone.utc).replace(tzinfo=None):
+        raise ConflictError('بازه تحویل تازه باید در آینده باشد.')
+    dispatch = _order_dispatch(db, order, start, end)
+    vehicle = (_validate_manual_vehicle(db, data.vehicle_id, **dispatch) if data.vehicle_id
+               else _auto_assign_vehicle(db, **dispatch))
+    order.delivery_window_start, order.delivery_window_end = start, end
+    order.vehicle_id, order.driver_id = vehicle.id, vehicle.driver_id
+    order.status = 'assigned'
+    # مسیر تلاش تازه از مبدأ شروع می‌شود؛ گزارش شهرهای تلاش قبلی با مسیر تازه نمی‌خواند
+    order.route = None
+    db.query(OrderCheckpoint).filter(OrderCheckpoint.order_id == order.id).delete(synchronize_session=False)
+    _add_history(db, order, 'failed', 'assigned', user, data.note or f"تحویل دوباره با خودرو {vehicle.license_plate or vehicle.id}")
+    notification_service.order_assigned(db, order)
+
+
+def resolve_failure(db: Session, user: User, order_id: int, data: ResolveFailureRequest) -> Order:
+    """تعیین تکلیف تحویل ناموفق: تحویل دوباره، برگشت به انبار، یا اختلاف (تیکت متصل؛ موجودی تا تصمیم بعدی بی‌تغییر)."""
+    try:
+        order = _open_failure(db, user, order_id, data.resolution)
+        if data.resolution == 'redeliver':
+            _redeliver(db, user, order, data)
+        elif data.resolution == 'return_to_warehouse':
+            _restore_stock(db, order, user, f"برگشت به انبار: تحویل سفارش {order.tracking_code} ناموفق بود")
+            _add_history(db, order, 'failed', 'failed', user, data.note or "تعیین تکلیف: برگشت به انبار")
+        else:
+            from app.services import ticket_service
+            ticket = ticket_service.open_dispute(db, user, order, data.note)
+            _add_history(db, order, 'failed', 'failed', user, data.note or f"تعیین تکلیف: اختلاف (تیکت {ticket.code})")
+        order.failure_resolution = data.resolution
+        attempt = db.query(DeliveryAttempt).filter(DeliveryAttempt.order_id == order.id).order_by(DeliveryAttempt.attempt_no.desc()).first()
+        if attempt is not None:
+            attempt.resolution = data.resolution
+            attempt.resolved_by_id = user.id
+            attempt.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+        return get_order(db, user, order.id)
     except Exception:
         db.rollback()
         raise
@@ -675,7 +781,8 @@ def delete_order(db: Session, user: User, order_id: int) -> None:
         # سفارشی که کالایش از انبار خارج شده (یا برگشته) سند انبار دارد و برای حفظ سوابق حذف نمی‌شود؛ لغو کنید.
         if target_order.stock_state in ("issued", "returned"):
             raise ConflictError("کالای این سفارش از انبار خارج شده و سند انبار دارد؛ به‌جای حذف، سفارش را لغو کنید.")
-        if target_order.status in ACTIVE_ORDER_STATUSES:
+        # ناموفق پیش از بارگیری هنوز رزرو دارد
+        if target_order.status in ACTIVE_ORDER_STATUSES or target_order.status == 'failed':
             _restore_stock(db, target_order, user, f"آزادسازی رزرو: سفارش {target_order.tracking_code} حذف شد")
             _release_vehicle(db, target_order)
 

@@ -41,6 +41,8 @@ STATUS_TEXT = {
     "expired": "بازه تحویل این سفارش گذشت و سفارش ارسال نشد.",
 }
 FINAL = ("delivered", "failed", "canceled", "expired")
+REDELIVERY_TEXT = "تلاش دوباره برای تحویل سفارش برنامه‌ریزی شد."
+RETURNED_TEXT = "سفارش به فروشنده برگشت."
 
 
 def _now() -> datetime:
@@ -70,6 +72,15 @@ def verify_phone(order: Order, customer: Customer | None, last4: str) -> bool:
         return True
     phone_attempts.allow(order.tracking_code)   # ثبت تلاش ناموفق
     return False
+
+
+def _status_text(order: Order) -> str:
+    """متن عمومی؛ دلیل شکست، یادداشت و نام تحویل‌گیرنده هرگز اینجا نمی‌آید."""
+    if order.failure_resolution == "redeliver" and order.status in ("assigned", "picking_up", "picked_up"):
+        return REDELIVERY_TEXT
+    if order.status == "failed" and order.failure_resolution == "return_to_warehouse":
+        return RETURNED_TEXT
+    return STATUS_TEXT.get(order.status, "")
 
 
 def _public_route(db: Session, order: Order) -> dict | None:
@@ -126,14 +137,14 @@ def track(db: Session, code: str, phone_last4: str | None = None) -> dict:
                        "vehicle_type": vehicle.type if vehicle else None, "vehicle_model": vehicle.model if vehicle else None}
 
     result = {
-        "tracking_code": order.tracking_code, "status": order.status, "status_text": STATUS_TEXT.get(order.status, ""),
+        "tracking_code": order.tracking_code, "status": order.status, "status_text": _status_text(order),
         "is_final": order.status in FINAL, "organization_name": org.name if org else "",
         "created_at": order.created_at, "updated_at": order.updated_at,
         "delivery_window_start": order.delivery_window_start, "delivery_window_end": order.delivery_window_end,
         "destination_province": order.destination_province, "destination_city": order.destination_city,
         "recipient_masked": _mask(order.recipient_name or (customer.name if customer else None)),
         "priority": order.priority, "steps": steps, "driver": driver_info,
-        "ended_at": first_at.get(order.status) if order.status in FINAL else None,
+        "ended_at": next((h.changed_at for h in reversed(history) if h.to_status == order.status), None) if order.status in FINAL else None,
         "verified": verified, "details": None,
         "route": _public_route(db, order),
     }

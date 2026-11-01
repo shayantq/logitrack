@@ -11,7 +11,7 @@ from app.models import Order, RoleEnum
 from app.schemas.dispatch import (
     DriverScheduleResponse, MyScheduleResponse, ScheduleUpdate, SuggestRequest, SuggestResponse, TimeOffCreate, TimeOffOut,
 )
-from app.services import dispatch_service, schedule_service
+from app.services import capacity_service, dispatch_service, schedule_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(prefix="/dispatch", tags=["🗓️ زمان‌بندی و تخصیص هوشمند"])
@@ -47,6 +47,7 @@ def order_suggestions(db: db_dependency, order_id: int = Path(gt=0), user=Depend
     return dispatch_service.suggest(
         db, weight=order.total_weight_kg, window_start=order.delivery_window_start, window_end=order.delivery_window_end,
         destination_city=order.destination_city, destination_province=order.destination_province, exclude_order_id=order.id,
+        volume=capacity_service.order_volumes(db, [order.id]).get(order.id),
     )
 
 

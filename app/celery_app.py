@@ -55,6 +55,10 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.classify_abc",
         "schedule": crontab(hour=21, minute=0, day_of_week=5),  # بامداد شنبه به وقت ایران
     },
+    "detect-exceptions-quarter-hourly": {
+        "task": "tasks.detect_exceptions",
+        "schedule": crontab(minute="*/15"),
+    },
     "reset-demo-half-hourly": {
         "task": "tasks.reset_demo",
         "schedule": crontab(minute="0,30"),  # نسخه نمایشی خصوصی به حالت اولیه

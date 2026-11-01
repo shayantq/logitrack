@@ -12,6 +12,8 @@ from app.schemas.base import BaseModelWithDateFormatting
 PackageSize = Literal["xs", "s", "m", "l", "xl"]
 OrderStatus = Literal["pending", "assigned", "picking_up", "picked_up", "in_transit",
                       "delivered", "failed", "canceled", "expired"]
+RecipientRole = Literal["self", "family", "colleague", "guard", "other"]
+FailureReason = Literal["recipient_absent", "wrong_address", "refused", "damaged", "access_issue", "vehicle_issue", "other"]
 
 
 def _check_province(value: str) -> str:
@@ -91,6 +93,31 @@ class OrderRequest(BaseModel):
 class OrderStatusRequest(BaseModel):
     order_status: OrderStatus = Field(examples=['in_transit'])
     note: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]] = None
+    # مدرک تحویل (فقط برای delivered)
+    recipient_name: Optional[Annotated[str, BeforeValidator(normalize_persian_text), StringConstraints(max_length=150)]] = None
+    recipient_role: Optional[RecipientRole] = None
+    exception_note: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]] = None
+    # تلاش ناموفق (فقط برای failed)؛ بدون دلیل = «سایر»
+    failure_reason: Optional[FailureReason] = None
+    next_attempt_at: Optional[datetime] = None
+
+
+class ResolveFailureRequest(BaseModel):
+    resolution: Literal["redeliver", "return_to_warehouse", "dispute"]
+    note: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)]] = None
+    # فقط برای «تحویل دوباره»: بازه تازه و خودرو (خالی = انتخاب خودکار)
+    delivery_window_start: Optional[datetime] = None
+    delivery_window_end: Optional[datetime] = None
+    vehicle_id: Optional[int] = Field(None, gt=0)
+
+    @model_validator(mode="after")
+    def _redelivery_window(self):
+        if self.resolution == "redeliver":
+            if self.delivery_window_start is None or self.delivery_window_end is None:
+                raise ValueError("برای تحویل دوباره، بازه تحویل تازه را مشخص کنید.")
+            if self.delivery_window_end <= self.delivery_window_start:
+                raise ValueError("پایان بازه تحویل باید بعد از شروع آن باشد.")
+        return self
 
 
 class OrderAssignRequest(BaseModel):
@@ -175,6 +202,30 @@ class OrderResponse(BaseModelWithDateFormatting):
     commission_percent: Optional[float] = None
     commission_amount: Optional[float] = None
     driver_earning: Optional[float] = None
+    delivery_attempt_count: int = 0
+    failure_resolution: Optional[str] = None
+
+
+class DeliveryAttemptOut(BaseModelWithDateFormatting):
+    id: int
+    attempt_no: int
+    outcome: str
+    at: datetime
+    driver_name: Optional[str] = None
+    vehicle_plate: Optional[str] = None
+    recipient_name: Optional[str] = None
+    recipient_role_label: Optional[str] = None
+    exception_note: Optional[str] = None
+    failure_reason: Optional[str] = None
+    failure_reason_label: Optional[str] = None
+    note: Optional[str] = None
+    next_attempt_at: Optional[datetime] = None
+    resolution: Optional[str] = None
+    resolution_label: Optional[str] = None
+    resolved_by_name: Optional[str] = None
+    resolved_at: Optional[datetime] = None
+    has_photo: bool = False
+    photo_type: Optional[str] = None
 
 
 class OrderDetailResponse(OrderResponse):

@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.wms import FULFILLMENT_LABELS, SHIPMENT_STATUS_LABELS
 from app.models import Order, Package, PackageItem, PickLine, Product, Shipment, User, Vehicle
-from app.services import dispatch_service, event_bus, location_service, stock_ledger
+from app.services import capacity_service, dispatch_service, event_bus, location_service, stock_ledger
 from app.services.exceptions import ConflictError, NotFoundError
 
 
@@ -115,19 +115,56 @@ def _load(db: Session, order_ids) -> tuple[float, float]:
     return sum(p.weight_kg for p in packages), sum(p.volume_m3 for p in packages)
 
 
-def _check_capacity(db: Session, vehicle: Vehicle, shipment: Shipment | None, order_ids: list[int]) -> tuple[float, float]:
-    """وزن و حجم محموله + محموله‌های باز دیگر همان خودرو ≤ ظرفیت خودرو."""
+def _other_load(db: Session, vehicle: Vehicle, shipment: Shipment | None) -> tuple[float, float]:
     others = db.query(Order.id).join(Shipment, Order.shipment_id == Shipment.id).filter(
         Shipment.vehicle_id == vehicle.id, Shipment.status == "open",
         Shipment.id != (shipment.id if shipment else -1)).all()
+    return _load(db, [o for (o,) in others])
+
+
+def _capacity_message(result: capacity_service.CapacityCheck) -> str | None:
+    if result.weight_over:
+        return f"ظرفیت وزنی خودرو {result.max_weight_kg:g} کیلوگرم است؛ بار محموله {result.weight_kg:g} کیلوگرم می‌شود."
+    if result.volume_over:
+        return f"ظرفیت حجمی خودرو {result.max_volume_m3:g} مترمکعب است؛ بار محموله {result.volume_m3:.3f} مترمکعب می‌شود."
+    return None
+
+
+def _check_capacity(db: Session, vehicle: Vehicle, shipment: Shipment | None, order_ids: list[int]) -> tuple[float, float]:
+    """وزن و حجم محموله + محموله‌های باز دیگر همان خودرو ≤ ظرفیت خودرو."""
     weight, volume = _load(db, order_ids)
-    other_weight, other_volume = _load(db, [o for (o,) in others])
-    limit_weight = vehicle.max_weight_kg or vehicle.capacity_kg
-    if limit_weight and weight + other_weight > limit_weight + 1e-9:
-        raise ConflictError(f"ظرفیت وزنی خودرو {limit_weight:g} کیلوگرم است؛ بار محموله {weight + other_weight:g} کیلوگرم می‌شود.")
-    if vehicle.max_volume_m3 and volume + other_volume > vehicle.max_volume_m3 + 1e-9:
-        raise ConflictError(f"ظرفیت حجمی خودرو {vehicle.max_volume_m3:g} مترمکعب است؛ بار محموله {volume + other_volume:.3f} مترمکعب می‌شود.")
+    other_weight, other_volume = _other_load(db, vehicle, shipment)
+    message = _capacity_message(capacity_service.check(vehicle, weight, volume, other_weight, other_volume))
+    if message:
+        raise ConflictError(message)
     return weight, volume
+
+
+def preview_shipment(db: Session, user: User, data) -> dict:
+    """پیش از ساخت محموله: درصد استفاده از ظرفیت و سفارش‌هایی که سبب اضافه‌بار می‌شوند (چیزی ذخیره نمی‌شود)."""
+    warehouse_id = location_service.scope_warehouse(user, data.warehouse_id)
+    vehicle = db.get(Vehicle, data.vehicle_id)
+    if vehicle is None:
+        raise NotFoundError("خودرو یافت نشد.")
+    orders = db.query(Order).filter(Order.id.in_(data.order_ids)).order_by(Order.id).all()
+    if len(orders) != len(set(data.order_ids)):
+        raise NotFoundError("بعضی سفارش‌ها یافت نشدند.")
+    if warehouse_id is not None and any(o.warehouse_id != warehouse_id for o in orders):
+        raise ConflictError("همه سفارش‌های محموله باید از همین انبار باشند.")
+    other_weight, other_volume = _other_load(db, vehicle, None)
+    running_weight, running_volume, over = 0.0, 0.0, []
+    for order in orders:
+        weight, volume = _load(db, [order.id])
+        running_weight, running_volume = running_weight + weight, running_volume + volume
+        if not capacity_service.check(vehicle, running_weight, running_volume, other_weight, other_volume).ok:
+            over.append({"id": order.id, "tracking_code": order.tracking_code, "weight_kg": round(weight, 3), "volume_m3": round(volume, 4)})
+    result = capacity_service.check(vehicle, running_weight, running_volume, other_weight, other_volume)
+    return {
+        "weight_kg": round(running_weight, 3), "volume_m3": round(running_volume, 4), "other_weight_kg": round(other_weight, 3),
+        "other_volume_m3": round(other_volume, 4), "max_weight_kg": result.max_weight_kg, "max_volume_m3": result.max_volume_m3,
+        "weight_pct": result.weight_pct, "volume_pct": result.volume_pct, "ok": result.ok,
+        "message": _capacity_message(result), "over_orders": over,
+    }
 
 
 def _attach(db: Session, user: User, shipment: Shipment, orders: list[Order], vehicle: Vehicle) -> None:
@@ -254,7 +291,7 @@ def _serialize(db: Session, shipment: Shipment) -> dict:
     orders = db.query(Order).filter(Order.shipment_id == shipment.id).order_by(Order.id).all()
     weight, volume = _load(db, [o.id for o in orders])
     vehicle = shipment.vehicle
-    limit_weight = (vehicle.max_weight_kg or vehicle.capacity_kg) if vehicle else None
+    limit_weight = capacity_service.weight_limit(vehicle) if vehicle else None
     return {
         "id": shipment.id, "code": shipment.code, "status": shipment.status,
         "status_label": SHIPMENT_STATUS_LABELS[shipment.status], "warehouse_id": shipment.warehouse_id,

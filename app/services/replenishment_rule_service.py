@@ -11,6 +11,7 @@ ABC: سهم هر کالا از ارزش مصرف (خروج سفارش × قیم�
 """
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -22,7 +23,9 @@ from app.models import (
     Location, Product, PutawayTask, ReplenishmentRule, StockBalance, StockMovement, Stocktake, StocktakeLine, User,
 )
 from app.services import catalog_service, event_bus, location_service, putaway_service
-from app.services.exceptions import ConflictError, NotFoundError
+from app.services.exceptions import ConflictError, DomainError, NotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -166,6 +169,25 @@ def check(db: Session, user: User | None, location_ids) -> int:
         if current[key] + pending[key] <= rule.min_quantity:
             total += _replenish(db, user, rule, current[key], pending[key])
     return total
+
+
+def check_product(db: Session, user: User | None, product_id: int, warehouse_id: int | None) -> int:
+    """
+    محرک رویدادی (آزاد شدن رزرو، کمبود هنگام ثبت): قواعد محل‌های برداشت همین کالا را بررسی می‌کند. خروجی فقط وظیفه
+    جانمایی است. خطای این بررسی عملیات اصلی را خراب نمی‌کند؛ بررسی ساعتی دوباره آن را می‌بیند.
+    """
+    query = db.query(ReplenishmentRule.location_id).filter(ReplenishmentRule.product_id == product_id, ReplenishmentRule.is_active.is_(True))
+    if warehouse_id is not None:
+        query = query.filter(ReplenishmentRule.warehouse_id == warehouse_id)
+    location_ids = {lid for (lid,) in query.all()}
+    if not location_ids:
+        return 0
+    try:
+        with db.begin_nested():
+            return check(db, user, location_ids)
+    except DomainError:
+        logger.warning("تأمین مجدد رویدادی کالای %s انجام نشد", product_id, exc_info=True)
+        return 0
 
 
 def generate(db: Session, user: User, warehouse_id: int | None) -> dict:

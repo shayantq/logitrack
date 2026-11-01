@@ -6,7 +6,6 @@
 کارتی که کاربر به فهرستش دسترسی ندارد (مجوز نقش، انبار نامتصل) بی‌صدا کنار گذاشته می‌شود.
 """
 from dataclasses import dataclass, field
-from datetime import timedelta
 from typing import Callable
 from urllib.parse import urlencode
 
@@ -15,11 +14,10 @@ from sqlalchemy.orm import Session
 from app.core.iran import fa_digits
 from app.models import PLATFORM_ROLES, User
 from app.services import (
-    backorder_service, dispatch_service, driver_portal_service, driver_service, order_service, organization_request_service,
+    backorder_service, dispatch_service, driver_portal_service, driver_service, exception_service, order_service, organization_request_service,
     picking_service, putaway_service, receiving_service, replenishment_service, shipping_service, ticket_service,
     transfer_order_service,
 )
-from app.services.catalog_service import today_local
 from app.services.exceptions import DomainError
 
 SAMPLE = 5
@@ -75,7 +73,6 @@ def _listed(fn: Callable[[], list], item: Callable[[object], dict]) -> dict:
 
 def _org_cards(db: Session, user: User) -> list[Card]:
     role = getattr(user.role, "value", user.role)
-    week_ago = today_local() - timedelta(days=7)
     cards = [
         Card("orders_late", "danger", 100, "سفارش‌هایی که از بازه تحویل گذشته‌اند و هنوز تحویل نشده‌اند",
              "مشتری منتظر است؛ هر ساعت تأخیر احتمال لغو و نارضایتی را بیشتر می‌کند.",
@@ -85,10 +82,20 @@ def _org_cards(db: Session, user: User) -> list[Card]:
              "تا خودرو تعیین نشود بارگیری شروع نمی‌شود و ظرفیت روز از دست می‌رود.",
              "هماهنگ‌کننده ارسال", "برای هر سفارش خودرو تعیین کنید (پیشنهاد خودکار هم هست).", "تخصیص خودرو",
              **_orders(db, user, order_status="pending")),
-        Card("orders_failed", "danger", 85, "تحویل‌های ناموفق هفت روز اخیر",
-             "کالا تحویل نشده و مشتری منتظر تصمیم شماست.",
-             "ادمین سازمان", "علت را بررسی کنید و با مشتری هماهنگ کنید.", "بررسی ناموفق‌ها",
-             **_orders(db, user, order_status="failed", delivery_from=week_ago)),
+        Card("orders_failed", "danger", 85, "تحویل‌های ناموفق منتظر تصمیم",
+             "کالا تحویل نشده و تا تصمیم شما سر جایش می‌ماند.",
+             "ادمین سازمان", "تحویل دوباره، برگشت به انبار یا اختلاف را ثبت کنید.", "تعیین تکلیف",
+             **_orders(db, user, view="awaiting_resolution")),
+        Card("orders_at_risk", "warning", 95, "سفارش‌هایی که در خطر تأخیر هستند",
+             "طبق برآورد برنامه‌ای، پیش از پایان بازه تحویل نمی‌رسند.",
+             "هماهنگ‌کننده ارسال", "با راننده هماهنگ کنید یا زمان تازه را به مشتری خبر دهید.", "بررسی سفارش‌ها",
+             **_orders(db, user, view="at_risk")),
+        Card("exceptions_urgent", "danger", 98, "استثناهای باز با شدت بالا",
+             "این کارها از روند عادی خارج شده‌اند و مسئول و تصمیم می‌خواهند.",
+             "تیم مسئول هر مورد", "برای هر مورد مسئول تعیین کنید و نتیجه را ثبت کنید.", "مرکز استثنا",
+             link="/app/exceptions?status=active&urgent=true", api="/exceptions/", query={"status": "active", "urgent": True},
+             **_listed(lambda: exception_service.list_exceptions(db, user, status="active", urgent=True),
+                       lambda x: {"id": x["id"], "label": x["kind_label"], "sub": x["team_label"], "link": x["link"] or "/app/exceptions"})),
         Card("tickets_waiting", "info", 80, "تیکت‌هایی که منتظر پاسخ شما هستند",
              "پاسخ دیر یعنی مشتری یا راننده بی‌خبر می‌ماند.", "پشتیبانی سازمان", "به تیکت‌ها پاسخ دهید.", "پاسخ به تیکت‌ها",
              link="/app/tickets", api="/tickets/", query={"waiting": True},
@@ -116,6 +123,12 @@ def _org_cards(db: Session, user: User) -> list[Card]:
              **_listed(lambda: transfer_order_service.list_transfers(db, user, status="in_transit"),
                        lambda t: {"id": t["id"], "label": t["code"], "sub": f"{t['from_warehouse_name'] or ''} ← {t['to_warehouse_name'] or ''}",
                                   "link": "/app/transfers?status=in_transit"})),
+        Card("exceptions_medium", "info", 40, "استثناهای باز دیگر",
+             "کارهایی که از روند عادی خارج شده‌اند ولی فوری نیستند.",
+             "تیم مسئول هر مورد", "مسئول تعیین کنید و در مهلت رسیدگی کنید.", "مرکز استثنا",
+             link="/app/exceptions?status=active&severity=medium", api="/exceptions/", query={"status": "active", "severity": "medium"},
+             **_listed(lambda: exception_service.list_exceptions(db, user, status="active", severity="medium"),
+                       lambda x: {"id": x["id"], "label": x["kind_label"], "sub": x["team_label"], "link": x["link"] or "/app/exceptions"})),
     ]
     if role == "warehouse_manager":
         cards += [

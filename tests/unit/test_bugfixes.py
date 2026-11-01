@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from app import tasks
 from app.models import User, RoleEnum, Vehicle, Product, Inventory, Order, Warehouse
 from app.models_notification import Notification
-from app.schemas.order import OrderStatusRequest
+from app.schemas.order import OrderStatusRequest, ResolveFailureRequest
 from app.schemas.product import ProductCreate, StockUpdate
 from app.schemas.user import CreateUserRequest
 from app.schemas.vehicle import VehicleStatusRequest
@@ -140,6 +140,9 @@ def test_failed_order_restores_stock_and_frees_vehicle(setup):
 
     order_service.update_order_status(db, driver, order.id, OrderStatusRequest(order_status="failed"))
 
+    # تا تصمیم، رزرو سر جایش می‌ماند و خودرو آزاد می‌شود
+    assert _stock(db, product.id) == 15
+    order_service.resolve_failure(db, admin, order.id, ResolveFailureRequest(resolution="return_to_warehouse"))
     assert _stock(db, product.id) == 20
     db.refresh(vehicle)
     assert vehicle.status == "available"

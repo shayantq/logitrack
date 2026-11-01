@@ -187,6 +187,7 @@ def create_demo_order(org_id, items, status, city, vehicle, warehouse_id, days_a
             stock_ledger.record(db, inv, qty, "order_return", document=back, reason=f"برگشت سفارش نمونه {order.tracking_code}",
                                 reference_type="order", reference_id=order.id)
         order.stock_state = "returned"
+        order.failure_resolution = "return_to_warehouse"
     return order
 
 

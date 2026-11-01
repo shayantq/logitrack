@@ -7,12 +7,12 @@
 یک خودرو فقط وقتی پیشنهاد می‌شود که همه این شرط‌ها برقرار باشد:
   - راننده دارد و راننده‌اش احراز هویت شده است
   - خودرو در تعمیر یا غیرفعال نیست
-  - ظرفیت خودرو برای وزن سفارش کافی است
+  - ظرفیت خودرو برای وزن (و اگر معلوم باشد حجم) سفارش کافی است (capacity_service)
   - مقصد در محدوده کاری راننده است (هم‌شهر/هم‌استان، یا راننده بار بین‌شهری می‌برد)
   - بازه تحویل با شیفت راننده هم‌پوشانی کافی دارد (اگر برنامه کاری ثبت شده باشد)
   - راننده در آن بازه مرخصی نیست
   - سقف سفارش روزانه راننده پر نشده است
-  - وزن سفارش‌های هم‌پوشان آن خودرو + این سفارش از ظرفیتش بیشتر نمی‌شود
+  - بار سفارش‌های هم‌پوشان آن خودرو + این سفارش از ظرفیتش بیشتر نمی‌شود
 
 همه زمان‌ها در دیتابیس UTC هستند؛ شیفت‌ها به وقت ایران تعریف می‌شوند (ایران از ۱۴۰۱ ساعت تابستانی ندارد).
 """
@@ -26,6 +26,7 @@ from app.core.iran import fa_digits
 from app.models import (
     ACTIVE_ORDER_STATUSES, DriverProfile, DriverShift, DriverTimeOff, Order, User, Vehicle,
 )
+from app.services import capacity_service
 
 IRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 MIN_SHIFT_OVERLAP = timedelta(minutes=30)
@@ -76,7 +77,7 @@ class Evaluation:
 
     def as_dict(self) -> dict:
         v, d = self.vehicle, self.driver
-        capacity = v.capacity_kg or 0
+        capacity = capacity_service.weight_limit(v) or 0
         return {
             "vehicle_id": v.id, "license_plate": v.license_plate, "vehicle_type": v.type, "vehicle_model": v.model,
             "vehicle_status": v.status, "capacity_kg": v.capacity_kg, "city": v.city,
@@ -108,7 +109,8 @@ def shift_overlap(shifts: list[DriverShift], start_local: datetime, end_local: d
 
 def evaluate(db: Session, *, weight: float, window_start: datetime, window_end: datetime,
              destination_city: str, destination_province: str | None = None,
-             exclude_order_id: int | None = None, vehicle_ids: list[int] | None = None) -> list[Evaluation]:
+             exclude_order_id: int | None = None, vehicle_ids: list[int] | None = None,
+             volume: float | None = None) -> list[Evaluation]:
     """همه خودروها (یا خودروهای مشخص) را برای این سفارش ارزیابی می‌کند؛ پیشنهادها مرتب بر اساس امتیاز."""
     start, end = to_utc_naive(window_start), to_utc_naive(window_end)
     start_local, end_local = to_local(start), to_local(end)
@@ -140,6 +142,11 @@ def evaluate(db: Session, *, weight: float, window_start: datetime, window_end: 
     for o in oq.all() if vehicles else []:
         orders_by_vehicle.setdefault(o.vehicle_id, []).append(o)
 
+    # حجم فقط وقتی سنجیده می‌شود که حجم این سفارش معلوم باشد و خودرو سقف حجم داشته باشد
+    volume_of: dict[int, float | None] = {}
+    if volume is not None and any(v.max_volume_m3 for v in vehicles):
+        volume_of = capacity_service.order_volumes(db, [o.id for rows in orders_by_vehicle.values() for o in rows])
+
     window_len = end - start
     required_overlap = min(MIN_SHIFT_OVERLAP, window_len)
     results = []
@@ -167,10 +174,16 @@ def evaluate(db: Session, *, weight: float, window_start: datetime, window_end: 
             ev.exclude("حساب راننده غیرفعال است")
         if v.status in ("maintenance", "inactive"):
             ev.exclude("خودرو در تعمیر است" if v.status == "maintenance" else "خودرو غیرفعال است")
-        if not v.capacity_kg:
+        limit = capacity_service.weight_limit(v)
+        if not limit:
             ev.exclude("ظرفیت خودرو ثبت نشده است")
-        elif weight > v.capacity_kg:
-            ev.exclude(f"ظرفیت خودرو ({_fa_kg(v.capacity_kg)} کیلوگرم) برای این سفارش کافی نیست")
+        elif weight > limit:
+            ev.exclude(f"ظرفیت خودرو ({_fa_kg(limit)} کیلوگرم) برای این سفارش کافی نیست")
+        if volume is not None and v.max_volume_m3:
+            if volume > v.max_volume_m3:
+                ev.exclude(f"ظرفیت حجمی خودرو ({v.max_volume_m3:g} مترمکعب) برای این سفارش کافی نیست")
+            elif volume + sum(volume_of.get(o.id) or 0 for o in overlapping) > v.max_volume_m3:
+                ev.exclude(f"ظرفیت حجمی خودرو در این بازه پر است ({v.max_volume_m3:g} مترمکعب)")
         if driver and base_city and not ev.same_city and not same_province and not (profile and profile.intercity):
             ev.exclude("مقصد خارج از شهر راننده است و راننده بار بین‌شهری نمی‌برد")
         if driver and driver_shifts and shift_overlap(driver_shifts, start_local, end_local) < required_overlap:
@@ -180,13 +193,13 @@ def evaluate(db: Session, *, weight: float, window_start: datetime, window_end: 
             ev.exclude("راننده در این بازه مرخصی است")
         if profile and profile.max_daily_orders and ev.day_orders >= profile.max_daily_orders:
             ev.exclude(f"سقف سفارش روزانه راننده ({profile.max_daily_orders}) پر شده است")
-        if v.capacity_kg and weight <= v.capacity_kg and ev.load_kg + weight > v.capacity_kg:
-            ev.exclude(f"ظرفیت خودرو در این بازه پر است ({_fa_kg(ev.load_kg)} از {_fa_kg(v.capacity_kg)} کیلوگرم رزرو شده)")
+        if limit and weight <= limit and ev.load_kg + weight > limit:
+            ev.exclude(f"ظرفیت خودرو در این بازه پر است ({_fa_kg(ev.load_kg)} از {_fa_kg(limit)} کیلوگرم رزرو شده)")
         if not ev.eligible:
             continue
 
         # ---------------- امتیاز (هرچه بیشتر، مناسب‌تر)
-        free = v.capacity_kg - ev.load_kg
+        free = limit - ev.load_kg
         if ev.same_city:
             ev.score += 40
             ev.reasons.append("هم‌شهر با مقصد")

@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.models import Inventory, Product, RoleEnum, StockMovement, StockReservation, User, Vehicle, Warehouse
-from app.schemas.order import OrderStatusRequest
+from app.schemas.order import OrderStatusRequest, ResolveFailureRequest
 from app.schemas.product import ProductCreate, StockMovementCreate, StockTransferCreate, StockUpdate
 from app.services import inventory_service, order_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError
@@ -88,6 +88,8 @@ def test_full_order_lifecycle_is_recorded(world):
     assert len(_movements(db, product.id)) == 1
     order_service.update_order_status(db, driver, order.id, OrderStatusRequest(order_status="picked_up"))
     order_service.update_order_status(db, driver, order.id, OrderStatusRequest(order_status="failed"))
+    assert len(_movements(db, product.id)) == 2      # کالا تا تصمیم نزد راننده است
+    order_service.resolve_failure(db, admin, order.id, ResolveFailureRequest(resolution="return_to_warehouse"))
 
     out, back = _movements(db, product.id)[1:]
     assert (out.movement_type, out.quantity_change, out.balance_after) == ("order_out", -5, 15)
@@ -96,7 +98,7 @@ def test_full_order_lifecycle_is_recorded(world):
     # کالای برگشتی «در انتظار بازرسی» برمی‌گردد (ردیف جدا با مانده ۵) و تا بازرسی قابل تخصیص نیست
     assert (back.movement_type, back.quantity_change, back.balance_after, back.stock_status) == ("order_return", 5, 5, "pending")
     assert back.document.doc_type == "order_return"
-    assert back.created_by_id == driver.id
+    assert back.created_by_id == admin.id
     [reservation] = db.query(StockReservation).filter(StockReservation.reference_id == order.id).all()
     assert (reservation.status, reservation.movement_id) == ("consumed", out.id)
     db.refresh(order)

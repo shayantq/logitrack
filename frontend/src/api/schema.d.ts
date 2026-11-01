@@ -867,6 +867,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/{order_id}/resolve-failure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 🧭 تعیین تکلیف تحویل ناموفق
+         * @description **سطح دسترسی:** ادمین سازمان همه گزینه‌ها؛ مدیر انبار مبدأ فقط «برگشت به انبار». موجودی فقط با «برگشت به انبار» برمی‌گردد.
+         */
+        post: operations["resolve_failure_orders__order_id__resolve_failure_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🚪 تلاش‌های تحویل سفارش و مدرک هر کدام */
+        get: operations["delivery_attempts_orders__order_id__attempts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/attempts/{attempt_no}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📷 مشاهده عکس مدرک تحویل (ثبت در گزارش فعالیت) */
+        get: operations["attempt_photo_orders__order_id__attempts__attempt_no__photo_get"];
+        put?: never;
+        /** 📷 عکس مدرک تحویل (تا ۵ مگابایت) */
+        post: operations["upload_attempt_photo_orders__order_id__attempts__attempt_no__photo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/vehicles/": {
         parameters: {
             query?: never;
@@ -2198,6 +2253,58 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/exceptions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📋 استثناها (پیش‌فرض: باز) */
+        get: operations["list_exceptions_exceptions__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exceptions/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔎 بررسی دوباره همین حالا */
+        post: operations["scan_exceptions_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exceptions/{exception_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 🔍 جزئیات و تاریخچه استثنا */
+        get: operations["get_exception_exceptions__exception_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** ✏️ تعیین مسئول، تغییر وضعیت، یادداشت یا ادغام */
+        patch: operations["update_exceptions__exception_id__patch"];
         trace?: never;
     };
     "/action-center": {
@@ -4009,6 +4116,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/shipping/shipments/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ⚖️ پیش‌نمایش ظرفیت محموله (چیزی ذخیره نمی‌شود) */
+        post: operations["preview_shipment_shipping_shipments_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shipping/shipments/{shipment_id}": {
         parameters: {
             query?: never;
@@ -4818,6 +4942,14 @@ export interface components {
             /** File */
             file?: string | null;
         };
+        /** Body_upload_attempt_photo_orders__order_id__attempts__attempt_no__photo_post */
+        Body_upload_attempt_photo_orders__order_id__attempts__attempt_no__photo_post: {
+            /**
+             * File
+             * Format: binary
+             */
+            file: string;
+        };
         /** Body_upload_document_driver_onboarding_documents__kind__post */
         Body_upload_document_driver_onboarding_documents__kind__post: {
             /**
@@ -5156,6 +5288,53 @@ export interface components {
             shifts: string[];
             /** Off */
             off: boolean;
+        };
+        /** DeliveryAttemptOut */
+        DeliveryAttemptOut: {
+            /** Id */
+            id: number;
+            /** Attempt No */
+            attempt_no: number;
+            /** Outcome */
+            outcome: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Driver Name */
+            driver_name?: string | null;
+            /** Vehicle Plate */
+            vehicle_plate?: string | null;
+            /** Recipient Name */
+            recipient_name?: string | null;
+            /** Recipient Role Label */
+            recipient_role_label?: string | null;
+            /** Exception Note */
+            exception_note?: string | null;
+            /** Failure Reason */
+            failure_reason?: string | null;
+            /** Failure Reason Label */
+            failure_reason_label?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Next Attempt At */
+            next_attempt_at?: string | null;
+            /** Resolution */
+            resolution?: string | null;
+            /** Resolution Label */
+            resolution_label?: string | null;
+            /** Resolved By Name */
+            resolved_by_name?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /**
+             * Has Photo
+             * @default false
+             */
+            has_photo: boolean;
+            /** Photo Type */
+            photo_type?: string | null;
         };
         /** DispatchIn */
         DispatchIn: {
@@ -5685,6 +5864,178 @@ export interface components {
         EscalateIn: {
             /** Reason */
             reason: string;
+        };
+        /** EtaOut */
+        EtaOut: {
+            /** Eta */
+            eta?: string | null;
+            /**
+             * Computed At
+             * Format: date-time
+             */
+            computed_at: string;
+            /** Label */
+            label: string;
+            /** At Risk */
+            at_risk: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** ExceptionDetailOut */
+        ExceptionDetailOut: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Kind Label */
+            kind_label: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Entity Id */
+            entity_id: number;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "low" | "medium" | "high" | "critical";
+            /** Severity Label */
+            severity_label: string;
+            /**
+             * Team
+             * @enum {string}
+             */
+            team: "warehouse" | "fleet" | "support" | "management";
+            /** Team Label */
+            team_label: string;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Trigger Reason */
+            trigger_reason: string;
+            /** Suggested Action */
+            suggested_action?: string | null;
+            /** Resolution */
+            resolution?: string | null;
+            /** Merged Into Id */
+            merged_into_id?: number | null;
+            /** Link */
+            link?: string | null;
+            suggested_owner?: components["schemas"]["SuggestedOwner"] | null;
+            /** Events */
+            events: components["schemas"]["ExceptionEventOut"][];
+        };
+        /** ExceptionEventOut */
+        ExceptionEventOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Actor */
+            actor: string;
+            /** Action */
+            action: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** ExceptionOut */
+        ExceptionOut: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Kind Label */
+            kind_label: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Entity Id */
+            entity_id: number;
+            /** Warehouse Id */
+            warehouse_id?: number | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "low" | "medium" | "high" | "critical";
+            /** Severity Label */
+            severity_label: string;
+            /**
+             * Team
+             * @enum {string}
+             */
+            team: "warehouse" | "fleet" | "support" | "management";
+            /** Team Label */
+            team_label: string;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Closed At */
+            closed_at?: string | null;
+            /** Overdue */
+            overdue: boolean;
+            /** Trigger Reason */
+            trigger_reason: string;
+            /** Suggested Action */
+            suggested_action?: string | null;
+            /** Resolution */
+            resolution?: string | null;
+            /** Merged Into Id */
+            merged_into_id?: number | null;
+            /** Link */
+            link?: string | null;
+            suggested_owner?: components["schemas"]["SuggestedOwner"] | null;
+        };
+        /** ExceptionScanOut */
+        ExceptionScanOut: {
+            /** Found */
+            found: number;
+            /** Created */
+            created: number;
+            /** Closed */
+            closed: number;
+        };
+        /** ExceptionUpdate */
+        ExceptionUpdate: {
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Status */
+            status?: ("open" | "in_progress" | "waiting" | "resolved") | null;
+            /** Note */
+            note?: string | null;
+            /** Resolution */
+            resolution?: string | null;
+            /** Merged Into Id */
+            merged_into_id?: number | null;
         };
         /** ExpiringItem */
         ExpiringItem: {
@@ -6858,6 +7209,13 @@ export interface components {
             /** Driver Earning */
             driver_earning?: number | null;
             /**
+             * Delivery Attempt Count
+             * @default 0
+             */
+            delivery_attempt_count: number;
+            /** Failure Resolution */
+            failure_resolution?: string | null;
+            /**
              * History
              * @default []
              */
@@ -7039,6 +7397,13 @@ export interface components {
             commission_amount?: number | null;
             /** Driver Earning */
             driver_earning?: number | null;
+            /**
+             * Delivery Attempt Count
+             * @default 0
+             */
+            delivery_attempt_count: number;
+            /** Failure Resolution */
+            failure_resolution?: string | null;
         };
         /** OrderRoute */
         OrderRoute: {
@@ -7106,6 +7471,16 @@ export interface components {
             order_status: "pending" | "assigned" | "picking_up" | "picked_up" | "in_transit" | "delivered" | "failed" | "canceled" | "expired";
             /** Note */
             note?: string | null;
+            /** Recipient Name */
+            recipient_name?: string | null;
+            /** Recipient Role */
+            recipient_role?: ("self" | "family" | "colleague" | "guard" | "other") | null;
+            /** Exception Note */
+            exception_note?: string | null;
+            /** Failure Reason */
+            failure_reason?: ("recipient_absent" | "wrong_address" | "refused" | "damaged" | "access_issue" | "vehicle_issue" | "other") | null;
+            /** Next Attempt At */
+            next_attempt_at?: string | null;
         };
         /** OrderTimelineOut */
         OrderTimelineOut: {
@@ -7121,6 +7496,7 @@ export interface components {
             last_action_at?: string | null;
             /** Blocker */
             blocker?: string | null;
+            eta?: components["schemas"]["EtaOut"] | null;
             /** Events */
             events: components["schemas"]["TimelineEvent"][];
         };
@@ -8646,6 +9022,7 @@ export interface components {
              * @default false
              */
             overdue: boolean;
+            suggested_assignee?: components["schemas"]["SuggestedAssignee"] | null;
             /** Escalation Reason */
             escalation_reason?: string | null;
             /** Requester Mobile */
@@ -9324,6 +9701,22 @@ export interface components {
             /** Close Reason */
             close_reason?: string | null;
         };
+        /** ResolveFailureRequest */
+        ResolveFailureRequest: {
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            resolution: "redeliver" | "return_to_warehouse" | "dispute";
+            /** Note */
+            note?: string | null;
+            /** Delivery Window Start */
+            delivery_window_start?: string | null;
+            /** Delivery Window End */
+            delivery_window_end?: string | null;
+            /** Vehicle Id */
+            vehicle_id?: number | null;
+        };
         /** ReverseRequest */
         ReverseRequest: {
             /** Reason */
@@ -9724,6 +10117,42 @@ export interface components {
             dispatched_at?: string | null;
             /** Orders */
             orders: components["schemas"]["ShipmentOrderOut"][];
+        };
+        /** ShipmentPreviewOrder */
+        ShipmentPreviewOrder: {
+            /** Id */
+            id: number;
+            /** Tracking Code */
+            tracking_code: string;
+            /** Weight Kg */
+            weight_kg: number;
+            /** Volume M3 */
+            volume_m3: number;
+        };
+        /** ShipmentPreviewOut */
+        ShipmentPreviewOut: {
+            /** Weight Kg */
+            weight_kg: number;
+            /** Volume M3 */
+            volume_m3: number;
+            /** Other Weight Kg */
+            other_weight_kg: number;
+            /** Other Volume M3 */
+            other_volume_m3: number;
+            /** Max Weight Kg */
+            max_weight_kg?: number | null;
+            /** Max Volume M3 */
+            max_volume_m3?: number | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+            /** Volume Pct */
+            volume_pct?: number | null;
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message?: string | null;
+            /** Over Orders */
+            over_orders: components["schemas"]["ShipmentPreviewOrder"][];
         };
         /** ShortIn */
         ShortIn: {
@@ -10458,6 +10887,24 @@ export interface components {
             /** Excluded */
             excluded: components["schemas"]["Candidate"][];
         };
+        /** SuggestedAssignee */
+        SuggestedAssignee: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Open Count */
+            open_count: number;
+        };
+        /** SuggestedOwner */
+        SuggestedOwner: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Open Count */
+            open_count: number;
+        };
         /** SupplierLinkIn */
         SupplierLinkIn: {
             /** Partner Id */
@@ -10547,6 +10994,7 @@ export interface components {
              * @default false
              */
             overdue: boolean;
+            suggested_assignee?: components["schemas"]["SuggestedAssignee"] | null;
             /** Escalation Reason */
             escalation_reason?: string | null;
             /** Requester Mobile */
@@ -12987,7 +13435,7 @@ export interface operations {
                 /** @description فقط فوری‌ها */
                 priority?: boolean | null;
                 /** @description نمای نام‌دار (مثل دیرکرد) */
-                view?: ("late" | "today" | "needs_update") | null;
+                view?: ("late" | "today" | "needs_update" | "awaiting_resolution" | "at_risk") | null;
             };
             header?: never;
             path?: never;
@@ -13267,6 +13715,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_failure_orders__order_id__resolve_failure_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveFailureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delivery_attempts_orders__order_id__attempts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAttemptOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_photo_orders__order_id__attempts__attempt_no__photo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+                attempt_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attempt_photo_orders__order_id__attempts__attempt_no__photo_post: {
+        parameters: {
+            query?: {
+                photo_type?: "delivery" | "damage" | "door" | "other";
+            };
+            header?: never;
+            path: {
+                order_id: number;
+                attempt_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attempt_photo_orders__order_id__attempts__attempt_no__photo_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAttemptOut"];
                 };
             };
             /** @description Validation Error */
@@ -16059,6 +16643,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_exceptions_exceptions__get: {
+        parameters: {
+            query?: {
+                status?: "active" | "all" | "open" | "in_progress" | "waiting" | "resolved" | "merged";
+                team?: ("warehouse" | "fleet" | "support" | "management") | null;
+                severity?: ("low" | "medium" | "high" | "critical") | null;
+                urgent?: boolean;
+                owner_id?: number | null;
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_exceptions_scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionScanOut"];
+                };
+            };
+        };
+    };
+    get_exception_exceptions__exception_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exception_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_exceptions__exception_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exception_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionDetailOut"];
                 };
             };
             /** @description Validation Error */
@@ -20088,6 +20794,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_shipment_shipping_shipments_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShipmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentPreviewOut"];
                 };
             };
             /** @description Validation Error */

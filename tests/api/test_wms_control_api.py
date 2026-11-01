@@ -71,7 +71,7 @@ def test_analytics_valuation_labels_scan_and_readiness(env):  # noqa: F811
     a = t["a"]
     shelf = _bin(client, a, "A-01")
     kpis = client.get("/analytics/kpis", headers=a["manager"])
-    assert kpis.status_code == 200 and len(kpis.json()["kpis"]) == 9
+    assert kpis.status_code == 200 and len(kpis.json()["kpis"]) == 10
     assert client.get("/valuation/", headers=a["manager"]).status_code == 403
     val = client.get("/valuation/", headers=a["admin"]).json()
     assert val["totals"]["weighted_average"] == 3000 and val["items"][0]["quantity"] == 30

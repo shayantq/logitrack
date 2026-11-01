@@ -37,6 +37,7 @@ const PickingPage = lazy(() => import("./pages/warehouse/PickingPage"));
 const ShippingPage = lazy(() => import("./pages/warehouse/ShippingPage"));
 const TransfersPage = lazy(() => import("./pages/warehouse/TransfersPage"));
 const BackordersPage = lazy(() => import("./pages/warehouse/BackordersPage"));
+const ExceptionsPage = lazy(() => import("./pages/ExceptionsPage"));
 const ReplenishmentRulesPage = lazy(() => import("./pages/warehouse/ReplenishmentRulesPage"));
 const DispositionsPage = lazy(() => import("./pages/warehouse/DispositionsPage"));
 const AnalyticsPage = lazy(() => import("./pages/control/AnalyticsPage"));
@@ -183,6 +184,7 @@ export function App() {
             <Route path="shipping" element={guard(ORG_STAFF, <ShippingPage />)} />
             <Route path="transfers" element={guard(ORG_STAFF, <TransfersPage />)} />
             <Route path="backorders" element={guard(ORG_STAFF, <BackordersPage />)} />
+            <Route path="exceptions" element={guard(ORG_STAFF, <ExceptionsPage />)} />
             <Route path="replenishment" element={guard(ORG_STAFF, <ReplenishmentRulesPage />)} />
             <Route path="dispositions" element={guard(ORG_STAFF, <DispositionsPage />)} />
             <Route path="analytics" element={guard(ORG_STAFF, <AnalyticsPage />)} />

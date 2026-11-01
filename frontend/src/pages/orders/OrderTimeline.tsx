@@ -34,6 +34,9 @@ export function OrderTimeline({ orderId, version }: { orderId: number; version: 
           <span><span className="text-muted">مرحله فعلی: </span><b>{data.stage}</b></span>
           {data.last_action && <span><span className="text-muted">آخرین اقدام: </span>{data.last_action}
             {data.last_action_at && <span className="text-xs text-muted"> ({faShortDateTime(data.last_action_at)})</span>}</span>}
+          {data.eta?.eta && <span data-testid="timeline-eta" data-risk={data.eta.at_risk}>
+            <span className="text-muted">{data.eta.label} برای رسیدن: </span>{faShortDateTime(data.eta.eta)}
+            <span className="text-xs text-muted"> (به‌روزرسانی {faShortDateTime(data.eta.computed_at)})</span></span>}
         </div>
         {data.blocker && (
           <p className="mt-2 flex items-center gap-1.5 font-medium text-warning" data-testid="timeline-blocker">

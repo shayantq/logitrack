@@ -360,6 +360,27 @@ class ShipmentCreate(BaseModel):
     note: Optional[Note] = None
 
 
+class ShipmentPreviewOrder(BaseModel):
+    id: int
+    tracking_code: str
+    weight_kg: float
+    volume_m3: float
+
+
+class ShipmentPreviewOut(BaseModel):
+    weight_kg: float
+    volume_m3: float
+    other_weight_kg: float
+    other_volume_m3: float
+    max_weight_kg: Optional[float] = None
+    max_volume_m3: Optional[float] = None
+    weight_pct: Optional[float] = None
+    volume_pct: Optional[float] = None
+    ok: bool
+    message: Optional[str] = None
+    over_orders: list[ShipmentPreviewOrder]
+
+
 class DispatchIn(BaseModel):
     note: Optional[Note] = None
 

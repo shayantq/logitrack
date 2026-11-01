@@ -161,6 +161,10 @@ def _detail(db: Session, ticket: Ticket, side: str) -> dict:
             (side == "org" and ticket.source != "org") or (side == "platform" and ticket.source == "org")),
         can_manage=side == "org" and ticket.source != "org",
     )
+    if side == "org" and ticket.source != "org" and ticket.assignee_id is None and ticket.status == "open":
+        from app.services import assignee_service
+        order = db.get(Order, ticket.order_id) if ticket.order_id else None
+        data["suggested_assignee"] = assignee_service.for_ticket(db, order.warehouse_id if order else None)
     return data
 
 
@@ -259,6 +263,17 @@ def create_ticket(db: Session, user: User, *, category: str, subject: str | None
     db.commit()
     db.refresh(ticket)
     return _detail(db, ticket, side)
+
+
+def open_dispute(db: Session, user: User, order: Order, note: str | None) -> Ticket:
+    """اختلاف روی تحویل ناموفق: تیکت متصل به سفارش در صف سازمان (بدون commit). پیام داخلی است و مشتری لینکی ندارد."""
+    ticket = Ticket(organization_id=order.organization_id, code=_new_code(db), subject=f"اختلاف تحویل — سفارش {order.tracking_code}",
+                    category="other", source="customer", priority="high", handler="org", status="open", waiting_on="org",
+                    order_id=order.id, requester_name=order.recipient_name or "مشتری", requester_mobile=order.recipient_mobile)
+    db.add(ticket)
+    db.flush()
+    _add(db, ticket, "org", note or "برای تحویل ناموفق این سفارش اختلاف ثبت شد.", "staff", user=user)
+    return ticket
 
 
 def create_customer_ticket(db: Session, tracking_code: str, phone_last4: str, *, category: str, body: str,

@@ -5,6 +5,7 @@ import { api, errorMessage, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { SuggestionList } from "@/components/dispatch/SuggestionList";
 import { OrderRouteCard } from "@/components/map/RouteCard";
+import { DeliveryAttempts, FAILURE_RESOLUTION, FailureResolution } from "./DeliveryPanel";
 import { OrderSettlement } from "./OrderSettlement";
 import { OrderTimeline } from "./OrderTimeline";
 import { OrderStatusBadge } from "@/components/StatusBadges";
@@ -80,7 +81,8 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
   return (
     <Modal open={orderId !== null} onClose={onClose} size="lg" testId="order-detail"
       title={order ? <span className="flex flex-wrap items-center gap-3"><span className="font-mono ltr">{order.tracking_code}</span><OrderStatusBadge status={order.status} />
-        {order.priority && <Badge tone="danger">فوری</Badge>}</span> : "جزئیات سفارش"}
+        {order.priority && <Badge tone="danger">فوری</Badge>}
+        {order.failure_resolution && FAILURE_RESOLUTION[order.failure_resolution] && <span data-testid="failure-resolution"><Badge tone="warning">{FAILURE_RESOLUTION[order.failure_resolution]}</Badge></span>}</span> : "جزئیات سفارش"}
       footer={<>
         <Button variant="secondary" onClick={onClose}>بستن</Button>
         {isAdmin && order && <Button variant="outline-danger" loading={remove.isPending}
@@ -156,7 +158,13 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
             </div>
           )}
 
-          <OrderTimeline orderId={order.id} version={`${order.status}-${order.history.length}-${order.priority}`} />
+          {order.status === "failed" && (order.failure_resolution == null || order.failure_resolution === "dispute")
+            && (isAdmin || (me.role === "warehouse_manager" && order.warehouse_id === me.warehouse_id))
+            && <FailureResolution order={order} onDone={refresh} />}
+
+          <DeliveryAttempts order={order} />
+
+          <OrderTimeline orderId={order.id} version={`${order.status}-${order.history.length}-${order.priority}-${order.failure_resolution}`} />
         </div>
       )}
     </Modal>

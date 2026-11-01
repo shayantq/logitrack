@@ -94,8 +94,7 @@ def orders(db: Session, user: User, action: str, ids: list[int], params: dict, d
                 raise _Invalid("این سفارش از انبار شما ارسال نمی‌شود.", unauthorized=True)
             if order.status != "pending":
                 raise _Invalid("فقط سفارش «در انتظار تخصیص» خودرو می‌گیرد.")
-            dispatch = order_service._dispatch_args(order.total_weight_kg, order.delivery_window_start, order.delivery_window_end,
-                                                    order.destination_city, order.destination_province, exclude_order_id=order.id)
+            dispatch = order_service._order_dispatch(db, order)
             if vehicle_id:
                 ev = dispatch_service.check_vehicle(db, vehicle_id, **dispatch)
                 if ev is None or not ev.eligible:

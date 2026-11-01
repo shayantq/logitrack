@@ -26,7 +26,7 @@ def _wf(code, label, states: dict[str, str], finals, transitions, note=None) -> 
 
 
 WORKFLOWS = [
-    _wf("order", "سفارش مشتری", ORDER_LABELS, ("delivered", "failed", "canceled", "expired"), [
+    _wf("order", "سفارش مشتری", ORDER_LABELS, ("delivered", "canceled", "expired"), [
         ("pending", "assigned", "تخصیص خودرو و راننده (دستی یا هوشمند)", f"{STAFF} / {SYSTEM}"),
         ("pending", "canceled", "لغو و آزادسازی رزرو", STAFF),
         ("pending", "expired", "گذشتن بازه تحویل", SYSTEM),
@@ -37,9 +37,11 @@ WORKFLOWS = [
         ("picked_up", "in_transit", "شروع مسیر", DRIVER),
         ("in_transit", "delivered", "تحویل به مشتری", DRIVER),
         ("assigned", "failed", "ناموفق", DRIVER), ("picking_up", "failed", "ناموفق", DRIVER),
-        ("picked_up", "failed", "ناموفق (برگشت کالا در انتظار بازرسی)", DRIVER),
-        ("in_transit", "failed", "ناموفق (برگشت کالا در انتظار بازرسی)", DRIVER),
-    ], "موجودی هنگام ثبت رزرو، هنگام بارگیری با حواله خروج کسر و در لغو/انقضا آزاد می‌شود."),
+        ("picked_up", "failed", "ناموفق (منتظر تعیین تکلیف)", DRIVER),
+        ("in_transit", "failed", "ناموفق (منتظر تعیین تکلیف)", DRIVER),
+        ("failed", "assigned", "تحویل دوباره با بازه و خودروی تازه", ADMIN),
+    ], "موجودی هنگام ثبت رزرو، هنگام بارگیری با حواله خروج کسر و در لغو/انقضا آزاد می‌شود. "
+       "کالای سفارش ناموفق فقط با تصمیم «برگشت به انبار» برمی‌گردد."),
     _wf("fulfillment", "آماده‌سازی سفارش در انبار", {"open": "آماده‌نشده", "picking": "در حال برداشت", "picked": "برداشت‌شده",
                                                     "packed": "بسته‌بندی‌شده", "shipped": "ارسال‌شده"}, ("shipped",), [
         ("open", "picking", "ساخت فهرست برداشت", STAFF), ("picking", "picked", "اسکن و برداشت همه سطرها", STAFF),

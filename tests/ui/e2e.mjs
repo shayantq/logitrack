@@ -1445,8 +1445,8 @@ await session("wms-control", "qazvin_admin", "admin123", async page => {
   check("wms-control", "nav groups collapse and the sidebar folds to icons", true);
 
   await page.click("[data-testid=app-nav] >> text=شاخص‌های عملکرد");
-  await page.waitForFunction(() => document.querySelectorAll("[data-testid=kpi-tile]").length === 9, null, { timeout: 15000 });
-  check("wms-control", "KPI dashboard shows nine indicators with trend charts", (await page.locator("[data-testid=kpi-trend]").count()) === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-testid=kpi-tile]").length === 10, null, { timeout: 15000 });
+  check("wms-control", "KPI dashboard shows ten indicators with trend charts", (await page.locator("[data-testid=kpi-trend]").count()) === 2);
 
   await page.click("[data-testid=app-nav] >> text=ارزش‌گذاری و کالای راکد");
   await page.waitForSelector("[data-testid=valuation-table] [data-testid=valuation-row]", { timeout: 15000 });
@@ -2044,6 +2044,96 @@ await session("productivity-platform", "superadmin", "superadmin123", async page
   await page.waitForSelector("[data-testid=search-group-organization], [data-testid=search-empty]");
   check("platform", "global search for platform staff", true);
 });
+
+// ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------
+const reliabilityAdmin = await apiToken("qazvin_admin", "admin123");
+const reliabilityDriver = await apiToken("qazvin_driver1", "driver123");
+const failOrder = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین",
+  customer: { name: "مشتری تحویل ناموفق", mobile: "09121239877" }, vehicle_id: routeVehicle.id });
+const proofOrder = await orderFor(iranDate(0), { destination_city: "قزوین", destination_province: "قزوین",
+  customer: { name: "مشتری مدرک تحویل", mobile: "09121239878" }, vehicle_id: routeVehicle.id });
+for (const o of [failOrder, proofOrder]) {
+  await apiCall(reliabilityDriver, "PUT", `/orders/${o.id}/status`, { order_status: "picked_up" });
+  await apiCall(reliabilityDriver, "PUT", `/orders/${o.id}/status`, { order_status: "in_transit" });
+}
+const stockBefore = await apiCall(reliabilityAdmin, "GET", `/orders/${failOrder.id}`);
+
+await session("reliability-driver", "qazvin_driver1", "driver123", async page => {
+  await page.goto(`${BASE}/app/driver`);
+  const proofCard = page.locator("[data-testid=driver-order]", { hasText: proofOrder.tracking_code });
+  await proofCard.locator("[data-testid=driver-deliver]").click();
+  await page.waitForSelector("[data-testid=outcome-modal]");
+  check("reliability", "reason fields stay hidden until failure is chosen", (await page.locator("[data-testid=outcome-reason]").count()) === 0);
+  await page.fill("[data-testid=outcome-recipient]", "نگهبان ساختمان");
+  await choose(page, "[data-testid=outcome-role]", "guard");
+  await page.fill("[data-testid=outcome-issue]", "یک کارتن خیس بود");
+  await page.setInputFiles("[data-testid=outcome-photo]", { name: "proof.png", mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
+  await page.click("[data-testid=outcome-save]");
+  await page.waitForSelector("[data-testid=outcome-modal]", { state: "detached" });
+  await proofCard.waitFor({ state: "detached" }).catch(() => {});
+  check("reliability", "driver records proof of delivery", true);
+
+  const failCard = page.locator("[data-testid=driver-order]", { hasText: failOrder.tracking_code });
+  await failCard.locator("[data-testid=driver-fail]").click();
+  await page.waitForSelector("[data-testid=outcome-reason]");
+  check("reliability", "failure needs a reason", await page.isDisabled("[data-testid=outcome-save]"));
+  await choose(page, "[data-testid=outcome-reason]", "recipient_absent");
+  await page.fill("[data-testid=outcome-note]", "تلفن پاسخ نداد");
+  await page.click("[data-testid=outcome-save]");
+  await page.waitForSelector("[data-testid=outcome-modal]", { state: "detached" });
+  check("reliability", "driver records failed attempt with reason", true);
+}, { viewport: { width: 420, height: 900 } });
+
+const proofAttempts = await apiCall(reliabilityAdmin, "GET", `/orders/${proofOrder.id}/attempts`);
+check("reliability", "proof saved with recipient and photo", proofAttempts[0]?.recipient_name === "نگهبان ساختمان" && proofAttempts[0]?.has_photo === true, JSON.stringify(proofAttempts));
+const failedPublic = await (await fetch(`${BASE}/public/track/${failOrder.tracking_code}`)).text();
+check("reliability", "customer tracking hides failure reason", !failedPublic.includes("تلفن پاسخ نداد") && !failedPublic.includes("recipient_absent"));
+const heldBack = await apiCall(reliabilityAdmin, "GET", `/orders/${failOrder.id}`);
+check("reliability", "failed order keeps stock until decided", heldBack.stock_state === stockBefore.stock_state && heldBack.stock_state === "issued" && heldBack.failure_resolution === null);
+
+await session("reliability-admin", "qazvin_admin", "admin123", async page => {
+  await page.goto(`${BASE}/app/orders?order=${failOrder.id}`);
+  await page.waitForSelector("[data-testid=failure-panel]");
+  check("reliability", "admin sees decision panel", true);
+  check("reliability", "attempt listed in order details", (await page.locator("[data-testid=attempt-row][data-outcome=failed]").count()) === 1);
+  await page.waitForSelector("[data-testid=order-history] li[data-source=attempt]");
+  check("reliability", "attempt appears on the timeline", true);
+  await page.click("[data-testid=resolve-redeliver]");
+  await page.waitForSelector("[data-testid=redeliver-form]");
+  await page.click("[data-testid=redeliver-save]");
+  await page.waitForSelector("[data-testid=failure-resolution] >> text=تحویل دوباره");
+  check("reliability", "redelivery scheduled from order details", (await page.locator("[data-testid=failure-panel]").count()) === 0);
+  await page.keyboard.press("Escape");
+
+  await page.goto(`${BASE}/app/orders?order=${proofOrder.id}`);
+  await page.click("[data-testid=attempt-photo]");
+  await page.waitForSelector("[data-testid=attempt-photo-image]");
+  check("reliability", "staff can open the delivery photo", true);
+  await page.keyboard.press("Escape");
+
+  await page.goto(`${BASE}/app/exceptions`);
+  await page.waitForSelector("[data-testid=exceptions-scan]");
+  await page.click("[data-testid=exceptions-scan]");
+  await page.locator("[data-testid=exception-card]").or(page.getByText("استثنایی نیست")).first().waitFor();
+  check("reliability", "exception center opens and scans", true);
+  const firstCard = page.locator("[data-testid=exception-card]").first();
+  if (await firstCard.count()) {
+    await firstCard.locator("[data-testid=exception-open]").click();
+    await page.waitForSelector("[data-testid=exception-events] li");
+    check("reliability", "exception shows its history", true);
+    await page.fill("[data-testid=exception-note]", "در حال پیگیری");
+    await page.click("[data-testid=exception-note-save]");
+    await page.waitForSelector("[data-testid=exception-events] >> text=در حال پیگیری");
+    check("reliability", "note added to exception history", true);
+    await page.keyboard.press("Escape");
+  }
+  await page.goto(`${BASE}/app/exceptions?status=resolved`);
+  await page.waitForSelector("[data-testid=exceptions-status]");
+  check("reliability", "exception filters live in the URL", (await page.textContent("[data-testid=exceptions-status]")).includes("حل‌شده"));
+});
+const redelivered = await (await fetch(`${BASE}/public/track/${failOrder.tracking_code}`)).json();
+check("reliability", "customer sees redelivery text", redelivered.status_text.includes("تلاش دوباره"), redelivered.status_text);
 
 // ---------------- مسیرهای قدیمی و ورود ناموفق ----------------
 await session("public", null, null, async page => {

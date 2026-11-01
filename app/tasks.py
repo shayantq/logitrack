@@ -335,6 +335,15 @@ def check_replenishment_rules_task():
     return _each_organization(work, "تأمین مجدد")
 
 
+@celery_app.task(name="tasks.detect_exceptions")
+def detect_exceptions_task():
+    """هر ۱۵ دقیقه: استثناهای تازه ثبت و موردهایی که دیگر صادق نیستند بسته می‌شوند."""
+    from app.services import exception_service
+    from app.core.tenancy import current_tenant
+
+    return _each_organization(lambda db: exception_service.detect(db, current_tenant(db)), "تشخیص استثنا")
+
+
 @celery_app.task(name="tasks.classify_abc")
 def classify_abc_task():
     """هر هفته: طبقه‌بندی ABC کالاها از ارزش مصرف یک سال اخیر (مبنای دوره شمارش)."""

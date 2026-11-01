@@ -22,6 +22,7 @@ from app.models import (
     Backorder, InboundReceipt, Inventory, Location, Order, PickLine, Product, PutawayTask, StockBalance, StockMovement,
     Stocktake, User,
 )
+from app.models_productivity import DeliveryAttempt
 from app.services import catalog_service, dispatch_service, location_service, permission_service, stocktake_service
 from app.services.exceptions import ConflictError
 
@@ -74,10 +75,19 @@ def kpis(db: Session, user: User, *, date_from: date | None = None, date_to: dat
 
     # ---- سفارش‌ها ----
     orders = wh(db.query(Order).filter(Order.created_at >= lo, Order.created_at < hi), Order.warehouse_id).all()
-    closed = [o for o in orders if o.status in ("delivered", "failed", "expired")]
+    # ناموفق فقط با «برگشت به انبار» بسته است؛ بی‌تکلیف، اختلاف و تحویل دوباره هنوز باز است
+    closed = [o for o in orders if o.status in ("delivered", "expired")
+              or (o.status == "failed" and o.failure_resolution in ("return_to_warehouse", "legacy"))]
     delivered = [o for o in closed if o.status == "delivered"]
     on_time = [o for o in delivered if o.delivered_at and o.delivered_at <= o.delivery_window_end]
     backordered = {oid for (oid,) in db.query(Backorder.order_id).filter(Backorder.order_id.in_({o.id for o in orders} or {-1})).all()}
+
+    # ---- تلاش‌های تحویل ----
+    attempts = db.query(DeliveryAttempt.outcome).filter(DeliveryAttempt.at >= lo, DeliveryAttempt.at < hi)
+    if warehouse_id:
+        attempts = attempts.join(Order, Order.id == DeliveryAttempt.order_id).filter(Order.warehouse_id == warehouse_id)
+    attempt_outcomes = [outcome for (outcome,) in attempts.all()]
+    failed_attempts = attempt_outcomes.count("failed")
 
     # ---- برداشت ----
     pick_lines = wh(db.query(PickLine).filter(PickLine.status.in_(("picked", "short")), PickLine.picked_at >= lo,
@@ -134,9 +144,12 @@ def kpis(db: Session, user: User, *, date_from: date | None = None, date_to: dat
              "سطرهای انبارگردانی بدون مغایرت ÷ همه سطرهای شمرده‌شده",
              detail=f"{acc['exact']} از {acc['lines']} سطر؛ دقت ارزشی {acc['value_accuracy'] if acc['value_accuracy'] is not None else '—'}٪"),
         _kpi("order_fulfillment", "نرخ تحقق سفارش", _pct(len(delivered), len(closed)), "%", 95.0,
-             "تحویل‌شده ÷ سفارش‌های بسته‌شده (تحویل، ناموفق، منقضی)", detail=f"{len(delivered)} از {len(closed)} سفارش"),
+             "تحویل‌شده ÷ سفارش‌های بسته‌شده (تحویل، منقضی، ناموفقِ برگشت‌خورده به انبار)", detail=f"{len(delivered)} از {len(closed)} سفارش"),
         _kpi("on_time_delivery", "تحویل به‌موقع", _pct(len(on_time), len(delivered)), "%", 90.0,
              "تحویل تا پایان بازه زمانی وعده‌داده‌شده", detail=f"{len(on_time)} از {len(delivered)} تحویل"),
+        _kpi("failed_attempt_rate", "نرخ تلاش ناموفق", _pct(failed_attempts, len(attempt_outcomes)), "%", 5.0,
+             "تلاش‌های ناموفق تحویل ÷ همه تلاش‌های تحویل در این بازه", higher_better=False,
+             detail=f"{failed_attempts} از {len(attempt_outcomes)} تلاش"),
         _kpi("fill_rate", "تأمین کامل سفارش", _pct(len(orders) - len(backordered), len(orders)), "%", 95.0,
              "سفارش‌هایی که بدون سفارش معوق از موجودی تأمین شدند", detail=f"{len(backordered)} سفارش با معوق"),
         _kpi("picking_accuracy", "دقت برداشت", _pct(exact_picks, len(pick_lines)), "%", 99.0,

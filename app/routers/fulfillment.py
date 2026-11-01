@@ -9,7 +9,7 @@ from app.dependencies import IdempotencyKey, user_dependency
 from app.schemas.fulfillment import (
     AbcRowOut, AbcRunIn, AbcRunOut, AllocateIn, AllocateOut, BackorderOut, DispatchIn, DispositionCreate, DispositionOut,
     FulfillIn, GenerateOut, PackIn, PackingQueueOut, PackingSlipOut, PickCandidateOut, PickIn, PickListCreate, PickListOut,
-    ReasonIn, ReplenishmentRuleIn, ReplenishmentRuleOut, ShipmentCreate, ShipmentOut, ShortIn, TransferCloseIn,
+    ReasonIn, ReplenishmentRuleIn, ReplenishmentRuleOut, ShipmentCreate, ShipmentOut, ShipmentPreviewOut, ShortIn, TransferCloseIn,
     TransferCreate, TransferOut, TransferReceiveIn,
 )
 from app.schemas.order import OrderResponse
@@ -193,6 +193,11 @@ def packing_slip(db: db_dependency, user: user_dependency, order_id: int = Path(
 def list_shipments(db: db_dependency, user: user_dependency, warehouse_id: Optional[int] = Query(None, gt=0),
                    status_: Optional[Literal[SHIPMENT_STATUSES]] = Query(None, alias="status")):
     return _call(shipping_service.list_shipments, db, user, warehouse_id=warehouse_id, status=status_)
+
+
+@shipping.post("/shipments/preview", response_model=ShipmentPreviewOut, summary="⚖️ پیش‌نمایش ظرفیت محموله (چیزی ذخیره نمی‌شود)")
+def preview_shipment(data: ShipmentCreate, db: db_dependency, user: user_dependency):
+    return _call(shipping_service.preview_shipment, db, user, data)
 
 
 @shipping.post("/shipments", response_model=ShipmentOut, status_code=status.HTTP_201_CREATED,

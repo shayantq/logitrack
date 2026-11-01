@@ -17,9 +17,11 @@ from app.models import (
 )
 from app.models_fulfillment import Backorder, Package, PickLine, PickList, Shipment
 from app.models_wms import StockDocument, StockReservation
-from app.services import order_service
+from app.models_productivity import ACTIVE_EXCEPTION_STATUSES, DeliveryAttempt
+from app.services import delivery_service, eta_service, exception_service, order_service
 
 AREAS = {"order": "سفارش", "warehouse": "انبار", "fleet": "ناوگان", "finance": "مالی", "support": "پشتیبانی"}
+EXCEPTION_AREA = {"warehouse": "warehouse", "fleet": "fleet", "support": "support", "management": "order"}
 
 
 def _now() -> datetime:
@@ -113,6 +115,24 @@ def timeline(db: Session, user, order_id: int) -> dict:
                                      None, None, "/app/shipping", source="shipment"))
     for c in checkpoints:
         events.append(_event(c.reached_at, "fleet", f"رسیدن به {c.city}", people.get(c.reported_by_id), source="checkpoint"))
+    attempts = db.query(DeliveryAttempt).filter(DeliveryAttempt.order_id == order.id).order_by(DeliveryAttempt.attempt_no).all()
+    if role == "driver":
+        attempts = [a for a in attempts if a.driver_id == user.id]
+    attempt_people = _names(db, [a.driver_id for a in attempts])
+    for a in attempts:
+        number = fa_digits(str(a.attempt_no))
+        if a.outcome == "delivered":
+            title = f"تلاش {number}: تحویل به {a.recipient_name}" if a.recipient_name else f"تلاش {number}: تحویل شد"
+            outcome = a.exception_note and f"کمبود یا آسیب: {a.exception_note}"
+        else:
+            title = f"تلاش {number}: {delivery_service.FAILURE_REASON_LABELS.get(a.failure_reason, 'ناموفق')}"
+            outcome = a.note
+        events.append(_event(a.at, "fleet", title, attempt_people.get(a.driver_id), outcome, source="attempt"))
+    exceptions = [] if role == "driver" else exception_service.active_for_order(db, order.id)
+    for x in exceptions:
+        label = exception_service.KINDS.get(x.kind, (x.kind,))[0]
+        events.append(_event(x.opened_at, EXCEPTION_AREA.get(x.team, "order"), f"استثنا: {label}", None, x.trigger_reason,
+                             "/app/exceptions", source="exception"))
     for b in backorders:
         events.append(_event(b.created_at, "warehouse", f"معوق: {products.get(b.product_id, '')}", None,
                              f"{fa_digits(str(b.quantity))} عدد", "/app/backorders", source="backorder"))
@@ -131,24 +151,32 @@ def timeline(db: Session, user, order_id: int) -> dict:
 
     events = [e for e in events if e["at"] is not None]
     events.sort(key=lambda e: e["at"])
-    blocker = _blocker(order, backorders, tickets)
+    eta = eta_service.estimate(db, order)
+    open_exception = next((x for x in exceptions if x.status in ACTIVE_EXCEPTION_STATUSES), None)
+    blocker = _blocker(order, backorders, tickets, eta, open_exception)
     return {
         "order_id": order.id, "tracking_code": order.tracking_code, "stage": labels.get(order.status, order.status),
         "last_action": events[-1]["title"] if events else None, "last_action_at": events[-1]["at"] if events else None,
-        "blocker": blocker, "events": events,
+        "blocker": blocker, "eta": eta, "events": events,
     }
 
 
-def _blocker(order, backorders, tickets) -> str | None:
+def _blocker(order, backorders, tickets, eta, open_exception) -> str | None:
     open_backorders = [b for b in backorders if b.status in ("open", "allocated")]
     if open_backorders:
         return f"کمبود موجودی: {fa_digits(str(len(open_backorders)))} قلم معوق"
-    if order.status == "failed":
+    if order.status == "failed" and order.failure_resolution is None:
         return "تحویل ناموفق؛ منتظر تصمیم"
+    if order.status == "failed" and order.failure_resolution == "dispute":
+        return "تحویل ناموفق؛ در حال رسیدگی به اختلاف"
     if order.status == "pending" and not order.vehicle_id:
         return "هنوز خودرو تعیین نشده"
     if order.status in ACTIVE_ORDER_STATUSES and order.delivery_window_end < _now():
         return "از بازه تحویل گذشته و هنوز تحویل نشده"
+    if eta and eta["at_risk"]:
+        return f"در خطر تأخیر: {eta['reason']}"
+    if open_exception is not None:
+        return open_exception.trigger_reason
     if any(t.status == "open" for t in tickets):
         return "تیکت باز پشتیبانی"
     return None

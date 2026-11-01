@@ -48,7 +48,14 @@ class ReplyOption(BaseModel):
     label: str
 
 
+class SuggestedAssignee(BaseModel):
+    id: int
+    name: str
+    open_count: int
+
+
 class TicketDetail(TicketSummary):
+    suggested_assignee: Optional[SuggestedAssignee] = None
     escalation_reason: Optional[str] = None
     requester_mobile: Optional[str] = None
     messages: list[TicketMessageOut]

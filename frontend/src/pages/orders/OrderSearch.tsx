@@ -18,7 +18,7 @@ const LABELS: Record<string, string> = {
   delivery_from: "تحویل از", delivery_to: "تحویل تا", priority: "فوری", view: "نما",
 };
 // نماهای نام‌دار سرور (همان تعریف کارت‌های مرکز اقدام)
-export const ORDER_VIEW_LABELS: Record<string, string> = { late: "دیرکرد", today: "فعال امروز", needs_update: "منتظر ثبت حرکت" };
+export const ORDER_VIEW_LABELS: Record<string, string> = { late: "دیرکرد", today: "فعال امروز", needs_update: "منتظر ثبت حرکت", awaiting_resolution: "ناموفقِ منتظر تصمیم", at_risk: "در خطر تأخیر" };
 
 const day = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return isoDate(d); };
 function weekRange() {

@@ -1,17 +1,19 @@
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, UploadFile
+from fastapi.responses import FileResponse
 from starlette import status
 
 from app.database import db_dependency
 from app.dependencies import IdempotencyKey, require_role, user_dependency
 from app.models import ACTIVE_ORDER_STATUSES, Order, RoleEnum, Vehicle
 from app.schemas.order import (
-    OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatus, OrderStatusRequest,
+    DeliveryAttemptOut, OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatus, OrderStatusRequest,
+    ResolveFailureRequest,
 )
 from app.schemas.action_center import BulkIn, BulkOut, OrderTimelineOut, PriorityIn
-from app.services import bulk_service, order_service, order_timeline_service
+from app.services import bulk_service, delivery_service, order_service, order_timeline_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(
@@ -132,6 +134,42 @@ def update_order_status(db: db_dependency, user: user_dependency, status_request
         return OrderDetailResponse.from_order(order_service.update_order_status(db, user, order_id, status_request))
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post('/{order_id}/resolve-failure', response_model=OrderDetailResponse, summary="🧭 تعیین تکلیف تحویل ناموفق")
+def resolve_failure(data: ResolveFailureRequest, db: db_dependency, user: user_dependency, order_id: int = Path(gt=0)):
+    """**سطح دسترسی:** ادمین سازمان همه گزینه‌ها؛ مدیر انبار مبدأ فقط «برگشت به انبار». موجودی فقط با «برگشت به انبار» برمی‌گردد."""
+    try:
+        return OrderDetailResponse.from_order(order_service.resolve_failure(db, user, order_id, data))
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get('/{order_id}/attempts', response_model=list[DeliveryAttemptOut], summary="🚪 تلاش‌های تحویل سفارش و مدرک هر کدام")
+def delivery_attempts(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0)):
+    try:
+        return delivery_service.attempts(db, user, order_id)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post('/{order_id}/attempts/{attempt_no}/photo', response_model=DeliveryAttemptOut, summary="📷 عکس مدرک تحویل (تا ۵ مگابایت)")
+async def upload_attempt_photo(file: UploadFile, db: db_dependency, user: user_dependency, order_id: int = Path(gt=0),
+                               attempt_no: int = Path(gt=0), photo_type: Literal["delivery", "damage", "door", "other"] = Query("delivery")):
+    data = await file.read(delivery_service.MAX_PHOTO_BYTES + 1)
+    try:
+        return delivery_service.save_photo(db, user, order_id, attempt_no, data, photo_type)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get('/{order_id}/attempts/{attempt_no}/photo', summary="📷 مشاهده عکس مدرک تحویل (ثبت در گزارش فعالیت)")
+def attempt_photo(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0), attempt_no: int = Path(gt=0)):
+    try:
+        path, media_type = delivery_service.photo_file(db, user, order_id, attempt_no)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    return FileResponse(path, media_type=media_type, headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.delete('/{order_id}', status_code=status.HTTP_204_NO_CONTENT, summary="❌ حذف کامل سفارش")

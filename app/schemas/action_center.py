@@ -107,6 +107,14 @@ class TimelineEvent(BaseModel):
     source: str = "status"      # status | reservation | document | pick | package | shipment | checkpoint | backorder | finance | ticket | rating
 
 
+class EtaOut(BaseModel):
+    eta: Optional[datetime] = None
+    computed_at: datetime
+    label: str
+    at_risk: bool
+    reason: Optional[str] = None
+
+
 class OrderTimelineOut(BaseModel):
     order_id: int
     tracking_code: str
@@ -114,6 +122,7 @@ class OrderTimelineOut(BaseModel):
     last_action: Optional[str] = None
     last_action_at: Optional[datetime] = None
     blocker: Optional[str] = None
+    eta: Optional[EtaOut] = None
     events: list[TimelineEvent]
 
 

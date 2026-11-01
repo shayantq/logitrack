@@ -16,7 +16,7 @@ import { SavedViews } from "@/components/SavedViews";
 import { useToast } from "@/components/Toast";
 import { TicketThread } from "@/components/tickets/TicketThread";
 import { useUsers } from "@/hooks/data";
-import { faShortDateTime } from "@/lib/format";
+import { faNumber, faShortDateTime } from "@/lib/format";
 import { messageForm, postForm, TICKET_CATEGORIES, TICKET_PRIORITY, TICKET_SOURCE, TICKET_STATUS, waitingLabel, type Side, type Ticket, type TicketRow } from "@/lib/tickets";
 import { confirmDialog, promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
@@ -332,6 +332,12 @@ function TicketPanel({ id, mode }: { id: number; mode: Mode }) {
                   {(staff.data ?? []).filter(u => u.role === "org_admin" || u.role === "warehouse_manager")
                     .map(u => <option key={u.id} value={u.id}>{u.full_name || u.username}</option>)}
                 </Select>
+              )}
+              {me.role === "org_admin" && t.suggested_assignee && (
+                <Button size="sm" variant="soft" data-testid="ticket-suggest"
+                  onClick={() => action.mutate(() => unwrap(api.PATCH("/tickets/{ticket_id}", { ...path, body: { assignee_id: t.suggested_assignee!.id, unassign: false } })))}>
+                  پیشنهاد: {t.suggested_assignee.name} ({faNumber(t.suggested_assignee.open_count)} مورد باز)
+                </Button>
               )}
             </div>
           )}

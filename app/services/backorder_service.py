@@ -43,6 +43,8 @@ def open_backorder(db: Session, user: User | None, order: Order, product: Produc
     event_bus.emit(db, "backorder.created", "backorder", backorder.id,
                    {"order_id": order.id, "product_id": product.id, "quantity": quantity}, organization_id=order.organization_id,
                    actor=user)
+    from app.services import replenishment_rule_service
+    replenishment_rule_service.check_product(db, user, product.id, order.warehouse_id)
     return backorder
 
 
