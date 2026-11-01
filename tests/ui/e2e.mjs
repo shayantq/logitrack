@@ -1863,15 +1863,12 @@ await session("capital", "admin", "admin123", async page => {
     await page.waitForURL(/\/app\/inventory$/);
     await page.waitForSelector(`[data-focus="product-${product.id}"].focus-flash`, { timeout: 10000 });
     check("notifications", "click opens the item in the inventory tab", true);
-    const inView = await page.evaluate(id => {
+    // اسکرول نرم است و زمانش به طول فهرست و سرعت ماشین بستگی دارد
+    const inView = await page.waitForFunction(id => {
       const r = document.querySelector(`[data-focus="product-${id}"]`).getBoundingClientRect();
       return r.top >= 0 && r.bottom <= innerHeight;
-    }, product.id);
-    await page.waitForTimeout(600);
-    check("notifications", "item scrolled into view", inView || await page.evaluate(id => {
-      const r = document.querySelector(`[data-focus="product-${id}"]`).getBoundingClientRect();
-      return r.top >= 0 && r.bottom <= innerHeight;
-    }, product.id));
+    }, product.id, { timeout: 8000 }).then(() => true, () => false);
+    check("notifications", "item scrolled into view", inView);
     await page.click("[data-testid=notifications-bell]");
     await item.waitFor();
     check("notifications", "opened item is now read", (await item.getAttribute("data-read")) === "1");
