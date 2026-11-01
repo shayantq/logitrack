@@ -37,6 +37,9 @@ EXCEPTIONS_OPEN = Gauge("pasineh_exceptions_open", "استثناهای باز", 
 
 task_id: ContextVar[str | None] = ContextVar("task_id", default=None)
 task_organization: ContextVar[int | None] = ContextVar("task_organization", default=None)
+task_started: ContextVar[float | None] = ContextVar("task_started", default=None)
+# فقط این فیلدهای اضافه از extra لاگ به خط JSON می‌روند؛ ورودی و خروجی وظیفه هرگز
+LOG_EXTRAS = ("task_name", "duration_ms", "outcome")
 
 
 class JsonFormatter(logging.Formatter):
@@ -52,6 +55,8 @@ class JsonFormatter(logging.Formatter):
             "user_id": state.get("user_id"),
             "task_id": task_id.get(),
         }
+        for key in LOG_EXTRAS:
+            data[key] = getattr(record, key, None)
         if record.exc_info:
             data["exception"] = "".join(traceback.format_exception(*record.exc_info))[-4000:]
         return json.dumps({k: v for k, v in data.items() if v is not None}, ensure_ascii=False)

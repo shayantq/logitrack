@@ -15,7 +15,7 @@ from app.core.security import create_access_token
 from app.core.tenancy import set_tenant
 from app.database import pool_options
 from app.models import Organization, Product, RoleEnum, User, Warehouse
-from app.tasks import _copy_request_id, _start_task_context
+from app.tasks import _copy_request_id, _end_task_context, _format_task_logs, _start_task_context
 
 
 def _auth(user) -> dict:
@@ -174,6 +174,30 @@ def test_request_id_travels_to_the_task():
     finally:
         observability.task_id.set(None)
         request_context.request_id.set(None)
+
+
+def test_task_end_logs_name_duration_and_outcome_without_inputs(caplog):
+    secret = "09121234567"
+    task = SimpleNamespace(name="tasks.send_sms", request=SimpleNamespace(get=lambda key, default=None: {"args": [secret]}.get(key, default)))
+    _start_task_context(task_id="task-2", task=task, args=[secret], kwargs={"text": secret})
+    with caplog.at_level(logging.INFO, logger="app.tasks"):
+        _end_task_context(task_id="task-2", task=task, state="FAILURE", args=[secret], kwargs={"text": secret}, retval=secret)
+    record = next(r for r in caplog.records if r.name == "app.tasks")
+    line = json.loads(observability.JsonFormatter().format(record))
+    assert line["task_name"] == "tasks.send_sms" and line["outcome"] == "FAILURE" and line["duration_ms"] >= 0
+    assert secret not in json.dumps(line)
+    assert observability.task_started.get() is None and observability.task_id.get() is None
+
+
+def test_celery_success_line_with_task_output_is_silenced():
+    _format_task_logs(logger=logging.getLogger("tests.unused"))
+    assert logging.getLogger("celery.app.trace").getEffectiveLevel() == logging.WARNING
+
+
+def test_task_end_without_a_start_writes_nothing(caplog):
+    with caplog.at_level(logging.INFO, logger="app.tasks"):
+        _end_task_context(task=SimpleNamespace(name="x"), state="SUCCESS")
+    assert not [r for r in caplog.records if r.name == "app.tasks"]
 
 
 def test_pool_settings_only_apply_to_postgres(monkeypatch):

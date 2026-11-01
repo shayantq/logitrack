@@ -12,6 +12,7 @@
 import io
 import logging
 import os
+import time
 import base64
 import pandas as pd
 
@@ -96,6 +97,8 @@ def _tenant_session(organization_id: int):
 @after_setup_task_logger.connect
 def _format_task_logs(logger=None, **_):
     observability.format_celery_logger(logger)
+    # خط موفقیت Celery خروجی وظیفه را هم چاپ می‌کند (مثلاً محتوای گزارش). خط «وظیفه تمام شد» جایش را می‌گیرد و خطاها می‌مانند.
+    logging.getLogger("celery.app.trace").setLevel(logging.WARNING)
 
 
 @worker_process_init.connect
@@ -116,11 +119,18 @@ def _copy_request_id(headers=None, **_):
 @task_prerun.connect
 def _start_task_context(task_id=None, task=None, **_):
     observability.task_id.set(task_id)
+    observability.task_started.set(time.perf_counter())
     request_context.request_id.set(task.request.get("pasineh_request_id") if task is not None else None)
 
 
 @task_postrun.connect
-def _end_task_context(**_):
+def _end_task_context(task=None, state=None, **_):
+    """پایان هر وظیفه یک خط لاگ با نام، مدت و نتیجه؛ ورودی و خروجی وظیفه در آن نیست."""
+    started = observability.task_started.get()
+    if started is not None:
+        logger.info("وظیفه تمام شد", extra={"task_name": getattr(task, "name", None), "outcome": state,
+                                            "duration_ms": round((time.perf_counter() - started) * 1000)})
+    observability.task_started.set(None)
     observability.task_id.set(None)
     observability.task_organization.set(None)
     request_context.request_id.set(None)
