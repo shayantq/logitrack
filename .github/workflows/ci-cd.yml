@@ -326,7 +326,7 @@ jobs:
           cd "$1"
           mkdir -p backups
           if docker compose ps --status running --services | grep -qx db; then
-            docker compose exec -T db pg_dump -U postgres -d logitrack | gzip > "backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"
+            ( umask 077; docker compose exec -T db pg_dump -U postgres -d logitrack | gzip > "backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz" )
             ls -1t backups/pre-deploy-*.sql.gz | tail -n +15 | xargs -r rm --
           fi
           git pull --ff-only origin main

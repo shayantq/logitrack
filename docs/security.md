@@ -137,24 +137,23 @@ sudo ufw status                               # فقط 22، 80 و 443 باز
 
 ### پشتیبان رمزگذاری‌شده بیرون از سرور (SEC-15)
 
-پیشنهاد: **RPO ۲۴ ساعت** (حداکثر یک روز داده از دست برود) و **RTO ۲ ساعت** (بازگشت کامل).
+هدف پیشنهادی، نه نتیجه اندازه‌گیری‌شده: **RPO ۲۴ ساعت** (حداکثر یک روز داده از دست برود) و **RTO ۲ ساعت** (بازگشت کامل).
 
 ```bash
 # یک بار: کلید رمزگذاری پشتیبان (جای امن و بیرون از سرور هم نگه دارید)
 sudo install -m 600 /dev/null /root/.pasineh-backup-key && openssl rand -base64 32 | sudo tee /root/.pasineh-backup-key >/dev/null
 # هر شب ساعت ۳ (crontab -e کاربر root)
-0 3 * * * cd /opt/logitrack && docker compose exec -T db pg_dump -U postgres -d logitrack | gzip | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/root/.pasineh-backup-key -out backups/nightly-$(date +\%F).sql.gz.enc && find backups -name 'nightly-*.enc' -mtime +14 -delete
+0 3 * * * umask 077; cd /opt/logitrack && docker compose exec -T db pg_dump -U postgres -d logitrack | gzip | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/root/.pasineh-backup-key -out backups/nightly-$(date +\%F).sql.gz.enc && find backups -name 'nightly-*.enc' -mtime +14 -delete
 # سپس انتقال به فضای بیرونی (مثلاً با rclone به فضای ابری) — همین پوشه backups/
 ```
 
-تمرین بازگردانی، ماهی یک بار، روی دیتابیس جدا:
+تمرین بازیابی، ماهی یک بار، فقط با کانتینر موقت بدون شبکه. هرگز دیتابیس آزمایشی روی سرویس زنده ساخته یا حذف نشود:
 
 ```bash
-openssl enc -d -aes-256-cbc -pbkdf2 -pass file:/root/.pasineh-backup-key -in backups/nightly-YYYY-MM-DD.sql.gz.enc | gunzip > /tmp/restore.sql
-docker compose exec -T db createdb -U postgres restore_check && docker compose exec -T db psql -U postgres -d restore_check -q < /tmp/restore.sql
-docker compose exec -T db psql -U postgres -d restore_check -c "select count(*) from orders"   # مقایسه با دیتابیس اصلی
-docker compose exec -T db dropdb -U postgres restore_check && rm /tmp/restore.sql
+cd /opt/logitrack && DRILL_ENV=production BACKUP_KEY_FILE=/root/.pasineh-backup-key bash scripts/verify-backup.sh backups/nightly-YYYY-MM-DD.sql.gz.enc
 ```
+
+جزئیات و ثبت نتیجه در `docs/runbooks.md` است.
 
 ### کاربر استقرار و SSH (SEC-12)
 

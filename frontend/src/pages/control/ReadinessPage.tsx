@@ -177,8 +177,8 @@ function ImportCard() {
           </div>
         )}
         <p className="rounded-xl bg-surface-2 p-3 text-xs leading-6 text-text-2">
-          <b>تأیید بکاپ:</b> روی سرور <code className="ltr">bash scripts/verify-backup.sh</code> آخرین بکاپ شبانه را در یک دیتابیس موقت بازیابی
-          و تعداد ردیف‌ها را با دیتابیس اصلی مقایسه می‌کند؛ بعد از موفقیت، مورد «بکاپ بازیابی آزمایشی شد» را تیک بزنید.</p>
+          <b>تأیید بکاپ:</b> روی سرور <code className="ltr">bash scripts/verify-backup.sh</code> تازه‌ترین بکاپ را در یک کانتینر موقت بدون شبکه بازیابی
+          و سالم بودنش را می‌سنجد. این کار به دیتابیس اصلی وصل نمی‌شود. بعد از موفقیت، مورد «بکاپ بازیابی آزمایشی شد» را تیک بزنید.</p>
       </div>
     </Card>
   );
