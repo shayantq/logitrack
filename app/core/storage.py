@@ -140,6 +140,15 @@ def save(relative_path: str, data: bytes) -> str:
     return relative_path
 
 
+def save_new(relative_path: str, data: bytes) -> str:
+    """فایلی که هرگز نباید بازنویسی شود: اگر این نام از قبل باشد خطا می‌دهد."""
+    path = _resolve(relative_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "xb") as out:
+        out.write(data)
+    return relative_path
+
+
 def path_of(relative_path: str) -> Path | None:
     path = _resolve(relative_path)
     return path if path.is_file() else None

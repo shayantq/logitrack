@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from app.core import storage
 from app.database import Base
 from app.models import AuthSession, Customer, Order, Organization, Ticket, TicketMessage, User, Warehouse
-from app.models_productivity import FeatureFlag, OutboundMessage, PlanChange, SupportAccessGrant, TenantExport
+from app.models_productivity import DeliveryEvidence, DeliveryEvidenceEvent, DeliveryEvidenceNote, FeatureFlag, OutboundMessage, PlanChange, SupportAccessGrant, TenantExport
 from app.services import audit_service
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
@@ -43,7 +43,7 @@ EXPORT_VALID = timedelta(days=30)
 # ستون‌هایی که هرگز از سازمان خارج نمی‌شوند
 EXPORT_SECRET_COLUMNS = {"hashed_password", "totp_secret", "totp_last_step", "token_version", "access_token", "rating_token", "request_hash", "idempotency_key"}
 # جدول‌های سند و گزارش فعالیت با trigger غیرقابل‌تغییرند و در پاک‌سازی دست نمی‌خورند
-IMMUTABLE_TABLES = {"stock_movements", "stock_movement_lines", "domain_events", "stock_documents", "audit_logs"}
+IMMUTABLE_TABLES = {"stock_movements", "stock_movement_lines", "domain_events", "stock_documents", "audit_logs", "delivery_evidence", "delivery_evidence_events"}
 PII_COLUMNS = {
     "recipient_name", "recipient_mobile", "requester_name", "requester_mobile", "destination_address", "destination_postal_code", "first_name", "last_name",
     "national_code", "birth_date", "mobile", "address", "postal_code", "note", "exception_note", "body", "photo_path", "attachment_path", "decision_note", "response_note",
@@ -372,6 +372,21 @@ def erase_due(db: Session, now: datetime | None = None) -> int:
     return len(due)
 
 
+def _redact_delivery_evidence(db: Session, organization_id: int) -> None:
+    """ردیف مدرک دست نمی‌خورد: توضیح جدا حذف می‌شود و پاک شدن توضیح و فایل با رویداد فقط‌افزودنی ثبت می‌شود."""
+    now, reason = _now(), "پاک‌سازی پس از خروج سازمان"
+    evidence = db.query(DeliveryEvidence.id).filter(DeliveryEvidence.organization_id == organization_id).execution_options(skip_tenant_filter=True).all()
+    notes = {evidence_id for (evidence_id,) in db.query(DeliveryEvidenceNote.evidence_id).filter(
+        DeliveryEvidenceNote.organization_id == organization_id).execution_options(skip_tenant_filter=True).all()}
+    for (evidence_id,) in evidence:
+        db.add(DeliveryEvidenceEvent(organization_id=organization_id, evidence_id=evidence_id, event_type="file_deleted", reason=reason, at=now))
+        if evidence_id in notes:
+            db.add(DeliveryEvidenceEvent(organization_id=organization_id, evidence_id=evidence_id, event_type="note_redacted", reason=reason, at=now))
+    db.query(DeliveryEvidenceNote).filter(DeliveryEvidenceNote.organization_id == organization_id).execution_options(
+        skip_tenant_filter=True).delete(synchronize_session=False)
+    db.flush()
+
+
 def erase_organization(db: Session, organization_id: int) -> None:
     """داده شخصی و فایل‌ها پاک می‌شود؛ اسناد انبار و گزارش فعالیت که عمداً غیرقابل‌تغییرند می‌مانند. اجرای دوباره بی‌اثر است."""
     org = _org(db, organization_id)
@@ -385,6 +400,7 @@ def erase_organization(db: Session, organization_id: int) -> None:
         user.hashed_password, user.totp_secret, user.totp_enabled_at = "!", None, None
         user.token_version = (user.token_version or 0) + 1
     db.flush()
+    _redact_delivery_evidence(db, organization_id)
     for table in Base.metadata.sorted_tables:
         if "organization_id" not in table.c or table.name in IMMUTABLE_TABLES or table.name == "users":
             continue

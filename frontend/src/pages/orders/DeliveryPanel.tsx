@@ -36,8 +36,8 @@ export function DeliveryAttempts({ order }: { order: Order }) {
     queryFn: () => unwrap(api.GET("/orders/{order_id}/attempts", { params: { path: { order_id: order.id } } })),
     enabled: (order.delivery_attempt_count ?? 0) > 0,
   });
-  const showPhoto = async (attempt: number) => {
-    const res = await authFetch(`/orders/${order.id}/attempts/${attempt}/photo`);
+  const showPhoto = async (attempt: number, evidence: number) => {
+    const res = await authFetch(`/orders/${order.id}/attempts/${attempt}/evidence/${evidence}/file`);
     if (res.ok) setPhoto(URL.createObjectURL(await res.blob()));
     else toast.error("عکس در دسترس نیست.");
   };
@@ -52,8 +52,16 @@ export function DeliveryAttempts({ order }: { order: Order }) {
               <span className="font-semibold">تلاش {faNumber(a.attempt_no)}</span>
               <Badge tone={a.outcome === "delivered" ? "success" : "danger"}>{a.outcome === "delivered" ? "تحویل شد" : a.failure_reason_label ?? "ناموفق"}</Badge>
               <span className="text-xs text-muted">{faShortDateTime(a.at)}{a.driver_name && ` — ${a.driver_name}`}</span>
-              {a.has_photo && <Button size="sm" variant="ghost" icon={<Camera className="size-4" />} onClick={() => showPhoto(a.attempt_no)} data-testid="attempt-photo">عکس مدرک</Button>}
             </div>
+            {a.evidence.map(e => (
+              <div key={e.id} className="flex flex-wrap items-center gap-2 text-xs text-text-2" data-testid="attempt-evidence">
+                {e.file_deleted ? <Badge tone="muted">فایل طبق سیاست نگهداری پاک شده</Badge> : (
+                  <Button size="sm" variant="ghost" icon={<Camera className="size-4" />} onClick={() => showPhoto(a.attempt_no, e.id)} data-testid="attempt-photo">عکس</Button>
+                )}
+                <span>{e.delivery_method_label}{e.method_note && `: ${e.method_note}`}</span>
+                <span className="text-muted">{e.uploaded_at ? faShortDateTime(e.uploaded_at) : "زمان ثبت نشده"} · {e.uploaded_by_name ?? "آپلودکننده ثبت نشده"}</span>
+              </div>
+            ))}
             {a.recipient_name && <p className="text-text-2">تحویل‌گیرنده: {a.recipient_name}{a.recipient_role_label && ` (${a.recipient_role_label})`}</p>}
             {a.exception_note && <p className="text-warning">کمبود یا آسیب: {a.exception_note}</p>}
             {a.partial && <ul className="text-text-2" data-testid="attempt-lines">{a.lines.filter(l => l.returned_quantity > 0).map(l => <li key={l.product_name}>{l.product_name}: {faNumber(l.delivered_quantity)} تحویل، {faNumber(l.returned_quantity)} برگشتی{l.reason && ` — ${l.reason}`}</li>)}</ul>}

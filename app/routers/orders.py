@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Path, Query, UploadFile
 from fastapi.responses import FileResponse
 from starlette import status
 
@@ -9,6 +9,7 @@ from app.database import db_dependency
 from app.dependencies import IdempotencyKey, require_role, user_dependency
 from app.models import ACTIVE_ORDER_STATUSES, Order, RoleEnum, Vehicle
 from app.schemas.order import (
+    DeliveryEvidenceOut,
     DeliveryAttemptOut, OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatus, OrderStatusRequest,
     ResolveFailureRequest,
 )
@@ -161,14 +162,33 @@ def delivery_attempts(db: db_dependency, user: user_dependency, order_id: int = 
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
-@router.post('/{order_id}/attempts/{attempt_no}/photo', response_model=DeliveryAttemptOut, summary="📷 عکس مدرک تحویل (تا ۵ مگابایت)")
+@router.post('/{order_id}/attempts/{attempt_no}/photo', response_model=DeliveryAttemptOut, summary="📷 ثبت مدرک تحویل (تا ۵ مگابایت؛ هر آپلود مستقل می‌ماند)")
 async def upload_attempt_photo(file: UploadFile, db: db_dependency, user: user_dependency, order_id: int = Path(gt=0),
-                               attempt_no: int = Path(gt=0), photo_type: Literal["delivery", "damage", "door", "other"] = Query("delivery")):
+                               attempt_no: int = Path(gt=0), photo_type: Literal["delivery", "damage", "door", "other"] = Query("delivery"),
+                               delivery_method: Literal["handed_to_recipient", "left_at_door", "other"] = Form(description="روش تحویل؛ هویت گیرنده را تأیید نمی‌کند"),
+                               method_note: Optional[str] = Form(None, max_length=300, description="فقط برای روش «سایر» و اجباری")):
     data = await file.read(delivery_service.MAX_PHOTO_BYTES + 1)
     try:
-        return delivery_service.save_photo(db, user, order_id, attempt_no, data, photo_type)
+        return delivery_service.save_photo(db, user, order_id, attempt_no, data, photo_type, delivery_method, method_note)
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get('/{order_id}/attempts/{attempt_no}/evidence', response_model=list[DeliveryEvidenceOut], summary="📎 مدرک‌های یک تلاش تحویل")
+def attempt_evidence(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0), attempt_no: int = Path(gt=0)):
+    try:
+        return delivery_service.evidence_list(db, user, order_id, attempt_no)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get('/{order_id}/attempts/{attempt_no}/evidence/{evidence_id}/file', summary="📷 فایل یک مدرک (ثبت در گزارش فعالیت)")
+def attempt_evidence_file(db: db_dependency, user: user_dependency, order_id: int = Path(gt=0), attempt_no: int = Path(gt=0), evidence_id: int = Path(gt=0)):
+    try:
+        path, media_type = delivery_service.evidence_file(db, user, order_id, attempt_no, evidence_id)
+    except DomainError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    return FileResponse(path, media_type=media_type, headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.get('/{order_id}/attempts/{attempt_no}/photo', summary="📷 مشاهده عکس مدرک تحویل (ثبت در گزارش فعالیت)")

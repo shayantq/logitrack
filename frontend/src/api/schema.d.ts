@@ -931,8 +931,42 @@ export interface paths {
         /** 📷 مشاهده عکس مدرک تحویل (ثبت در گزارش فعالیت) */
         get: operations["attempt_photo_orders__order_id__attempts__attempt_no__photo_get"];
         put?: never;
-        /** 📷 عکس مدرک تحویل (تا ۵ مگابایت) */
+        /** 📷 ثبت مدرک تحویل (تا ۵ مگابایت؛ هر آپلود مستقل می‌ماند) */
         post: operations["upload_attempt_photo_orders__order_id__attempts__attempt_no__photo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/attempts/{attempt_no}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📎 مدرک‌های یک تلاش تحویل */
+        get: operations["attempt_evidence_orders__order_id__attempts__attempt_no__evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orders/{order_id}/attempts/{attempt_no}/evidence/{evidence_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 📷 فایل یک مدرک (ثبت در گزارش فعالیت) */
+        get: operations["attempt_evidence_file_orders__order_id__attempts__attempt_no__evidence__evidence_id__file_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5601,6 +5635,17 @@ export interface components {
              * Format: binary
              */
             file: string;
+            /**
+             * Delivery Method
+             * @description روش تحویل؛ هویت گیرنده را تأیید نمی‌کند
+             * @enum {string}
+             */
+            delivery_method: "handed_to_recipient" | "left_at_door" | "other";
+            /**
+             * Method Note
+             * @description فقط برای روش «سایر» و اجباری
+             */
+            method_note?: string | null;
         };
         /** Body_upload_document_driver_onboarding_documents__kind__post */
         Body_upload_document_driver_onboarding_documents__kind__post: {
@@ -6136,6 +6181,11 @@ export interface components {
         };
         /** DeliveryAttemptOut */
         DeliveryAttemptOut: {
+            /**
+             * Evidence
+             * @default []
+             */
+            evidence: components["schemas"]["DeliveryEvidenceOut"][];
             /** Id */
             id: number;
             /** Attempt No */
@@ -6190,6 +6240,36 @@ export interface components {
              * @default []
              */
             lines: components["schemas"]["AttemptLineOut"][];
+        };
+        /** DeliveryEvidenceOut */
+        DeliveryEvidenceOut: {
+            /** Id */
+            id: number;
+            /** Photo Type */
+            photo_type?: string | null;
+            /** Delivery Method */
+            delivery_method: string;
+            /** Delivery Method Label */
+            delivery_method_label: string;
+            /** Method Note */
+            method_note?: string | null;
+            /** Media Type */
+            media_type?: string | null;
+            /** Size Bytes */
+            size_bytes?: number | null;
+            /** Sha256 */
+            sha256?: string | null;
+            /** Uploaded At */
+            uploaded_at?: string | null;
+            /** Uploaded By Name */
+            uploaded_by_name?: string | null;
+            /**
+             * File Deleted
+             * @default false
+             */
+            file_deleted: boolean;
+            /** File Deleted At */
+            file_deleted_at?: string | null;
         };
         /** DeliveryLineIn */
         DeliveryLineIn: {
@@ -15397,6 +15477,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeliveryAttemptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_evidence_orders__order_id__attempts__attempt_no__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+                attempt_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryEvidenceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attempt_evidence_file_orders__order_id__attempts__attempt_no__evidence__evidence_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+                attempt_no: number;
+                evidence_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

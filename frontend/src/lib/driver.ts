@@ -99,7 +99,7 @@ export async function compressImage(file: File, maxSide = 2000): Promise<Blob> {
 }
 
 /** آپلود با نوار پیشرفت (fetch پیشرفت آپلود را گزارش نمی‌دهد) */
-export function uploadWithProgress<T>(url: string, file: Blob, filename: string, onProgress: (ratio: number) => void): Promise<T> {
+export function uploadWithProgress<T>(url: string, file: Blob, filename: string, onProgress: (ratio: number) => void, fields: Record<string, string> = {}): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
@@ -114,6 +114,7 @@ export function uploadWithProgress<T>(url: string, file: Blob, filename: string,
     };
     xhr.onerror = () => reject(new ApiError("ارتباط با سرور برقرار نشد؛ اینترنت را بررسی کنید.", 0));
     const form = new FormData();
+    Object.entries(fields).forEach(([name, value]) => form.append(name, value));
     form.append("file", file, filename);
     xhr.send(form);
   });

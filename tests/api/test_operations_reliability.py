@@ -258,11 +258,11 @@ def test_delivery_photo_access_and_audit(env, tmp_path, monkeypatch):
     assert _status(env, order["id"], "delivered", recipient_name="نگهبان", recipient_role="guard", exception_note="یک کارتن خیس بود").status_code == 200
     url = f"/orders/{order['id']}/attempts/1/photo"
 
-    bad = env.client.post(url, headers=_auth(env.driver), files={"file": ("a.txt", b"not an image", "text/plain")})
+    bad = env.client.post(url, headers=_auth(env.driver), data={"delivery_method": "left_at_door"}, files={"file": ("a.txt", b"not an image", "text/plain")})
     assert bad.status_code == 400
-    assert env.client.post(url, headers=_auth(env.manager), files={"file": ("a.png", PNG, "image/png")}).status_code == 403
-    assert env.client.post(url, headers=_auth(env.rival), files={"file": ("a.png", PNG, "image/png")}).status_code == 404
-    up = env.client.post(url, headers=_auth(env.driver), params={"photo_type": "door"}, files={"file": ("a.png", PNG, "image/png")})
+    assert env.client.post(url, headers=_auth(env.manager), data={"delivery_method": "left_at_door"}, files={"file": ("a.png", PNG, "image/png")}).status_code == 403
+    assert env.client.post(url, headers=_auth(env.rival), data={"delivery_method": "left_at_door"}, files={"file": ("a.png", PNG, "image/png")}).status_code == 404
+    up = env.client.post(url, headers=_auth(env.driver), params={"photo_type": "door"}, data={"delivery_method": "left_at_door"}, files={"file": ("a.png", PNG, "image/png")})
     assert up.status_code == 200 and up.json()["has_photo"] and up.json()["photo_type"] == "door"
 
     assert env.client.get(url, headers=_auth(env.rival)).status_code == 404

@@ -26,7 +26,7 @@ from app.models import (
     ACTIVE_ORDER_STATUSES, Customer, Inventory, Order, OrderCheckpoint, OrderItem, OrderStatusHistory, Organization, Product,
     Shipment, StockReservation, User, Vehicle, Warehouse,
 )
-from app.models_productivity import CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DriverReturn
+from app.models_productivity import CustomerRequest, DeliveryAttempt, DeliveryAttemptLine, DeliveryEvidence, DriverReturn
 from app.schemas.order import CustomerIn, OrderAssignRequest, OrderRequest, OrderStatusRequest, ResolveFailureRequest
 from app.core.iran import fa_date, fa_digits, latin_digits, normalize_digits, normalize_persian_text
 from app.core.wms import AVAILABLE
@@ -879,6 +879,9 @@ def delete_order(db: Session, user: User, order_id: int) -> None:
         if target_order is None:
             raise NotFoundError('سفارش یافت نشد.')
 
+        if db.query(DeliveryEvidence.id).join(DeliveryAttempt, DeliveryEvidence.attempt_id == DeliveryAttempt.id).filter(
+                DeliveryAttempt.order_id == target_order.id).first():
+            raise ConflictError("این سفارش مدرک تحویل دارد و حذف نمی‌شود؛ به‌جای حذف، آن را لغو کنید.")
         # سفارشی که کالایش از انبار خارج شده (یا برگشته) سند انبار دارد و برای حفظ سوابق حذف نمی‌شود؛ لغو کنید.
         if target_order.stock_state in ("issued", "returning", "returned"):
             raise ConflictError("کالای این سفارش از انبار خارج شده و سند انبار دارد؛ به‌جای حذف، سفارش را لغو کنید.")

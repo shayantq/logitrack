@@ -97,6 +97,55 @@ class DeliveryAttemptLine(TenantScoped, Base):
     reason = Column(String(300), nullable=True)
 
 
+DELIVERY_METHODS = ("handed_to_recipient", "left_at_door", "other")
+EVIDENCE_METHODS = (*DELIVERY_METHODS, "unrecorded")
+
+
+class DeliveryEvidence(TenantScoped, Base):
+    """
+    یک فایل مدرک تحویل. ردیف با تریگر تغییرناپذیر است و متن آزاد ندارد (توضیح در DeliveryEvidenceNote).
+    delivery_method روش تحویل را می‌گوید و هویت گیرنده را تأیید نمی‌کند. unrecorded فقط برای داده پیش از این جدول است.
+    """
+    __tablename__ = "delivery_evidence"
+    __table_args__ = (
+        CheckConstraint("delivery_method IN ('handed_to_recipient', 'left_at_door', 'other', 'unrecorded')", name="ck_delivery_evidence_method"),
+        CheckConstraint("delivery_method = 'unrecorded' OR (uploaded_by_id IS NOT NULL AND uploaded_at IS NOT NULL AND media_type IS NOT NULL "
+                        "AND size_bytes IS NOT NULL AND sha256 IS NOT NULL)", name="ck_delivery_evidence_recorded"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    attempt_id = Column(Integer, ForeignKey("delivery_attempts.id", ondelete="RESTRICT"), nullable=False, index=True)
+    storage_key = Column(String(255), nullable=False, unique=True)
+    photo_type = Column(String(16), nullable=True)
+    delivery_method = Column(String(24), nullable=False)
+    media_type = Column(String(32), nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+    sha256 = Column(String(64), nullable=True)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True, index=True)
+    uploaded_at = Column(DateTime, nullable=True)
+
+
+class DeliveryEvidenceNote(TenantScoped, Base):
+    """توضیح آزاد روش «سایر». ممکن است داده شخصی داشته باشد، پس بیرون از ردیف مدرک است و با خروج سازمان حذف می‌شود."""
+    __tablename__ = "delivery_evidence_notes"
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("delivery_evidence.id", ondelete="RESTRICT"), nullable=False, unique=True)
+    note = Column(String(300), nullable=False)
+
+
+class DeliveryEvidenceEvent(TenantScoped, Base):
+    """رویداد فقط‌افزودنی پاک شدن فایل یا توضیح یک مدرک."""
+    __tablename__ = "delivery_evidence_events"
+    __table_args__ = (CheckConstraint("event_type IN ('file_deleted', 'note_redacted')", name="ck_delivery_evidence_events_type"),)
+
+    id = Column(Integer, primary_key=True)
+    evidence_id = Column(Integer, ForeignKey("delivery_evidence.id", ondelete="RESTRICT"), nullable=False, index=True)
+    event_type = Column(String(16), nullable=False)
+    reason = Column(String(200), nullable=False)
+    at = Column(DateTime, nullable=False, default=_now)
+
+
 class DriverReturn(TenantScoped, Base):
     """کالایی که باید از راننده به انبار برگردد. موجودی فقط با شمارش انبار (received) تغییر می‌کند."""
     __tablename__ = "driver_returns"

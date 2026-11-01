@@ -228,7 +228,23 @@ class AttemptLineOut(BaseModel):
     reason: Optional[str] = None
 
 
+class DeliveryEvidenceOut(BaseModelWithDateFormatting):
+    id: int
+    photo_type: Optional[str] = None
+    delivery_method: str
+    delivery_method_label: str
+    method_note: Optional[str] = None
+    media_type: Optional[str] = None
+    size_bytes: Optional[int] = None
+    sha256: Optional[str] = None
+    uploaded_at: Optional[datetime] = None
+    uploaded_by_name: Optional[str] = None
+    file_deleted: bool = False
+    file_deleted_at: Optional[datetime] = None
+
+
 class DeliveryAttemptOut(BaseModelWithDateFormatting):
+    evidence: list[DeliveryEvidenceOut] = []
     id: int
     attempt_no: int
     outcome: str

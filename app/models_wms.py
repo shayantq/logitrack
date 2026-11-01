@@ -254,6 +254,11 @@ LEDGER_TRIGGERS_SQL = (
     "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
     "CREATE TRIGGER trg_stock_documents_guard BEFORE UPDATE OR DELETE ON stock_documents "
     "FOR EACH ROW EXECUTE FUNCTION pasineh_guard_stock_document()",
+    # مایگریشن ۰۰۳۸: مدرک تحویل و رویدادهای پاک‌سازی آن
+    "CREATE TRIGGER trg_delivery_evidence_immutable BEFORE UPDATE OR DELETE ON delivery_evidence "
+    "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
+    "CREATE TRIGGER trg_delivery_evidence_events_immutable BEFORE UPDATE OR DELETE ON delivery_evidence_events "
+    "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
 )
 
 

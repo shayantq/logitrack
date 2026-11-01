@@ -2131,6 +2131,7 @@ await session("reliability-driver", "qazvin_driver1", "driver123", async page =>
   await page.fill("[data-testid=outcome-issue]", "یک کارتن خیس بود");
   await page.setInputFiles("[data-testid=outcome-photo]", { name: "proof.png", mimeType: "image/png",
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") });
+  await choose(page, "[data-testid=outcome-method]", "left_at_door");
   await page.click("[data-testid=outcome-save]");
   await page.waitForSelector("[data-testid=outcome-modal]", { state: "detached" });
   await proofCard.waitFor({ state: "detached" }).catch(() => {});
@@ -2172,6 +2173,7 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
   await page.goto(`${BASE}/app/orders?order=${proofOrder.id}`);
   await page.click("[data-testid=attempt-photo]");
   await page.waitForSelector("[data-testid=attempt-photo-image]");
+  check("reliability", "evidence shows the delivery method, not a verified identity", (await page.textContent("[data-testid=attempt-evidence]")).includes("گذاشتن پشت در"));
   check("reliability", "staff can open the delivery photo", true);
   await page.keyboard.press("Escape");
 

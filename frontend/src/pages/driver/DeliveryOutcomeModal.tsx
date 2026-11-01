@@ -30,6 +30,8 @@ export function DeliveryOutcomeModal({ order, outcome, onClose, onSaved }: { ord
   const [note, setNote] = useState("");
   const [nextAt, setNextAt] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [method, setMethod] = useState("");
+  const [methodNote, setMethodNote] = useState("");
   const [partial, setPartial] = useState(false);
   const [lines, setLines] = useState<Record<number, { quantity: string; reason: string }>>({});
   const [busy, setBusy] = useState(false);
@@ -51,7 +53,7 @@ export function DeliveryOutcomeModal({ order, outcome, onClose, onSaved }: { ord
         const blob = await compressImage(photo);
         const type = issue ? "damage" : "delivery";
         // وضعیت ثبت شده؛ شکست آپلود عکس نباید راننده را برای ثبت دوباره نگه دارد
-        await uploadWithProgress(`/orders/${order.id}/attempts/${saved.delivery_attempt_count}/photo?photo_type=${type}`, blob, photo.name, () => {})
+        await uploadWithProgress(`/orders/${order.id}/attempts/${saved.delivery_attempt_count}/photo?photo_type=${type}`, blob, photo.name, () => {}, { delivery_method: method, ...(method === "other" ? { method_note: methodNote } : {}) })
           .catch(e => toast.error(`تحویل ثبت شد ولی عکس بارگذاری نشد: ${errorMessage(e)}`));
       }
       toast.success(delivered ? "تحویل ثبت شد." : "تحویل ناموفق ثبت شد؛ سازمان درباره ادامه کار تصمیم می‌گیرد.");
@@ -82,6 +84,15 @@ export function DeliveryOutcomeModal({ order, outcome, onClose, onSaved }: { ord
           <Field label="عکس مدرک (اختیاری)">
             <Input type="file" accept="image/*" capture="environment" onChange={e => setPhoto(e.target.files?.[0] ?? null)} data-testid="outcome-photo" />
           </Field>
+          {photo && <Field label="روش تحویل">
+            <Select required value={method} onChange={e => setMethod(e.target.value)} data-testid="outcome-method">
+              <option value="">انتخاب کنید</option>
+              <option value="handed_to_recipient">تحویل به گیرنده</option>
+              <option value="left_at_door">گذاشتن پشت در</option>
+              <option value="other">سایر</option>
+            </Select>
+          </Field>}
+          {photo && method === "other" && <Field label="توضیح روش تحویل"><Input required minLength={3} maxLength={300} value={methodNote} onChange={e => setMethodNote(e.target.value)} data-testid="outcome-method-note" /></Field>}
           <Field label="کمبود یا آسیب (اختیاری)"><Textarea rows={2} value={issue} onChange={e => setIssue(e.target.value)} maxLength={500} data-testid="outcome-issue" /></Field>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="size-4 accent-[var(--brand)]" checked={partial} onChange={e => setPartial(e.target.checked)} data-testid="outcome-partial" />
