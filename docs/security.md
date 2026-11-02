@@ -139,18 +139,25 @@ sudo ufw status                               # فقط 22، 80 و 443 باز
 
 هدف پیشنهادی، نه نتیجه اندازه‌گیری‌شده: **RPO ۲۴ ساعت** (حداکثر یک روز داده از دست برود) و **RTO ۲ ساعت** (بازگشت کامل).
 
+بدون زیرساخت تازه: بکاپ روی همین سرور می‌ماند و یک نسخه رمزشده با دست روی کامپیوتر مالک می‌رود. هیچ داده‌ای به سرویس بیرونی (OneDrive، فضای ابری) نمی‌رود.
+
 ```bash
-# یک بار: کلید رمزگذاری پشتیبان (جای امن و بیرون از سرور هم نگه دارید)
-sudo install -m 600 /dev/null /root/.pasineh-backup-key && openssl rand -base64 32 | sudo tee /root/.pasineh-backup-key >/dev/null
-# هر شب ساعت ۳ (crontab -e کاربر root)
-0 3 * * * umask 077; cd /opt/logitrack && docker compose exec -T db pg_dump -U postgres -d logitrack | gzip | openssl enc -aes-256-cbc -pbkdf2 -salt -pass file:/root/.pasineh-backup-key -out backups/nightly-$(date +\%F).sql.gz.enc && find backups -name 'nightly-*.enc' -mtime +14 -delete
-# سپس انتقال به فضای بیرونی (مثلاً با rclone به فضای ابری) — همین پوشه backups/
+# یک بار: کلید (۶۴ نویسه تصادفی). نسخه بازیابی در مدیر رمز یا روی کاغذ، نه کنار بکاپ‌ها و نه در OneDrive
+( umask 077; openssl rand -base64 48 > /root/.pasineh-backup-key )
+# هر شب ساعت ۳ UTC (crontab کاربر root): دیتابیس و فایل‌ها با GPG متقارن AES256، هر کدام با .sha256
+0 3 * * * /opt/logitrack/scripts/backup-nightly.sh >> /var/log/logitrack-backup.log 2>&1
 ```
 
-تمرین بازیابی، ماهی یک بار، فقط با کانتینر موقت بدون شبکه. هرگز دیتابیس آزمایشی روی سرویس زنده ساخته یا حذف نشود:
+- متن ساده dump و آرشیو فقط در لوله است و روی دیسک نوشته نمی‌شود. فایل‌ها با `umask 077` ساخته می‌شوند و ۱۴ روز می‌مانند.
+- نسخه روی کامپیوتر مالک (Git Bash): `BACKUP_HOST=root@passineh.ir bash scripts/pull-backup.sh /c/PasinehBackups`. مقصد داخل OneDrive یا مخزن پذیرفته نمی‌شود. فضای خالی و checksum سنجیده می‌شود و هفت نسخه آخر می‌ماند.
+- RPO بیرون از سرور برابر عمر آخرین نسخه دریافت‌شده است. نسخه‌ای که فقط روی همین سرور است با از دست رفتن سرور یا دیسک از بین می‌رود.
+- `.env` سرور (`SECRET_KEY` و رمزهای دیتابیس) در بکاپ نیست. نسخه‌اش هم در مدیر رمز مالک نگه داشته شود، وگرنه بازیابی کامل نیست.
+
+تمرین بازیابی، ماهی یک بار و پس از هر تغییر بزرگ، فقط با کانتینر موقت بدون شبکه. هرگز دیتابیس آزمایشی روی سرویس زنده ساخته یا حذف نشود:
 
 ```bash
-cd /opt/logitrack && DRILL_ENV=production BACKUP_KEY_FILE=/root/.pasineh-backup-key bash scripts/verify-backup.sh backups/nightly-YYYY-MM-DD.sql.gz.enc
+cd /opt/logitrack && DRILL_ENV=production bash scripts/verify-backup.sh                                           # تازه‌ترین بکاپ دیتابیس
+cd /opt/logitrack && bash scripts/verify-backup.sh backups/nightly-media-YYYYMMDD-HHMM.tar.gz.gpg                   # آرشیو فایل‌ها
 ```
 
 جزئیات و ثبت نتیجه در `docs/runbooks.md` است.

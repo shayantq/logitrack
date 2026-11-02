@@ -95,6 +95,19 @@ docker compose exec web python create_admin.py
 - **کوئری گران:** `bash scripts/slow-queries.sh`
 - **متریک:** با `METRICS_TOKEN` در `.env`: `curl -H "Authorization: Bearer $METRICS_TOKEN" http://localhost:8000/internal/metrics`
 
+## بازیابی واقعی (از دست رفتن سرور یا دیتابیس)
+
+فقط با تصمیم فرمانده رخداد. پیش از هر کاری، از وضعیت فعلی (اگر چیزی مانده) بکاپ بگیرید.
+
+1. سرور جایگزین یا همان سرور: docker و `git clone` مخزن روی همان کامیتی که پیش‌تر اجرا بود.
+2. `.env` را از نسخه مدیر رمز برگردانید و کلید بکاپ را در `/root/.pasineh-backup-key` بگذارید (`umask 077`).
+3. فایل‌های `nightly-db-*` و `nightly-media-*` تازه‌ترین نسخه را از سرور یا کامپیوتر مالک بیاورید و `sha256sum -c` بزنید.
+4. فقط سرویس دیتابیس را بالا بیاورید: `docker compose up -d db`.
+5. دیتابیس: `gpg --batch --pinentry-mode loopback --passphrase-file /root/.pasineh-backup-key --decrypt backups/nightly-db-X.sql.gz.gpg | gunzip | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d logitrack`
+6. فایل‌ها: `gpg ... --decrypt backups/nightly-media-X.tar.gz.gpg | docker run --rm -i -v logitrack_media_data:/media alpine tar xzf - -C /media`
+7. `docker compose up -d --wait`، سپس `alembic current` و `curl -fsS https://passineh.ir/health`.
+8. زمان شروع و پایان را ثبت کنید؛ RTO واقعی همین است. عمر بکاپ استفاده‌شده RPO است.
+
 ## تمرین بازیابی
 
 بکاپی که بازیابی نشده باشد بکاپ حساب نمی‌شود. این تمرین را هر ماه و بعد از هر تغییر بزرگ اجرا کنید:
@@ -103,9 +116,9 @@ docker compose exec web python create_admin.py
 cd /opt/logitrack && DRILL_ENV=production bash scripts/verify-backup.sh
 ```
 
-**پیش‌نیاز:** docker روی میزبان، و برای فایل `.enc` خواندن کلید از `BACKUP_KEY_FILE`.
+**پیش‌نیاز:** docker روی میزبان، و برای فایل `.enc` یا `.gpg` خواندن کلید از `BACKUP_KEY_FILE` (پیش‌فرض `/root/.pasineh-backup-key`). روی کامپیوتر مالک، Git Bash و Docker Desktop کافی است. کلید را موقتاً در فایلی بیرون از OneDrive بگذارید و پس از تمرین پاکش کنید.
 
-**اسکریپت چه می‌کند:** تازه‌ترین فایل `db-*`، `pre-deploy-*` یا `nightly-*.enc` را در کانتینر موقت بدون شبکه بازیابی می‌کند. فایل فقط‌خواندنی وصل می‌شود. سالم بودن gzip، کامل بودن dump، جدول‌های اصلی و نسخه دیتابیس را می‌سنجد و نتیجه را در `backups/restore-drills.log` می‌نویسد. به دیتابیس زنده وصل نمی‌شود، پس تعداد ردیف را با آن مقایسه نمی‌کند.
+**اسکریپت چه می‌کند:** اگر کنار فایل `.sha256` باشد، اول آن را می‌سنجد. تازه‌ترین فایل `db-*`، `pre-deploy-*`، `nightly-*.enc` یا `nightly-db-*.gpg` را در کانتینر موقت بدون شبکه بازیابی می‌کند. فایل `nightly-media-*.tar.gz.gpg` را فقط باز و شمارش می‌کند. کلید نادرست یا فایل دستکاری‌شده با پیام روشن و کد خروج ۱ رد می‌شود. فایل فقط‌خواندنی وصل می‌شود. سالم بودن gzip، کامل بودن dump، جدول‌های اصلی و نسخه دیتابیس را می‌سنجد و نتیجه را در `backups/restore-drills.log` می‌نویسد. به دیتابیس زنده وصل نمی‌شود، پس تعداد ردیف را با آن مقایسه نمی‌کند.
 
 **اگر شکست خورد:**
 

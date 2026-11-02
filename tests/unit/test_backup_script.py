@@ -55,3 +55,39 @@ def test_deploy_backup_umask_is_limited_to_the_backup_file():
     backup = next(line for line in WORKFLOW.splitlines() if "pg_dump" in line and "pre-deploy" in line)
     assert re.match(r"\s*\(\s*umask 077;.*pg_dump.*\)\s*$", backup)
     assert "umask" not in "".join(line for line in WORKFLOW.splitlines() if line.strip().startswith("git pull"))
+
+
+NIGHTLY = (ROOT / "scripts/backup-nightly.sh").read_text(encoding="utf-8")
+NIGHTLY_COMMANDS = "\n".join(line for line in NIGHTLY.splitlines() if not line.lstrip().startswith("#"))
+PULL = (ROOT / "scripts/pull-backup.sh").read_text(encoding="utf-8")
+
+
+def test_nightly_backup_is_encrypted_before_touching_disk():
+    """متن ساده dump و آرشیو فقط در لوله است؛ تنها فایل نوشته‌شده خروجی gpg است."""
+    assert "umask 077" in NIGHTLY_COMMANDS
+    assert "--symmetric --cipher-algo AES256" in NIGHTLY_COMMANDS and '--passphrase-file "$KEY_FILE"' in NIGHTLY_COMMANDS
+    assert re.search(r"pg_dump .*\| gzip \| encrypt", NIGHTLY_COMMANDS) and re.search(r"tar czf - .*\| encrypt", NIGHTLY_COMMANDS)
+    assert not re.search(r">\s*\"?\$?\{?OUT\}?/[^\"]*\.(sql|tar)(\.gz)?\"?\s*$", NIGHTLY_COMMANDS, re.MULTILINE)
+    assert not re.search(r"(cat|echo|printf)\b.*\$\{?KEY_FILE", NIGHTLY_COMMANDS)
+
+
+def test_nightly_backup_is_atomic_locked_and_keeps_old_plain_files():
+    assert ".part" in NIGHTLY_COMMANDS and 'mv "$DB.part" "$DB"' in NIGHTLY_COMMANDS and "flock -n 9" in NIGHTLY_COMMANDS
+    assert "600|400)" in NIGHTLY_COMMANDS                    # کلید با دسترسی باز پذیرفته نمی‌شود
+    deletes = [line for line in NIGHTLY_COMMANDS.splitlines() if "-delete" in line]
+    assert deletes and all("nightly-db-" in line and "'db-" not in line and "media-*.tar.gz'" not in line for line in deletes)
+    assert "--network none" in NIGHTLY_COMMANDS and "/media:ro" in NIGHTLY_COMMANDS
+
+
+def test_drill_reads_gpg_backups_with_a_key_path_and_checks_the_checksum():
+    assert "backups/nightly-db-*.sql.gz.gpg" in COMMANDS and '--passphrase-file "$KEY_FILE"' in COMMANDS
+    assert "sha256sum -c" in COMMANDS and "*.tar.gz.gpg)" in COMMANDS
+
+
+def test_copy_to_the_owner_computer_stays_out_of_cloud_sync_and_is_verified():
+    assert "*OneDrive*" in PULL and '"$REPO"*)' in PULL
+    assert "sha256sum -c" in PULL and "df -Pk" in PULL
+    scp = next(line for line in PULL.splitlines() if line.strip().startswith("scp "))
+    assert ".gpg" not in scp or "$DB" in scp                 # فقط فایل‌های رمزشده و checksum آن‌ها
+    commands = "\n".join(line for line in PULL.splitlines() if not line.lstrip().startswith("#"))
+    assert not re.search(r"\b(rclone|aws|gsutil|curl|wget)\b", commands)          # هیچ بارگذاری به سرویس بیرونی

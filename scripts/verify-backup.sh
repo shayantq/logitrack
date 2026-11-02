@@ -5,29 +5,46 @@
 #   cd /opt/logitrack && DRILL_ENV=production bash scripts/verify-backup.sh    # تازه‌ترین بکاپ
 #   DRILL_ENV=local bash scripts/verify-backup.sh backups/db-20261026-0300.sql.gz
 #
-# نام‌های شناخته‌شده: db-*.sql.gz، pre-deploy-*.sql.gz و nightly-*.sql.gz.enc.
-# فایل .enc با BACKUP_KEY_FILE (پیش‌فرض /root/.pasineh-backup-key) باز می‌شود. مسیر کلید به openssl داده می‌شود و خود کلید در
-# آرگومان پردازش، خروجی یا لاگ نمی‌آید.
+# نام‌های شناخته‌شده: db-*.sql.gz، pre-deploy-*.sql.gz، nightly-*.sql.gz.enc و nightly-db-*.sql.gz.gpg (scripts/backup-nightly.sh).
+# فایل رمزشده با BACKUP_KEY_FILE (پیش‌فرض /root/.pasineh-backup-key) باز می‌شود. مسیر کلید به openssl یا gpg داده می‌شود و خود کلید
+# در آرگومان پردازش، خروجی یا لاگ نمی‌آید. اگر کنار فایل .sha256 باشد، اول همان سنجیده می‌شود.
+# فایل nightly-media-*.tar.gz.gpg فقط باز و شمارش می‌شود (بدون docker و بدون نوشتن روی دیسک).
 set -euo pipefail
 umask 077
 cd "$(dirname "$0")/.."
 
-FILE="${1:-$(ls -1t backups/db-*.sql.gz backups/pre-deploy-*.sql.gz backups/nightly-*.sql.gz.enc 2>/dev/null | head -n 1 || true)}"
+FILE="${1:-$(ls -1t backups/db-*.sql.gz backups/pre-deploy-*.sql.gz backups/nightly-*.sql.gz.enc backups/nightly-db-*.sql.gz.gpg 2>/dev/null | head -n 1 || true)}"
 if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
-  echo "❌ فایل بکاپ پیدا نشد (backups/db-*.sql.gz، pre-deploy-*.sql.gz، nightly-*.sql.gz.enc)." >&2
+  echo "❌ فایل بکاپ پیدا نشد (backups/db-*.sql.gz، pre-deploy-*.sql.gz، nightly-*.sql.gz.enc، nightly-db-*.sql.gz.gpg)." >&2
   exit 1
 fi
+if [ -f "$FILE.sha256" ]; then
+  (cd "$(dirname "$FILE")" && sha256sum -c --quiet "$(basename "$FILE").sha256") || { echo "❌ checksum فایل نمی‌خواند؛ فایل خراب یا ناقص است." >&2; exit 1; }
+fi
+need_key() {
+  KEY_FILE="${BACKUP_KEY_FILE:-/root/.pasineh-backup-key}"
+  if [ ! -r "$KEY_FILE" ]; then
+    echo "❌ فایل کلید خوانده نشد؛ مسیر آن را در BACKUP_KEY_FILE بدهید." >&2
+    exit 1
+  fi
+}
+gpg_decrypt() {
+  gpg --batch --quiet --pinentry-mode loopback --passphrase-file "$KEY_FILE" --decrypt "$1"
+}
 case "$FILE" in
-  *.sql.gz.enc)
-    KEY_FILE="${BACKUP_KEY_FILE:-/root/.pasineh-backup-key}"
-    if [ ! -r "$KEY_FILE" ]; then
-      echo "❌ فایل کلید خوانده نشد؛ مسیر آن را در BACKUP_KEY_FILE بدهید." >&2
+  *.tar.gz.gpg)
+    need_key
+    if ! count=$(gpg_decrypt "$FILE" | tar -tzf - | wc -l) || [ "$count" -lt 1 ]; then
+      echo "❌ آرشیو فایل‌ها باز نشد: کلید نادرست است یا فایل خراب یا دستکاری شده است." >&2
       exit 1
     fi
+    echo "✅ آرشیو فایل‌ها باز شد و ${count} مورد دارد: $FILE"
+    exit 0
     ;;
+  *.sql.gz.enc|*.sql.gz.gpg) need_key ;;
   *.sql.gz) ;;
   *)
-    echo "❌ قالب فایل شناخته نشد؛ فقط .sql.gz و .sql.gz.enc پذیرفته می‌شود." >&2
+    echo "❌ قالب فایل شناخته نشد؛ فقط .sql.gz، .sql.gz.enc، .sql.gz.gpg و .tar.gz.gpg پذیرفته می‌شود." >&2
     exit 1
     ;;
 esac
@@ -61,6 +78,13 @@ case "$FILE" in
   *.enc)
     # تصویر postgres ابزار openssl ندارد: روی میزبان باز می‌شود و فقط داخل همین کانتینر موقت می‌ماند
     openssl enc -d -aes-256-cbc -pbkdf2 -pass "file:$KEY_FILE" -in "$FILE" | docker exec -i "$NAME" sh -c 'cat > /tmp/restore.sql.gz'
+    ;;
+  *.gpg)
+    # gpg با بررسی یکپارچگی (MDC) باز می‌کند؛ متن ساده فقط داخل همین کانتینر موقت است
+    if ! gpg_decrypt "$FILE" | docker exec -i "$NAME" sh -c 'cat > /tmp/restore.sql.gz'; then
+      echo "❌ بکاپ باز نشد: کلید نادرست است یا فایل خراب یا دستکاری شده است." >&2
+      exit 1
+    fi
     ;;
   *)
     docker exec "$NAME" cp /backup/source /tmp/restore.sql.gz
