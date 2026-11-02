@@ -237,6 +237,12 @@ def test_approve_creates_organization_with_profile_and_admin(env):
 
     # ادمین سازمان جدید با رمز موقت وارد می‌شود و پروفایل منتقل‌شده را می‌بیند
     token = client.post("/auth/token", data={"username": "qazvin_shop_admin", "password": temp_password}).json()["access_token"]
+    # رمز موقت است: تا عوض نشود سرور جز پروفایل خود و تغییر رمز چیزی باز نمی‌کند
+    assert client.get("/organization/profile", headers={"Authorization": f"Bearer {token}"}).status_code == 403
+    changed = client.put("/users/me/password", headers={"Authorization": f"Bearer {token}"},
+                         json={"old_password": temp_password, "new_password": "Owner-Pass-2026"})
+    assert changed.status_code == 200, changed.text
+    token = changed.json()["access_token"]
     profile = client.get("/organization/profile", headers={"Authorization": f"Bearer {token}"}).json()
     assert profile["legal_name"] == "شرکت بازرگانی نمونه"
     assert profile["monthly_order_volume"] == "100-1000"

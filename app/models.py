@@ -195,6 +195,8 @@ class User(TenantScoped, Base):
     mobile = Column(String(11), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     must_change_password = Column(Boolean, nullable=False, default=False, server_default="false")
+    # رمز موقت تا این زمان برای ورود معتبر است؛ پس از تغییر رمز یا بازیابی پاک می‌شود (app/services/user_service.py)
+    temp_password_expires_at = Column(DateTime, nullable=True)
     # با هر بازنشانی/تغییر رمز یا غیرفعال‌سازی یکی زیاد می‌شود تا توکن‌های قبلی باطل شوند
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
     failed_logins = Column(Integer, nullable=False, default=0, server_default="0")

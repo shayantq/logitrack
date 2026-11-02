@@ -89,6 +89,8 @@ def create_user(db: Session, current_user: User, request: CreateUserRequest) -> 
             organization_id=current_user.organization_id,
             hashed_password=bcrypt_context.hash(request.password)
         )
+        if request.must_change_password:          # ادمین رمز را می‌داند؛ همان قاعده رمز موقت
+            set_temporary_password(new_user, request.password)
         db.add(new_user)
         db.flush()  # گرفتن id برای ساخت کد راننده، در همان تراکنش
 
@@ -200,6 +202,21 @@ def set_active(db: Session, admin: User, user_id: int, active: bool) -> User:
     return target
 
 
+TEMP_PASSWORD_EXPIRED = ("رمز موقت شما منقضی شده است. از «فراموشی رمز» کد بازیابی بگیرید "
+                         "یا از ادمین بخواهید رمز را دوباره بازنشانی کند.")
+
+
+def set_temporary_password(user: User, password: str) -> None:
+    """رمزی که کس دیگری ساخته یا دیده است: اولین ورود باید عوضش کند و پس از TEMP_PASSWORD_TTL دیگر پذیرفته نمی‌شود."""
+    user.hashed_password = bcrypt_context.hash(password)
+    user.must_change_password = True
+    user.temp_password_expires_at = _now() + messaging.TEMP_PASSWORD_TTL
+
+
+def _clear_temporary_password(user: User) -> None:
+    user.must_change_password, user.temp_password_expires_at = False, None
+
+
 def reset_password(db: Session, admin: User, user_id: int) -> tuple[User, str]:
     """رمز موقت تصادفی؛ کاربر در اولین ورود باید عوضش کند و همه نشست‌های قبلی‌اش بسته می‌شود."""
     _require_admin(admin)
@@ -207,8 +224,7 @@ def reset_password(db: Session, admin: User, user_id: int) -> tuple[User, str]:
     if target.id == admin.id:
         raise ConflictError("رمز خودتان را از «تغییر رمز» عوض کنید.")
     password = "".join(secrets.choice(_TEMP_ALPHABET) for _ in range(10))
-    target.hashed_password = bcrypt_context.hash(password)
-    target.must_change_password = True
+    set_temporary_password(target, password)
     target.token_version = (target.token_version or 0) + 1
     target.failed_logins, target.locked_until = 0, None
     # گوشی گم‌شده: بازنشانی رمز توسط ادمین، ورود دومرحله‌ای را هم خاموش می‌کند تا کاربر دوباره راه‌اندازی‌اش کند
@@ -342,6 +358,10 @@ def authenticate(db: Session, username: str, password: str, otp: str | None = No
         raise DomainError("حساب کاربری شما غیرفعال شده است؛ با ادمین سازمان تماس بگیرید.", 403)
     if user.organization_id is not None and (user.organization is None or not user.organization.is_active):
         raise DomainError('حساب سازمان شما غیرفعال شده است؛ با پشتیبانی پسینه تماس بگیرید.', 403)
+    if user.must_change_password and user.temp_password_expires_at is not None and user.temp_password_expires_at <= now:
+        audit_service.log(db, user, "auth.temp_password_expired", "ورود با رمز موقت منقضی‌شده رد شد")
+        db.commit()
+        raise DomainError(TEMP_PASSWORD_EXPIRED, 403)
     if user.totp_enabled_at is not None:
         if not (otp or "").strip():
             raise MfaRequired(MFA_REQUIRED, 401)
@@ -425,7 +445,7 @@ def change_own_password(db: Session, user: User, old_password: str, new_password
     if old_password == new_password:
         raise ConflictError("رمز جدید باید با رمز فعلی فرق داشته باشد.")
     user.hashed_password = bcrypt_context.hash(new_password)
-    user.must_change_password = False
+    _clear_temporary_password(user)
     user.token_version = (user.token_version or 0) + 1        # نشست‌های دیگر بسته می‌شوند؛ این نشست توکن تازه می‌گیرد
     audit_service.log(db, user, "auth.password_changed", "رمز عبور خود را تغییر داد")
     db.commit()
@@ -533,7 +553,7 @@ def confirm_password_reset(db: Session, identifier: str, code: str, new_password
         db.rollback()
         raise ConflictError(INVALID_RESET)
     user.hashed_password = bcrypt_context.hash(new_password)
-    user.must_change_password = False
+    _clear_temporary_password(user)
     user.token_version = (user.token_version or 0) + 1          # خروج از همه دستگاه‌ها
     user.failed_logins, user.locked_until = 0, None
     audit_service.log(db, user, "auth.password_reset", "رمز عبور را با کد بازیابی تغییر داد")

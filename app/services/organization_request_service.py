@@ -14,13 +14,12 @@ from datetime import datetime, timezone
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.core.security import bcrypt_context
 from app.core.tenancy import SKIP_TENANT_FILTER
 from app.models import Organization, OrganizationRequest, PROFILE_FIELDS, RoleEnum, User, Warehouse
 from app.schemas.organization import (
     OrganizationRequestApprove, OrganizationRequestCreate, OrganizationRequestReject,
 )
-from app.services import messaging, organization_service
+from app.services import messaging, organization_service, user_service
 from app.services.exceptions import ConflictError, NotFoundError
 
 _CODE_ALPHABET = string.ascii_uppercase + string.digits
@@ -127,15 +126,17 @@ def approve_request(db: Session, reviewer: User, request_id: int, data: Organiza
         db.add(Warehouse(organization_id=org.id, code="WH-01", name=f"انبار مرکزی {request.city}", location=request.address,
                          province=request.province, city=request.city))
 
-        db.add(User(
+        # رمز را کارکنان پلتفرم ساخته یا دیده‌اند و با پیامک و ایمیل می‌رود؛ پس رمز موقت است و اولین ورود باید عوضش کند
+        admin = User(
             organization_id=org.id,
             username=username,
             email=email,
             full_name=request.contact_name,
             mobile=request.contact_mobile,
             role=RoleEnum.ORG_ADMIN,
-            hashed_password=bcrypt_context.hash(password),
-        ))
+        )
+        user_service.set_temporary_password(admin, password)
+        db.add(admin)
 
         request.status = "approved"
         request.reviewed_at = datetime.now(timezone.utc)

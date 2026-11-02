@@ -20,6 +20,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 # ------------------------------------------------------------------------------
 # تا کارمند پلتفرم ورود دومرحله‌ای را راه نینداخته، فقط همین مسیرها باز است (سرور اصلی)
 MFA_SETUP_PATHS = ("/users/me", "/auth/mfa", "/auth/sessions", "/auth/logout")
+# تا رمز موقت عوض نشده، سرور هم (نه فقط فرانت) فقط خواندن پروفایل خود، تغییر رمز و خروج را می‌پذیرد
+TEMP_PASSWORD_PATHS = {("GET", "/users/me"), ("PUT", "/users/me/password"), ("POST", "/auth/logout")}
 
 
 def get_current_user(
@@ -76,6 +78,8 @@ def get_current_user(
     if state is not None:
         state.update(organization_id=user.organization_id, user_id=user.id, role=getattr(user.role, "value", user.role))
 
+    if user.must_change_password and (request.method, request.url.path.rstrip("/")) not in TEMP_PASSWORD_PATHS:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="ابتدا رمز موقت را عوض کنید.")
     from app.services.user_service import mfa_required
     if mfa_required(user) and user.totp_enabled_at is None and not request.url.path.rstrip("/").startswith(MFA_SETUP_PATHS):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
