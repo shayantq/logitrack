@@ -1719,6 +1719,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/organizations/{organization_id}/exports/{export_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 🔁 ساخت دوباره خروجی ناموفق (ردیف تازه) */
+        post: operations["retry_export_platform_organizations__organization_id__exports__export_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/organizations/{organization_id}/exports/{export_id}/download": {
         parameters: {
             query?: never;
@@ -7341,10 +7358,39 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Started At */
+            started_at?: string | null;
             /** Finished At */
             finished_at?: string | null;
-            /** Error */
+            /** Retry Of Id */
+            retry_of_id?: number | null;
+            /**
+             * Retried
+             * @default false
+             */
+            retried: boolean;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /**
+             * Waiting Too Long
+             * @default false
+             */
+            waiting_too_long: boolean;
+            /** Message */
+            message?: string | null;
+            /**
+             * Error
+             * @description جزئیات فنی شکست؛ فقط برای ادمین پلتفرم
+             */
             error?: string | null;
+            /**
+             * Can Retry
+             * @default false
+             */
+            can_retry: boolean;
         };
         /** FinanceDetail */
         FinanceDetail: {
@@ -17554,6 +17600,42 @@ export interface operations {
             header?: never;
             path: {
                 organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__schemas__platform_ops__ReasonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_export_platform_organizations__organization_id__exports__export_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organization_id: number;
+                export_id: number;
             };
             cookie?: never;
         };

@@ -17,6 +17,11 @@ type Org = Schemas["OrganizationStats"];
 type PlanId = Schemas["PlanIn"]["plan_id"];
 const PLANS: [PlanId, string][] = [["trial", "آزمایشی"], ["basic", "پایه"], ["pro", "حرفه‌ای"], ["enterprise", "سازمانی"]];
 
+type Export = Schemas["ExportOut"];
+// «متوقف» و «در صف» از روی lease و زمان ساخت محاسبه می‌شوند؛ ثبت شکست با سرور است
+const exportLabel = (x: Export) => x.status === "done" ? "آماده" : x.status === "failed" ? "ناموفق" : x.stale ? "متوقف" : x.waiting_too_long ? "در صف" : "در حال ساخت";
+const exportTone = (x: Export) => x.status === "done" ? "success" : x.status === "failed" || x.stale ? "danger" : x.waiting_too_long ? "warning" : "muted";
+
 const askReason = (title: string) => promptDialog({ title, label: "دلیل", required: true, minLength: 3, multiline: true, confirmLabel: "ثبت" });
 
 export function OrganizationAdmin({ org, onClose }: { org: Org | null; onClose: () => void }) {
@@ -58,6 +63,10 @@ export function OrganizationAdmin({ org, onClose }: { org: Org | null; onClose: 
   const startExport = async () => {
     const reason = await askReason("خروجی کامل داده سازمان");
     if (reason?.trim()) run.mutate(() => unwrap(api.POST("/platform/organizations/{organization_id}/exports", { ...path, body: { reason: reason.trim() } })));
+  };
+  const retryExport = async (exportId: number) => {
+    const reason = await askReason(`ساخت دوباره خروجی شماره ${faNumber(exportId)}`);
+    if (reason?.trim()) run.mutate(() => unwrap(api.POST("/platform/organizations/{organization_id}/exports/{export_id}/retry", { params: { path: { organization_id: id, export_id: exportId } }, body: { reason: reason.trim() } })));
   };
   const download = async (exportId: number) => {
     const res = await authFetch(`/platform/organizations/${id}/exports/${exportId}/download`);
@@ -115,10 +124,16 @@ export function OrganizationAdmin({ org, onClose }: { org: Org | null; onClose: 
 
           <section className="space-y-2" data-testid="org-exports">
             <h4 className="font-bold">خروجی داده و خروج سازمان</h4>
-            <ul className="space-y-1">{(exportsList.data ?? []).map(x => (
-              <li key={x.id} className="flex flex-wrap items-center gap-2">
-                <Badge tone={x.status === "done" ? "success" : x.status === "failed" ? "danger" : "muted"}>{x.status === "done" ? "آماده" : x.status === "failed" ? "ناموفق" : "در حال ساخت"}</Badge>{faShortDateTime(x.created_at)}
-                {x.status === "done" && <Button size="sm" variant="ghost" icon={<Download className="size-4" />} onClick={() => download(x.id)}>دریافت</Button>}
+            <ul className="space-y-2">{(exportsList.data ?? []).map(x => (
+              <li key={x.id} className="space-y-1" data-testid="org-export">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={exportTone(x)}>{exportLabel(x)}</Badge>{faShortDateTime(x.created_at)}
+                  {x.retry_of_id && <span className="text-muted">تلاش دوباره خروجی {faNumber(x.retry_of_id)}</span>}
+                  {x.status === "done" && <Button size="sm" variant="ghost" icon={<Download className="size-4" />} onClick={() => download(x.id)}>دریافت</Button>}
+                  {x.can_retry && <Button size="sm" variant="ghost" onClick={() => retryExport(x.id)} data-testid="export-retry">ساخت دوباره</Button>}
+                </div>
+                {x.message && <p className={x.waiting_too_long ? "text-warning" : "text-danger"}>{x.message}</p>}
+                {x.error && <p className="text-muted">جزئیات فنی: <span dir="ltr">{x.error}</span></p>}
               </li>
             ))}</ul>
             <div className="flex flex-wrap gap-2">

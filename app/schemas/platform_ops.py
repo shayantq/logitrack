@@ -94,8 +94,15 @@ class ExportOut(BaseModelWithDateFormatting):
     organization_id: int
     status: str
     created_at: datetime
+    started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
-    error: Optional[str] = None
+    retry_of_id: Optional[int] = None
+    retried: bool = False
+    stale: bool = False
+    waiting_too_long: bool = False
+    message: Optional[str] = None
+    error: Optional[str] = Field(None, description="جزئیات فنی شکست؛ فقط برای ادمین پلتفرم")
+    can_retry: bool = False
 
 
 class DeprovisionOut(BaseModelWithDateFormatting):

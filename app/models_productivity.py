@@ -406,9 +406,16 @@ class FeatureFlag(Base):
 
 
 class TenantExport(Base):
-    """خروجی کامل داده یک سازمان؛ فایل خصوصی است و فقط ادمین پلتفرم دریافت می‌کند."""
+    """
+    خروجی کامل داده یک سازمان؛ فایل خصوصی است و فقط ادمین پلتفرم دریافت می‌کند.
+    هر اجرا run_token خودش را دارد و فقط با همان توکن پایان می‌یابد، پس اجرای کهنه نتیجه اجرای تازه را بازنویسی نمی‌کند.
+    تلاش دوباره ردیف تازه است و retry_of_id آن را به ردیف ناموفق وصل می‌کند.
+    """
     __tablename__ = "tenant_exports"
-    __table_args__ = (CheckConstraint("status IN ('pending', 'done', 'failed')", name="ck_tenant_exports_status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'done', 'failed')", name="ck_tenant_exports_status"),
+        UniqueConstraint("retry_of_id", name="uq_tenant_exports_retry_of"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -419,6 +426,10 @@ class TenantExport(Base):
     requested_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=_now)
     finished_at = Column(DateTime, nullable=True)
+    run_token = Column(String(32), nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    lease_until = Column(DateTime, nullable=True)
+    retry_of_id = Column(Integer, ForeignKey("tenant_exports.id", ondelete="SET NULL", name="fk_tenant_exports_retry_of"), nullable=True)
 
 
 class PurchaseRequest(TenantScoped, Base):

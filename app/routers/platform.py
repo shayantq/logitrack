@@ -211,14 +211,20 @@ def set_feature_flag(data: FlagIn, db: db_dependency, key: str = Path(max_length
 
 
 @router.get("/organizations/{organization_id}/exports", response_model=list[ExportOut], summary="📤 خروجی‌های داده سازمان")
-def exports(db: db_dependency, organization_id: int = Path(gt=0), _=Depends(platform_staff)):
-    return platform_service.list_exports(db, organization_id)
+def exports(db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_staff)):
+    return platform_service.list_exports(db, organization_id, user)
 
 
 @router.post("/organizations/{organization_id}/exports", response_model=ExportOut, summary="📤 ساخت خروجی کامل داده سازمان")
 def create_export(data: ReasonIn, db: db_dependency, organization_id: int = Path(gt=0), user=Depends(platform_admin)):
     from app.tasks import export_tenant_task
     return _ops(platform_service.request_export, db, user, organization_id, data.reason, export_tenant_task.delay)
+
+
+@router.post("/organizations/{organization_id}/exports/{export_id}/retry", response_model=ExportOut, summary="🔁 ساخت دوباره خروجی ناموفق (ردیف تازه)")
+def retry_export(data: ReasonIn, db: db_dependency, organization_id: int = Path(gt=0), export_id: int = Path(gt=0), user=Depends(platform_admin)):
+    from app.tasks import export_tenant_task
+    return _ops(platform_service.retry_export, db, user, organization_id, export_id, data.reason, export_tenant_task.delay)
 
 
 @router.get("/organizations/{organization_id}/exports/{export_id}/download", summary="📤 دریافت فایل خروجی (ثبت در گزارش فعالیت)")

@@ -18,7 +18,8 @@ import uuid
 import zipfile
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core import storage
@@ -41,6 +42,10 @@ NEAR_LIMIT = 0.8
 SUPPORT_MAX_MINUTES = 240
 DEPROVISION_GRACE = timedelta(days=30)
 EXPORT_VALID = timedelta(days=30)
+EXPORT_LEASE_MARGIN = timedelta(seconds=60)
+EXPORT_FAILED_MESSAGE = "ساخت این خروجی ناتمام ماند؛ می‌توانید دوباره درخواست دهید."
+EXPORT_STALE_MESSAGE = "ساخت این خروجی متوقف شده است و دیگر پیش نمی‌رود."
+EXPORT_WAITING_MESSAGE = "این خروجی هنوز شروع نشده است؛ صف کار شلوغ است یا درخواست به پردازش پس‌زمینه نرسیده."
 # ستون‌هایی که هرگز از سازمان خارج نمی‌شوند
 EXPORT_SECRET_COLUMNS = {"hashed_password", "totp_secret", "totp_last_step", "token_version", "access_token", "rating_token", "request_hash", "idempotency_key"}
 # جدول‌های سند و گزارش فعالیت با trigger غیرقابل‌تغییرند و در پاک‌سازی دست نمی‌خورند
@@ -268,8 +273,44 @@ def set_flag(db: Session, user: User, key: str, data) -> dict:
 # ---------------------------------------------------------------------------
 # خروجی داده سازمان
 # ---------------------------------------------------------------------------
-def _export_out(row: TenantExport) -> dict:
-    return {"id": row.id, "organization_id": row.organization_id, "status": row.status, "created_at": row.created_at, "finished_at": row.finished_at, "error": row.error}
+def _export_lease() -> timedelta:
+    """پردازشی که بیش از time_limit وظیفه کار کند کشته شده است؛ حاشیه برای کشتن پردازش و commit پایانی است."""
+    from app.tasks import export_tenant_task
+    return timedelta(seconds=export_tenant_task.time_limit) + EXPORT_LEASE_MARGIN
+
+
+def _queue_warning_after() -> timedelta:
+    """پیامی که worker برداشته ولی شروع نکرده، پس از visibility_timeout به صف برمی‌گردد؛ پیش از آن نمی‌شود گفت گم شده است."""
+    from kombu.transport.redis import Channel
+    from app.celery_app import celery_app
+    return timedelta(seconds=(celery_app.conf.broker_transport_options or {}).get("visibility_timeout", Channel.visibility_timeout))
+
+
+def _is_platform_admin(user: User | None) -> bool:
+    return user is not None and getattr(user.role, "value", user.role) == "platform_admin"
+
+
+def _export_out(row: TenantExport, viewer: User | None, retried: bool = False, now: datetime | None = None) -> dict:
+    """جزئیات فنی شکست فقط برای ادمین پلتفرم است؛ بقیه پیام امن می‌بینند. این تابع چیزی را تغییر نمی‌دهد."""
+    now = now or _now()
+    stale = row.status == "pending" and row.lease_until is not None and row.lease_until < now
+    waiting = row.status == "pending" and row.started_at is None and row.created_at < now - _queue_warning_after()
+    message = EXPORT_FAILED_MESSAGE if row.status == "failed" else EXPORT_STALE_MESSAGE if stale else EXPORT_WAITING_MESSAGE if waiting else None
+    admin = _is_platform_admin(viewer)
+    return {"id": row.id, "organization_id": row.organization_id, "status": row.status, "created_at": row.created_at, "started_at": row.started_at,
+            "finished_at": row.finished_at, "retry_of_id": row.retry_of_id, "retried": retried, "stale": stale, "waiting_too_long": waiting,
+            "message": message, "error": row.error if admin else None, "can_retry": admin and not retried and (row.status == "failed" or stale)}
+
+
+def _enqueue_export(db: Session, row: TenantExport, enqueue) -> None:
+    """ردیفی که به صف نرسید همان‌جا ناموفق می‌شود، وگرنه برای همیشه در pending می‌ماند."""
+    try:
+        enqueue(row.id)
+    except Exception as error:
+        logger.exception("صف کردن خروجی %s ناموفق بود", row.id)
+        row.status, row.error, row.finished_at = "failed", f"EnqueueFailed: {type(error).__name__}"[:200], _now()
+        db.commit()
+        raise ConflictError("صف کار پس‌زمینه در دسترس نیست و خروجی ناموفق ثبت شد. کمی بعد دوباره تلاش کنید.") from error
 
 
 def request_export(db: Session, user: User, organization_id: int, reason: str, enqueue) -> dict:
@@ -278,13 +319,58 @@ def request_export(db: Session, user: User, organization_id: int, reason: str, e
     db.add(row)
     _audit(db, user, "platform.org_export", f"خروجی داده سازمان «{org.name}»", org, reason)
     db.commit()
-    enqueue(row.id)
-    return _export_out(row)
+    _enqueue_export(db, row, enqueue)
+    return _export_out(row, user)
 
 
-def list_exports(db: Session, organization_id: int) -> list[dict]:
+def retry_export(db: Session, user: User, organization_id: int, export_id: int, reason: str, enqueue) -> dict:
+    """تلاش دوباره فقط دستی است و ردیف تازه می‌سازد؛ هر ردیف ناموفق فقط یک بار دوباره ساخته می‌شود (قید یکتای retry_of_id)."""
+    org = _org(db, organization_id)
+    fail_stale_exports(db, organization_id=org.id, commit=False)
+    row = db.query(TenantExport).filter(TenantExport.id == export_id, TenantExport.organization_id == org.id).with_for_update().first()
+    if row is None:
+        raise NotFoundError("این خروجی یافت نشد.")
+    if row.status != "failed":
+        raise ConflictError("فقط خروجی ناموفق دوباره ساخته می‌شود.")
+    retry = TenantExport(organization_id=org.id, status="pending", requested_by_id=user.id, reason=reason, created_at=_now(), retry_of_id=row.id)
+    try:
+        with db.begin_nested():
+            db.add(retry)
+            db.flush()
+    except IntegrityError:
+        raise ConflictError("این خروجی قبلاً دوباره درخواست شده است.") from None
+    _audit(db, user, "platform.org_export_retry", f"ساخت دوباره خروجی شماره {row.id} سازمان «{org.name}»", org, reason)
+    db.commit()
+    _enqueue_export(db, retry, enqueue)
+    return _export_out(retry, user)
+
+
+def list_exports(db: Session, organization_id: int, viewer: User) -> list[dict]:
+    """فقط می‌خواند؛ اجرای متوقف‌شده این‌جا «متوقف» نشان داده می‌شود و ثبت شکست با وظیفه روزانه، تلاش دوباره یا ثبت خروج است."""
     rows = db.query(TenantExport).filter(TenantExport.organization_id == organization_id).order_by(TenantExport.id.desc()).limit(20).all()
-    return [_export_out(r) for r in rows]
+    retried = {r for (r,) in db.query(TenantExport.retry_of_id).filter(TenantExport.retry_of_id.in_([r.id for r in rows])).all()} if rows else set()
+    now = _now()
+    return [_export_out(r, viewer, r.id in retried, now) for r in rows]
+
+
+def fail_stale_exports(db: Session, now: datetime | None = None, organization_id: int | None = None, commit: bool = True) -> int:
+    """اجرایی که lease آن گذشته قطعاً تمام شده است؛ ردیف ناموفق می‌شود. خروجی شروع‌نشده دست نمی‌خورد."""
+    now = now or _now()
+    query = update(TenantExport).where(TenantExport.status == "pending", TenantExport.lease_until.is_not(None), TenantExport.lease_until < now)
+    if organization_id is not None:
+        query = query.where(TenantExport.organization_id == organization_id)
+    count = db.execute(query.values(status="failed", error="LeaseExpired", finished_at=now).execution_options(synchronize_session=False)).rowcount
+    if commit:
+        db.commit()
+    return count
+
+
+def _finish_export(db: Session, export_id: int, token: str, **values) -> bool:
+    """فقط اجرایی که توکنش هنوز روی ردیف است و ردیف هنوز pending است پایان را ثبت می‌کند."""
+    done = db.execute(update(TenantExport).where(TenantExport.id == export_id, TenantExport.run_token == token, TenantExport.status == "pending")
+                      .values(finished_at=_now(), **values).execution_options(synchronize_session=False)).rowcount
+    db.commit()
+    return done == 1
 
 
 def build_export(db: Session, export_id: int) -> dict:
@@ -292,6 +378,13 @@ def build_export(db: Session, export_id: int) -> dict:
     row = db.get(TenantExport, export_id)
     if row is None:
         raise NotFoundError("این خروجی یافت نشد.")
+    token, now = uuid.uuid4().hex, _now()
+    claimed = db.execute(update(TenantExport).where(TenantExport.id == export_id, TenantExport.status == "pending", TenantExport.run_token.is_(None))
+                         .values(run_token=token, started_at=now, lease_until=now + _export_lease()).execution_options(synchronize_session=False)).rowcount
+    db.commit()
+    if not claimed:
+        logger.warning("اجرای خروجی %s کنار گذاشته شد؛ ردیف منتظر شروع نبود", export_id)
+        return {"id": export_id, "skipped": True}
     org_id = row.organization_id
     buffer = io.BytesIO()
     try:
@@ -308,16 +401,35 @@ def build_export(db: Session, export_id: int) -> dict:
                 writer.writerow([c.name for c in columns])
                 writer.writerows(rows)
                 archive.writestr(f"{table.name}.csv", "﻿" + out.getvalue())
-        row.path = storage.save(f"exports/{org_id}/{uuid.uuid4().hex}.zip", buffer.getvalue())
-        row.status, row.finished_at = "done", _now()
+        path = storage.save(f"exports/{org_id}/{uuid.uuid4().hex}.zip", buffer.getvalue())
     except Exception as error:
         db.rollback()
-        row = db.get(TenantExport, export_id)
-        row.status, row.error, row.finished_at = "failed", f"{type(error).__name__}"[:200], _now()
-        db.commit()
+        _finish_export(db, export_id, token, status="failed", error=f"{type(error).__name__}"[:200])
         raise
-    db.commit()
-    return _export_out(row)
+    if not _finish_export(db, export_id, token, status="done", path=path):
+        storage.delete(path)
+        logger.warning("اجرای کهنه خروجی %s کنار گذاشته شد و فایلش پاک شد", export_id)
+        return {"id": export_id, "skipped": True}
+    db.expire_all()
+    return _export_out(db.get(TenantExport, export_id), None)
+
+
+def clean_export_files(db: Session, now: datetime | None = None) -> int:
+    """فایل نیمه‌نوشته (.tmp) و zipی که هیچ خروجی آماده‌ای به آن اشاره نمی‌کند، پس از گذشت lease پاک می‌شود."""
+    root = storage.MEDIA_ROOT / "exports"
+    if not root.is_dir():
+        return 0
+    cutoff = ((now or _now()) - _export_lease()).replace(tzinfo=timezone.utc).timestamp()
+    kept = {p for (p,) in db.query(TenantExport.path).filter(TenantExport.status == "done", TenantExport.path.is_not(None)).all()}
+    removed = 0
+    for path in root.rglob("*"):
+        if not path.is_file() or path.stat().st_mtime > cutoff:
+            continue
+        relative = path.relative_to(storage.MEDIA_ROOT).as_posix()
+        if path.suffix == ".tmp" or relative not in kept:
+            path.unlink()
+            removed += 1
+    return removed
 
 
 def export_file(db: Session, user: User, organization_id: int, export_id: int):
@@ -341,6 +453,7 @@ def request_deprovision(db: Session, user: User, organization_id: int, reason: s
     _confirm(org, confirm_slug)
     if org.deprovisioned_at is not None or org.deprovision_requested_at is not None:
         raise ConflictError("خروج این سازمان از قبل ثبت شده است.")
+    fail_stale_exports(db, organization_id=org.id, commit=False)
     recent = db.query(TenantExport.id).filter(TenantExport.organization_id == org.id, TenantExport.status == "done", TenantExport.finished_at >= _now() - EXPORT_VALID).first()
     if recent is None:
         raise ConflictError("پیش از خروج، یک خروجی کامل تازه از داده سازمان بگیرید.")

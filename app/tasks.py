@@ -475,10 +475,14 @@ def erase_deprovisioned_task():
 
 @celery_app.task(name="tasks.purge_operations_records")
 def purge_operations_records_task():
-    from app.services import outbox_service
+    """هر روز: سوابق قدیمی پاک می‌شوند، خروجی‌هایی که lease اجرایشان گذشته ناموفق ثبت می‌شوند و فایل خروجی بی‌صاحب می‌رود."""
+    from app.services import outbox_service, platform_service
     db = SessionLocal()
     try:
-        return outbox_service.purge_old(db)
+        result = outbox_service.purge_old(db)
+        result["stale_exports"] = platform_service.fail_stale_exports(db)
+        result["export_files_removed"] = platform_service.clean_export_files(db)
+        return result
     finally:
         db.close()
 
