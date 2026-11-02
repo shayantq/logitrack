@@ -301,9 +301,11 @@ def pick(db: Session, user: User, line_id: int, data, idempotency_key: str | Non
             line.picked_quantity += data.quantity
             line.picked_at, line.picked_by_id = _now(), user.id
             if pick_list.staging_location_id is not None:
+                # ترتیب قفل: اول موجودی. flush این سطر روی محل قفل اشتراکی کلید خارجی می‌گیرد و ثبت گردش همان محل را قفل می‌کند،
+                # پس flush پیش از قفل موجودی با برداشت همزمان همان کالا بن‌بست می‌داد.
+                inventory = stock_ledger.lock_bucket(db, line.product_id, line.warehouse_id, AVAILABLE, create=False)
                 line.staged_location_id = pick_list.staging_location_id
                 db.flush()
-                inventory = stock_ledger.lock_bucket(db, line.product_id, line.warehouse_id, AVAILABLE, create=False)
                 document = stock_ledger.new_document(
                     db, "pick", organization_id=line.organization_id, user=user, warehouse_id=line.warehouse_id,
                     reference_type="pick_list", reference_id=pick_list.id, note=f"برداشت {pick_list.code}",

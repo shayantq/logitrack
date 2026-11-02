@@ -206,3 +206,16 @@ def test_pool_settings_only_apply_to_postgres(monkeypatch):
     assert options["pool_pre_ping"] is True and options["pool_size"] == 10 and options["max_overflow"] == 10 and options["pool_timeout"] == 15
     monkeypatch.setenv("DB_POOL_SIZE", "4")
     assert pool_options("postgresql+psycopg://x")["pool_size"] == 4
+
+
+def test_deadlock_is_a_retryable_busy_answer_not_a_server_error():
+    import asyncio
+
+    from sqlalchemy.exc import OperationalError
+
+    from app.main import database_busy_handler
+
+    class DeadlockDetected(Exception):
+        pass
+    response = asyncio.run(database_busy_handler(None, OperationalError("x", {}, DeadlockDetected())))
+    assert response.status_code == 503

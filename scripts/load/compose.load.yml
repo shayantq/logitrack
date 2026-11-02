@@ -1,0 +1,23 @@
+# بار آزمایشی (ت۱۷): سقف منابع نزدیک به سرور فعلی (۲ پردازنده، حدود ۲ گیگابایت رم آزاد). هرگز روی سرور اصلی اجرا نشود.
+#   docker compose -p pasineh_load -f docker-compose.yml -f scripts/load/compose.load.yml up -d --build --wait
+services:
+  db:
+    cpus: 1.0
+    mem_limit: 700m
+  redis:
+    cpus: 0.25
+    mem_limit: 100m
+  web:
+    cpus: 1.0
+    mem_limit: 600m
+    environment:
+      LOAD_TEST: "1"
+  celery_worker:
+    cpus: 1.0
+    mem_limit: 700m
+    command: celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-1}
+    environment:
+      LOAD_TEST: "1"
+  celery_beat:
+    cpus: 0.25
+    mem_limit: 150m

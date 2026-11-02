@@ -263,7 +263,7 @@ async def database_pool_handler(request: Request, exc: PoolTimeoutError):
 @app.exception_handler(OperationalError)
 async def database_busy_handler(request: Request, exc: OperationalError):
     # پایان مهلت قفل یا کوئری (app/database.py): موفقیت ساختگی نشان نمی‌دهیم و کاربر می‌تواند دوباره امتحان کند
-    if type(exc.orig).__name__ in ("LockNotAvailable", "QueryCanceled"):
+    if type(exc.orig).__name__ in ("LockNotAvailable", "QueryCanceled", "DeadlockDetected", "SerializationFailure"):
         return JSONResponse(status_code=503, content=_error_body(503, "سرور الان مشغول است؛ چند لحظه دیگر دوباره امتحان کنید."))
     raise exc
 

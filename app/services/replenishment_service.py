@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 from statistics import NormalDist
 
+from sqlalchemy import Date, cast, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.iran import fa_digits, gregorian_to_jalali, jalali_to_gregorian
@@ -134,10 +135,16 @@ def daily_demand(db: Session, inventory_ids: list[int], start: date, end: date) 
         return {}
     lo = dispatch_service.local_to_utc(datetime.combine(start, time.min))
     hi = dispatch_service.local_to_utc(datetime.combine(end + timedelta(days=1), time.min))
-    rows = db.query(StockMovement.inventory_id, StockMovement.created_at, StockMovement.quantity_change) \
-        .filter(StockMovement.inventory_id.in_(inventory_ids), StockMovement.movement_type.in_(DEMAND_TYPES),
-                StockMovement.created_at >= lo, StockMovement.created_at < hi).all()
+    conditions = (StockMovement.inventory_id.in_(inventory_ids), StockMovement.movement_type.in_(DEMAND_TYPES),
+                  StockMovement.created_at >= lo, StockMovement.created_at < hi)
     out: dict[int, dict[date, float]] = defaultdict(lambda: defaultdict(float))
+    if db.get_bind().dialect.name == "postgresql":
+        # بار آزمایشی ت۱۷: با ۱۴۰ هزار گردش، خواندن ردیف‌به‌ردیف کندترین بخش مرکز اقدام بود
+        local_day = cast(StockMovement.created_at + dispatch_service.IRAN_TZ.utcoffset(None), Date)
+        for inventory_id, day, change in db.query(StockMovement.inventory_id, local_day, func.sum(StockMovement.quantity_change))                 .filter(*conditions).group_by(StockMovement.inventory_id, local_day).all():
+            out[inventory_id][day] -= change
+        return out
+    rows = db.query(StockMovement.inventory_id, StockMovement.created_at, StockMovement.quantity_change).filter(*conditions).all()
     for inventory_id, created_at, change in rows:
         out[inventory_id][_local_day(created_at)] -= change      # خروج منفی است ← تقاضای مثبت
     return out
