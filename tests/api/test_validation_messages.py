@@ -232,6 +232,7 @@ def _assert_validation(res) -> list[dict]:
     assert body["code"] == "validation" and "request_id" in body and isinstance(body["detail"], list)
     for item in body["detail"]:
         assert {"loc", "type", "msg", "field_label"} <= set(item) and _readable(item["msg"]), item
+        assert "input" not in item and "url" not in item, item
     return body["detail"]
 
 
@@ -245,6 +246,15 @@ def test_invalid_lot_number_in_receiving_is_readable(env):
 def test_duplicate_serials_keep_their_own_persian_message(env):
     detail = _assert_validation(_receive(env, "PHONE-1", serial_numbers=["SN-1", "SN-1"]))
     assert detail[0]["msg"] == "شماره سریال تکراری وارد شده است."
+
+
+def test_rejected_value_is_not_echoed_back(env):
+    # رمز بیش از حد بلند رد می‌شود و خودش نباید در پاسخ بیاید
+    secret = "q7" * 40
+    res = env.client.post("/auth/", headers=_auth(env.admin), json={
+        "username": "new_user", "email": "n@x.io", "password": secret, "full_name": "کاربر", "role": "warehouse_operator"})
+    detail = _assert_validation(res)
+    assert detail[0]["msg"] == "رمز عبور حداکثر ۷۲ نویسه می‌تواند باشد." and secret not in res.text
 
 
 def test_query_param_and_broken_json_are_readable(env):

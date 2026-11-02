@@ -1,7 +1,7 @@
 """پیام فارسی خطاهای اعتبارسنجی ورودی (۴۲۲) برای کاربر غیرفنی.
 
 خطاهای Pydantic متن انگلیسی دارند (مثلاً «String should match pattern ...»). اینجا هر خطا به یک جمله فارسی با نام
-فیلد تبدیل می‌شود. شکل پاسخ عوض نمی‌شود: هر مورد همان loc و type را دارد، msg فارسی می‌شود و field_label اضافه می‌شود.
+فیلد تبدیل می‌شود. هر مورد همان loc و type را دارد، msg فارسی می‌شود و field_label اضافه می‌شود؛ مقدار ورودی کاربر برنمی‌گردد.
 حدها (حداقل، حداکثر، طول) همیشه از ctx همان خطا خوانده می‌شوند؛ اینجا هیچ قاعده‌ای تعریف یا عوض نمی‌شود.
 """
 import re
@@ -400,11 +400,16 @@ def persian_message(error: dict) -> str:
     return f"{label} معتبر نیست."
 
 
+# input مقدار خام کاربر است (حتی رمز عبور) و url پیوند مستندات Pydantic؛ هیچ‌کدام به پاسخ نمی‌رود
+_HIDDEN_KEYS = {"input", "url"}
+
+
 def translate(errors: list[dict]) -> list[dict]:
-    """فهرست خطای Pydantic با msg فارسی و field_label؛ بقیه کلیدها (loc، type، input، ctx) همان می‌مانند."""
+    """فهرست خطای Pydantic با msg فارسی و field_label؛ loc، type و ctx همان می‌مانند."""
     out = []
     for error in errors:
         field = field_of(error.get("loc"))
-        out.append({**error, "msg": persian_message(error),
+        item = {k: v for k, v in error.items() if k not in _HIDDEN_KEYS}
+        out.append({**item, "msg": persian_message(error),
                     "field_label": FIELD_LABELS.get(field, DEFAULT_LABEL) if field else None})
     return out

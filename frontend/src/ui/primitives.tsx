@@ -1,6 +1,7 @@
 /** اجزای پایه رابط کاربری — همه بر پایه توکن‌های رنگی (روشن/تاریک خودکار) */
 import { forwardRef, useEffect, useImperativeHandle, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
+import { faNumber } from "@/lib/format";
 
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
@@ -88,18 +89,50 @@ export function CardHeader({ title, subtitle, actions, icon, tone = "brand" }: {
 export { Select } from "./select";
 const FIELD_BASE = "w-full rounded-xl border border-border-strong bg-surface px-3.5 text-sm text-text placeholder:text-muted/70 transition focus:border-brand focus:ring-4 focus:ring-brand/15 focus:outline-none disabled:opacity-60";
 
+/**
+ * پیام فارسی به‌جای پیام انگلیسی مرورگر برای قاعده‌هایی که خود فیلد دارد (required، type، min، max، طول، pattern).
+ * پیام قالب (pattern) همان title فیلد است که با پیام سرور یکی است (lib/validation.ts).
+ */
+export function persianValidity(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, title?: string): string {
+  const v = el.validity;
+  if (v.valueMissing) return el instanceof HTMLSelectElement ? "یکی از گزینه‌ها را انتخاب کنید." : "این فیلد را پر کنید.";
+  if (v.patternMismatch) return title || "قالب این مقدار درست نیست.";
+  if (v.typeMismatch) return el.type === "email" ? "نشانی ایمیل درست نیست (مثل name@example.com)." : el.type === "url" ? "نشانی اینترنتی درست نیست (با https:// شروع کنید)." : "این مقدار درست نیست.";
+  if (v.badInput) return "فقط عدد وارد کنید.";
+  if (el instanceof HTMLInputElement) {
+    if (v.rangeUnderflow) return `مقدار نباید کمتر از ${faNumber(Number(el.min))} باشد.`;
+    if (v.rangeOverflow) return `مقدار نباید بیشتر از ${faNumber(Number(el.max))} باشد.`;
+    if (v.stepMismatch) return !el.step || el.step === "1" ? "فقط عدد صحیح وارد کنید." : `مقدار باید مضربی از ${faNumber(Number(el.step))} باشد.`;
+  }
+  if (!(el instanceof HTMLSelectElement)) {
+    if (v.tooShort) return `دست‌کم ${faNumber(el.minLength)} نویسه وارد کنید.`;
+    if (v.tooLong) return `حداکثر ${faNumber(el.maxLength)} نویسه مجاز است.`;
+  }
+  return v.valid ? "" : "این مقدار درست نیست.";
+}
+
+/** پیام مرورگر را فارسی می‌کند؛ پیام قبلی اول پاک می‌شود تا وضعیت واقعی فیلد سنجیده شود */
+function explainInvalid(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, title?: string) {
+  el.setCustomValidity("");
+  if (!el.validity.valid) el.setCustomValidity(persianValidity(el, title));
+}
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, onInvalid, onInput, ...props }, ref) {
   const inner = useRef<HTMLInputElement>(null);
   useImperativeHandle(ref, () => inner.current as HTMLInputElement);
-  // مقدار تازه (تایپ، اسکن یا پر شدن خودکار) پیام قالب قبلی را پاک می‌کند تا فرم گیر نکند
+  // مقدار تازه (تایپ، اسکن یا پر شدن خودکار) پیام قبلی را پاک می‌کند تا فرم گیر نکند
   useEffect(() => { inner.current?.setCustomValidity(""); }, [props.value]);
-  // اگر قالب (pattern) نخواند، متن title (همان پیام فارسی سرور) به‌جای پیام انگلیسی مرورگر نشان داده می‌شود
   return <input ref={inner} className={cn(FIELD_BASE, "h-10", className)} {...props}
-    onInvalid={e => { if (props.title && e.currentTarget.validity.patternMismatch) e.currentTarget.setCustomValidity(props.title); onInvalid?.(e); }}
+    onInvalid={e => { explainInvalid(e.currentTarget, props.title); onInvalid?.(e); }}
     onInput={e => { e.currentTarget.setCustomValidity(""); onInput?.(e); }} />;
 });
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...props }, ref) {
-  return <textarea ref={ref} className={cn(FIELD_BASE, "py-2.5", className)} {...props} />;
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, onInvalid, onInput, ...props }, ref) {
+  const inner = useRef<HTMLTextAreaElement>(null);
+  useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
+  useEffect(() => { inner.current?.setCustomValidity(""); }, [props.value]);
+  return <textarea ref={inner} className={cn(FIELD_BASE, "py-2.5", className)} {...props}
+    onInvalid={e => { explainInvalid(e.currentTarget); onInvalid?.(e); }}
+    onInput={e => { e.currentTarget.setCustomValidity(""); onInput?.(e); }} />;
 });
 
 export function Field({ label, hint, error, children, className }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; children: ReactNode; className?: string }) {

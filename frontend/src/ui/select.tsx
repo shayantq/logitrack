@@ -131,9 +131,10 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         </span>
         <ChevronDown className={cn("size-4 shrink-0 text-muted transition-transform duration-200", open && "rotate-180 text-brand")} />
       </button>
-      {/* برای اعتبارسنجی فرم (required) و ارسال با name */}
-      <select tabIndex={-1} aria-hidden className="sr-only" name={name} required={required} disabled={disabled}
-        value={current} onChange={() => {}} data-native-for={testId}>
+      {/* برای اعتبارسنجی فرم (required) و ارسال با name؛ key: با هر انتخاب تازه از نو ساخته می‌شود تا پیام فارسی قبلی نماند */}
+      <select key={current} tabIndex={-1} aria-hidden className="sr-only" name={name} required={required} disabled={disabled}
+        value={current} onChange={() => {}} data-native-for={testId}
+        onInvalid={e => e.currentTarget.setCustomValidity("یکی از گزینه‌ها را انتخاب کنید.")}>
         {options.map(o => <option key={o.value} value={o.value}>{o.text}</option>)}
       </select>
 

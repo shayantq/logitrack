@@ -54,7 +54,9 @@ export function DateField({ value, onChange, required, disabled, placeholder = "
             className="grid size-6 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-text"><X className="size-3.5" /></span>
         )}
       </button>
-      <input tabIndex={-1} aria-hidden className="sr-only" required={required} value={value} onChange={() => {}} />
+      {/* key: با هر مقدار تازه از نو ساخته می‌شود تا پیام فارسی قبلی نماند */}
+      <input key={value} tabIndex={-1} aria-hidden className="sr-only" required={required} value={value} onChange={() => {}}
+        onInvalid={e => e.currentTarget.setCustomValidity("تاریخ را انتخاب کنید.")} />
 
       <Popover anchor={trigger} open={open} onClose={() => setOpen(false)} width={288} maxHeight={400} testId={testId && `${testId}-calendar`}>
         <div className="p-3">
@@ -129,7 +131,8 @@ export function TimeField({ value, onChange, required, disabled, step = 5, testI
         <Clock3 className="size-4 shrink-0 text-muted" />
         <span className={cn("flex-1 tnum", !value && "text-muted")}>{value ? FA(value) : "--:--"}</span>
       </button>
-      <input tabIndex={-1} aria-hidden className="sr-only" required={required} value={value} onChange={() => {}} />
+      <input key={value} tabIndex={-1} aria-hidden className="sr-only" required={required} value={value} onChange={() => {}}
+        onInvalid={e => e.currentTarget.setCustomValidity("ساعت را انتخاب کنید.")} />
       <Popover anchor={trigger} open={open} onClose={() => setOpen(false)} width={200} maxHeight={300} testId={testId && `${testId}-picker`}>
         <div className="grid min-h-0 flex-1 grid-cols-2 divide-x divide-x-reverse divide-border">
           <div className="flex min-h-0 flex-col">
