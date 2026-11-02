@@ -7589,6 +7589,32 @@ export interface components {
             /** Preview */
             preview: components["schemas"]["ImportPreviewRow"][];
         };
+        /** InboundEntryOut */
+        InboundEntryOut: {
+            /** Product Id */
+            product_id?: number | null;
+            /** Product Name */
+            product_name?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Entry Mode */
+            entry_mode: string;
+            /** Scanned Code */
+            scanned_code?: string | null;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Reason Label */
+            reason_label?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Created By Name */
+            created_by_name?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** IncidentIn */
         IncidentIn: {
             /** Order Id */
@@ -10876,6 +10902,11 @@ export interface components {
         };
         /** ReceiptOut */
         ReceiptOut: {
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["InboundEntryOut"][];
             /** Id */
             id: number;
             /** Code */
@@ -11016,6 +11047,14 @@ export interface components {
             condition: "good" | "damaged";
             /** Over Reason */
             over_reason?: string | null;
+            /** Entry Mode */
+            entry_mode?: ("scan" | "manual") | null;
+            /** Product Scan */
+            product_scan?: string | null;
+            /** Manual Reason */
+            manual_reason?: ("no_barcode" | "label_damaged" | "scanner_down" | "other") | null;
+            /** Manual Note */
+            manual_note?: string | null;
         };
         /** ReceiveReturnIn */
         ReceiveReturnIn: {
@@ -11961,6 +12000,10 @@ export interface components {
             expiry_date?: string | null;
             /** Serial Numbers */
             serial_numbers?: string[];
+            /** Manual Reason */
+            manual_reason?: ("no_barcode" | "label_damaged" | "scanner_down" | "other") | null;
+            /** Manual Note */
+            manual_note?: string | null;
         };
         /** StockMovementResponse */
         StockMovementResponse: {
@@ -22187,6 +22230,8 @@ export interface operations {
                 q?: string | null;
                 skip?: number;
                 limit?: number;
+                /** @description سطرها هم بیاید (صف کار) */
+                with_lines?: boolean;
             };
             header?: never;
             path?: never;

@@ -94,6 +94,8 @@ def list_movements(
 @router.post("/movements", status_code=status.HTTP_201_CREATED, response_model=StockMovementResponse,
              summary="➕ ثبت گردش: ورود کالا، ضایعات یا اصلاح موجودی")
 def record_movement(data: StockMovementCreate, db: db_dependency, user: user_dependency, idempotency_key: IdempotencyKey = None):
+    if data.movement_type == "receipt" and not data.manual_reason:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="ورود دستی کالا کد دلیل می‌خواهد.")
     try:
         movement = inventory_service.record_movement(db, user, data, idempotency_key)
     except DomainError as e:

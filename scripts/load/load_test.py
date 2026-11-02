@@ -189,7 +189,7 @@ class Flows:
             raise RuntimeError(f"receipt {res.status_code}: {res.text[:160]}")
         receipt = res.json()
         step, res = self._step(api, "receipt_receive", "POST", f"/inbound/receipts/{receipt['id']}/receive", headers={"Idempotency-Key": uuid.uuid4().hex}, json={
-            "location_id": self.receiving["id"], "lines": [{"line_id": receipt["lines"][0]["id"], "quantity": 2}]})
+            "location_id": self.receiving["id"], "lines": [{"line_id": receipt["lines"][0]["id"], "quantity": 2, "entry_mode": "scan", "product_scan": self.product["sku"]}]})
         out.append(step)
         if res.status_code >= 300:
             raise RuntimeError(f"receive {res.status_code}: {res.text[:160]}")

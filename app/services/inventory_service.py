@@ -323,6 +323,8 @@ def record_movement(db: Session, user: User, data: StockMovementCreate, idempote
             )
             movement = stock_ledger.record(db, inventory, change, data.movement_type, document=document, user=user,
                                            reason=reason, lines=lines, match=match or None)
+            if data.movement_type == "receipt":
+                receiving_service.record_entry(db, user, data, product, quantity, movement, None)
             db.commit()
             db.refresh(movement)
             return movement

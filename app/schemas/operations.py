@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Optional
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app.core.wms import (
+    MANUAL_ENTRY_REASONS,
     LOCATION_LEVELS, LOCATION_TYPES, PUTAWAY_PROBLEMS, RECEIPT_CONDITIONS, RECEIPT_TYPES, STOCK_STATUSES,
 )
 from app.schemas.product import LotNumber, SerialNumber, UomName, _unique_serials
@@ -129,11 +130,22 @@ class ReceiveLineIn(BaseModel):
     serial_numbers: list[SerialNumber] = Field(default_factory=list, max_length=1000)
     condition: Literal[RECEIPT_CONDITIONS] = "good"
     over_reason: Optional[Reason] = None
+    # روش ورود: API آن را الزامی می‌کند (app/routers/inbound.py)؛ جریان‌های سیستمی این مسیر را صدا نمی‌زنند
+    entry_mode: Optional[Literal["scan", "manual"]] = None
+    product_scan: Optional[Scan] = None
+    manual_reason: Optional[Literal[MANUAL_ENTRY_REASONS]] = None
+    manual_note: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]] = None
 
     @model_validator(mode="after")
     def _check(self):
         if self.line_id is None and self.product_id is None:
             raise ValueError("سطر رسید یا کالا را مشخص کنید.")
+        if self.entry_mode == "scan" and (not self.product_scan or self.manual_reason):
+            raise ValueError("در حالت اسکن، کد کالا لازم است و کد دلیل پذیرفته نمی‌شود.")
+        if self.entry_mode == "manual" and not self.manual_reason:
+            raise ValueError("ورود دستی کد دلیل می‌خواهد.")
+        if self.manual_reason == "other" and not self.manual_note:
+            raise ValueError("برای دلیل «سایر» توضیح بنویسید.")
         _unique_serials(self.serial_numbers)
         return self
 
@@ -196,7 +208,21 @@ class ReceiptTaskOut(BaseModel):
     stock_status_label: str
 
 
+class InboundEntryOut(BaseModel):
+    product_id: Optional[int] = None
+    product_name: Optional[str] = None
+    quantity: int
+    entry_mode: str
+    scanned_code: Optional[str] = None
+    reason_code: Optional[str] = None
+    reason_label: Optional[str] = None
+    note: Optional[str] = None
+    created_by_name: Optional[str] = None
+    created_at: datetime
+
+
 class ReceiptOut(BaseModel):
+    entries: list[InboundEntryOut] = []
     id: int
     code: str
     receipt_type: str

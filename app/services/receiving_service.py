@@ -23,6 +23,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.wms import (
+    MANUAL_ENTRY_REASON_LABELS,
     AVAILABLE, DISCREPANCY_LABELS, LOCATION_TYPES, PENDING, RECEIPT_STATUS_LABELS, RECEIPT_TYPE_LABELS,
     STOCK_STATUS_LABELS,
 )
@@ -30,7 +31,9 @@ from app.models import (
     InboundReceipt, InboundReceiptLine, Location, Order, OrderItem, Partner, Product, PutawayTask, StockBalance,
     StockDocument, User, Warehouse,
 )
+from app.models_operations import InboundEntry
 from app.services import (
+    audit_service,
     catalog_service, event_bus, location_service, putaway_service, stock_document_service, stock_ledger,
     warehouse_service,
 )
@@ -281,6 +284,21 @@ def _transfer_lines(db: Session, source, product: Product, quantity: int, entry)
     return stock_ledger.pick_lines(db, source, quantity, match={"lot_number": entry.lot_number} if entry.lot_number else None)
 
 
+def record_entry(db: Session, user: User, source, product: Product, quantity: int, movement, receipt_id: int | None) -> None:
+    """روش ورود یک مقدار را کنار گردش انبار نگه می‌دارد. جریان سیستمی روش ندارد و چیزی ثبت نمی‌کند."""
+    mode = getattr(source, "entry_mode", None) or ("manual" if getattr(source, "manual_reason", None) else None)
+    if mode is None:
+        return
+    db.flush()
+    db.add(InboundEntry(receipt_id=receipt_id, movement_id=movement.id, product_id=product.id, quantity=quantity, entry_mode=mode,
+                        scanned_code=getattr(source, "product_scan", None), reason_code=source.manual_reason, note=source.manual_note or None,
+                        created_by_id=user.id, created_at=_now()))
+    if mode == "manual":
+        audit_service.log(db, user, "inbound.manual_entry", f"ورود دستی {quantity} عدد {product.name}", target_type="movement", target_id=movement.id,
+                          target_label=product.sku, reason=source.manual_note or MANUAL_ENTRY_REASON_LABELS[source.manual_reason],
+                          details={"reason_code": source.manual_reason, "receipt_id": receipt_id})
+
+
 def receive(db: Session, user: User, receipt_id: int, data, idempotency_key: str | None = None) -> dict:
     def create(key, digest):
         try:
@@ -302,6 +320,8 @@ def receive(db: Session, user: User, receipt_id: int, data, idempotency_key: str
                 quantity = catalog_service.to_base(product, entry.quantity, entry.uom)
                 damaged = entry.condition == "damaged"
                 lot = entry.lot_number or line.lot_number
+                if entry.entry_mode == "scan" and not putaway_service.matches_product(db, product, entry.product_scan):
+                    raise ConflictError(f"کد اسکن‌شده «{entry.product_scan}» با کالای این سطر ({product.name}) نمی‌خواند.")
                 _check_over(receipt, line, quantity, entry.over_reason)
                 status = "damaged" if damaged else (PENDING if _needs_inspection(product, receipt, warehouse) else AVAILABLE)
                 target = stock_ledger.lock_bucket(db, product.id, warehouse.id, status, reorder_point=product.reorder_point)
@@ -330,6 +350,7 @@ def receive(db: Session, user: User, receipt_id: int, data, idempotency_key: str
                 elif damaged:
                     line.rejected_quantity += quantity
                 movements.append(movement)
+                record_entry(db, user, entry, product, quantity, movement, receipt.id)
             if receipt.status == "open":
                 receipt.status, receipt.received_at = "receiving", _now()
             db.flush()
@@ -430,6 +451,10 @@ def _serialize(receipt: InboundReceipt, documents: list[StockDocument] | None = 
         "total_pending_inspection": sum(ln.pending_inspection for ln in lines),
         "total_outstanding": sum(ln.outstanding for ln in lines),
         "has_discrepancy": any(ln.discrepancy_type for ln in lines),
+        "entries": [{"product_id": e.product_id, "product_name": e.product.name if e.product else None, "quantity": e.quantity, "entry_mode": e.entry_mode,
+                     "scanned_code": e.scanned_code, "reason_code": e.reason_code, "reason_label": MANUAL_ENTRY_REASON_LABELS.get(e.reason_code),
+                     "note": e.note, "created_at": e.created_at,
+                     "created_by_name": (e.created_by.full_name or e.created_by.username) if e.created_by else None} for e in receipt.entries],
         "lines": [{
             "id": ln.id, "line_no": ln.line_no, "product_id": ln.product_id, "product_name": ln.product.name,
             "product_sku": ln.product.sku, "unit": ln.product.unit or "عدد", "lot_tracked": bool(ln.product.lot_tracked),
@@ -474,7 +499,7 @@ def get_receipt(db: Session, user: User, receipt_id: int) -> dict:
 
 
 def list_receipts(db: Session, user: User, *, status: str | None = None, receipt_type: str | None = None,
-                  warehouse_id: int | None = None, q: str | None = None, skip: int = 0, limit: int = 50) -> list[dict]:
+                  warehouse_id: int | None = None, q: str | None = None, skip: int = 0, limit: int = 50, with_lines: bool = False) -> list[dict]:
     warehouse_id = location_service.scope_warehouse_work(user, warehouse_id)
     query = _options(db.query(InboundReceipt))
     if warehouse_id is not None:
@@ -488,7 +513,7 @@ def list_receipts(db: Session, user: User, *, status: str | None = None, receipt
         query = query.filter(InboundReceipt.code.ilike(term) | InboundReceipt.external_ref.ilike(term)
                              | InboundReceipt.reference_number.ilike(term))
     receipts = query.order_by(InboundReceipt.id.desc()).offset(skip).limit(limit).all()
-    return [_serialize(r, with_lines=False) for r in receipts]
+    return [_serialize(r, with_lines=with_lines) for r in receipts]
 
 
 def attribute_inspection(db: Session, *, product_id: int, warehouse_id: int, receipt_id: int | None,

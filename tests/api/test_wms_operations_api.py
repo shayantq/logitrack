@@ -39,7 +39,7 @@ def test_inbound_to_shelf_flow_over_http(env):  # noqa: F811
 
     rid, line = receipt.json()["id"], receipt.json()["lines"][0]["id"]
     received = client.post(f"/inbound/receipts/{rid}/receive", headers=a["manager"],
-                           json={"lines": [{"line_id": line, "quantity": 10}]})
+                           json={"lines": [{"line_id": line, "entry_mode": "manual", "manual_reason": "no_barcode", "quantity": 10}]})
     assert received.status_code == 201, received.text
     data = received.json()
     assert (data["status"], data["total_received"], data["total_outstanding"]) == ("receiving", 10, 2)
@@ -79,7 +79,7 @@ def test_quality_inspection_permissions_over_http(env):  # noqa: F811
         "receipt_type": "purchase", "warehouse_id": a["warehouse"], "partner_id": _supplier(client, t),
         "lines": [{"product_id": a["product"], "expected_quantity": 5}]}).json()
     client.post(f"/inbound/receipts/{receipt['id']}/receive", headers=a["manager"],
-                json={"lines": [{"line_id": receipt["lines"][0]["id"], "quantity": 5}]})
+                json={"lines": [{"line_id": receipt["lines"][0]["id"], "entry_mode": "manual", "manual_reason": "no_barcode", "quantity": 5}]})
     missing_reason = client.post("/quality/inspections", headers=a["manager"], json={
         "product_id": a["product"], "results": [{"status": "rejected", "quantity": 1}]})
     assert missing_reason.status_code == 422
@@ -106,7 +106,7 @@ def test_operations_are_tenant_and_warehouse_scoped(env):  # noqa: F811
         "receipt_type": "unexpected", "warehouse_id": a["warehouse"]}).json()
     assert client.get(f"/inbound/receipts/{receipt['id']}", headers=b["admin"]).status_code == 404
     got = client.post(f"/inbound/receipts/{receipt['id']}/receive", headers=a["manager"], json={
-        "lines": [{"product_id": a["product"], "quantity": 2}]})
+        "lines": [{"product_id": a["product"], "entry_mode": "manual", "manual_reason": "no_barcode", "quantity": 2}]})
     assert got.status_code == 201 and got.json()["lines"][0]["expected_quantity"] == 0
     move = client.post("/inventory/location-moves", headers=a["manager"], json={
         "product_id": a["product"], "to_location_id": locs["A-01"]["id"], "quantity": 5})

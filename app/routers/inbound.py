@@ -36,9 +36,9 @@ def list_receipts(
     status_: Optional[Literal[RECEIPT_STATUSES]] = Query(None, alias="status"),
     receipt_type: Optional[Literal[RECEIPT_TYPES]] = Query(None), warehouse_id: Optional[int] = Query(None, gt=0),
     q: Optional[str] = Query(None, max_length=64, description="کد رسید، شماره بارنامه یا سفارش خرید"),
-    skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200),
+    skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200), with_lines: bool = Query(False, description="سطرها هم بیاید (صف کار)"),
 ):
-    return _call(receiving_service.list_receipts, db, user, status=status_, receipt_type=receipt_type,
+    return _call(receiving_service.list_receipts, db, user, status=status_, receipt_type=receipt_type, with_lines=with_lines,
                  warehouse_id=warehouse_id, q=q, skip=skip, limit=limit)
 
 
@@ -57,6 +57,8 @@ def get_receipt(db: db_dependency, user: user_dependency, receipt_id: int = Path
              summary="📦 ثبت دریافت فیزیکی (شمارش، بچ، انقضا، سریال، وضعیت)")
 def receive(data: ReceiveIn, db: db_dependency, user: user_dependency, receipt_id: int = Path(gt=0),
             idempotency_key: IdempotencyKey = None):
+    if any(line.entry_mode is None for line in data.lines):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="برای هر سطر روش ورود (اسکن یا دستی) را مشخص کنید.")
     return _call(receiving_service.receive, db, user, receipt_id, data, idempotency_key)
 
 

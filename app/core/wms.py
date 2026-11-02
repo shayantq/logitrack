@@ -175,6 +175,9 @@ RECEIPT_TYPES = ("purchase", "transfer", "return", "unexpected")
 RECEIPT_TYPE_LABELS = {"purchase": "خرید از تأمین‌کننده", "transfer": "انتقال از انبار دیگر",
                        "return": "مرجوعی مشتری", "unexpected": "ورود پیش‌بینی‌نشده"}
 RECEIPT_STATUSES = ("open", "receiving", "closed", "canceled")
+# ورود دستی کالا به‌جای اسکن: فقط این کدها پذیرفته می‌شوند و other توضیح می‌خواهد
+MANUAL_ENTRY_REASONS = ("no_barcode", "label_damaged", "scanner_down", "other")
+MANUAL_ENTRY_REASON_LABELS = {"no_barcode": "کالا بارکد ندارد", "label_damaged": "برچسب خراب است", "scanner_down": "بارکدخوان کار نمی‌کند", "other": "سایر"}
 RECEIPT_STATUS_LABELS = {"open": "در انتظار ورود", "receiving": "در حال دریافت", "closed": "بسته‌شده", "canceled": "لغوشده"}
 DISCREPANCY_TYPES = ("shortage", "over", "unexpected_item")
 DISCREPANCY_LABELS = {"shortage": "کسری", "over": "اضافه تحویل", "unexpected_item": "کالای خارج از برنامه"}

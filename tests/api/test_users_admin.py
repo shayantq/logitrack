@@ -192,7 +192,7 @@ def test_delete_only_without_history_and_user_timeline(env):
     mh = _h(client, "alpha_mgr")
     pid = client.post("/inventory/products", json={"name": "چای", "sku": "T-1", "price": 1000, "weight_kg": 1, "initial_quantity": 5,
                                                    "warehouse_id": a["wh"].id}, headers=h).json()["product"]["id"]
-    mv = client.post("/inventory/movements", json={"product_id": pid, "warehouse_id": a["wh"].id, "movement_type": "receipt",
+    mv = client.post("/inventory/movements", json={"product_id": pid, "warehouse_id": a["wh"].id, "movement_type": "receipt", "manual_reason": "no_barcode",
                                                     "quantity": 3, "reason": "ورود بار"}, headers=mh)
     assert mv.status_code in (200, 201), mv.text
     res = client.delete(f"/users/{a['manager'].id}", headers=h)

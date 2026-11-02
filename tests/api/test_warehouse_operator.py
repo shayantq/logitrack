@@ -80,20 +80,12 @@ def test_every_route_outside_the_allow_list_is_forbidden(env):
             if role_access.allows("warehouse_operator", method, path):
                 assert ALLOWED.match(path), f"{method} {path} نباید مجاز باشد"
                 continue
-            if not ({"get_current_user", "get_tenant_user"} & _flat(route.dependant)):
+            # مسیر عمومی بدون ورود هم پاسخ می‌دهد؛ فقط مسیرهایی که ورود می‌خواهند باید برای این نقش بسته باشند
+            if env.client.request(method, path, json={}).status_code != 401:
                 continue
             checked += 1
             assert env.client.request(method, path, headers=headers, json={}).status_code == 403, (method, path)
     assert checked > 200
-
-
-def _flat(dependant) -> set:
-    names = set()
-    for child in dependant.dependencies:
-        if child.call:
-            names.add(getattr(child.call, "__name__", ""))
-        names |= _flat(child)
-    return names
 
 
 @pytest.mark.parametrize("method,path", [

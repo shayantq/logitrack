@@ -324,7 +324,7 @@ def test_stock_movements_are_isolated(tenants):
     assert movements and {m["product_id"] for m in movements} == {a.product_id}
 
     # ثبت گردش یا انتقال روی کالا/انبار سازمان دیگر ممکن نیست
-    assert client.post("/inventory/movements", json={"product_id": b.product_id, "movement_type": "receipt", "quantity": 5},
+    assert client.post("/inventory/movements", json={"product_id": b.product_id, "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 5},
                        headers=h).status_code == 404
     assert client.post("/inventory/transfers", json={"product_id": a.product_id, "from_warehouse_id": a.warehouse_id,
                                                      "to_warehouse_id": b.warehouse_id, "quantity": 1},

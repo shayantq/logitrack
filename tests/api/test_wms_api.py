@@ -118,7 +118,7 @@ def test_receipt_documents_reversal_and_idempotency(env):
     client, t = env
     a = t["a"]
     supplier = client.post("/partners/", headers=a["admin"], json=SUPPLIER).json()
-    body = {"product_id": a["product"], "movement_type": "receipt", "quantity": 10, "partner_id": supplier["id"],
+    body = {"product_id": a["product"], "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 10, "partner_id": supplier["id"],
             "external_ref": "INV-1402-77"}
     headers = {**a["manager"], "Idempotency-Key": "rc-test-000001"}
     first = client.post("/inventory/movements", headers=headers, json=body)
@@ -172,7 +172,7 @@ def test_status_change_buckets_and_reservations(env):
 def test_events_feed_is_admin_only_and_tenant_scoped(env):
     client, t = env
     client.post("/inventory/movements", headers=t["a"]["manager"],
-                json={"product_id": t["a"]["product"], "movement_type": "receipt", "quantity": 2})
+                json={"product_id": t["a"]["product"], "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 2})
     events = client.get("/wms/events", headers=t["a"]["admin"]).json()
     assert any(e["event_type"] == "stock.document.posted" for e in events)
     assert client.get("/wms/events", headers=t["a"]["manager"]).status_code == 403
@@ -201,11 +201,11 @@ def test_warehouse_types_codes_and_hierarchy(env):
     assert client.post("/warehouses/", headers=t["b"]["admin"], json={**base, "name": "انبار بیگانه", "parent_id": site.json()["id"]}).status_code == 404
     # رسید مستقیم در سایت ممکن نیست
     receipt = client.post("/inventory/movements", headers=a["admin"], json={
-        "product_id": a["product"], "warehouse_id": site.json()["id"], "movement_type": "receipt", "quantity": 1})
+        "product_id": a["product"], "warehouse_id": site.json()["id"], "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 1})
     assert receipt.status_code == 400
     # رسید در قرنطینه به‌طور پیش‌فرض با وضعیت قرنطینه
     held = client.post("/inventory/movements", headers=a["admin"], json={
-        "product_id": a["product"], "warehouse_id": child["id"], "movement_type": "receipt", "quantity": 3}).json()
+        "product_id": a["product"], "warehouse_id": child["id"], "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 3}).json()
     assert held["stock_status"] == "quarantine"
 
 

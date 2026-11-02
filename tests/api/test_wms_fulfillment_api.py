@@ -58,7 +58,7 @@ def test_order_to_driver_flow_over_http(env):  # noqa: F811
 
     # موجودی تازه ← تخصیص به معوق ← سفارش تکمیلی
     client.post("/inventory/movements", headers=a["manager"],
-                json={"product_id": a["product"], "movement_type": "receipt", "quantity": 4})
+                json={"product_id": a["product"], "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 4})
     assert client.post("/backorders/allocate", headers=a["manager"], json={}).json()["allocated_quantity"] == 4
     start = datetime.now(timezone.utc) + timedelta(hours=1)
     follow = client.post(f"/backorders/orders/{order['id']}/fulfill", headers=a["admin"], json={

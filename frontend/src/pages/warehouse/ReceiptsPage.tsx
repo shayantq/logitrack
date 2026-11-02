@@ -16,7 +16,7 @@ import { faDate, faDateTime, faNumber } from "@/lib/format";
 import { DateField } from "@/ui/datetime";
 import { promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, Textarea } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, Textarea } from "@/ui/primitives";
 import { InspectModal, LocationSelect, WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type Receipt = Schemas["ReceiptOut"];
@@ -253,6 +253,14 @@ function ReceiptModal({ id, onClose }: { id: number | null; onClose: () => void 
                 </tbody>
               </table>
             </div>
+            {r.entries.length > 0 && (
+              <div className="rounded-xl border border-border p-3 text-sm" data-testid="receipt-entries">
+                <div className="mb-2 font-semibold">روش ورود</div>
+                <ul className="space-y-1 text-xs text-text-2">
+                  {r.entries.map((e, i) => <li key={i}>{e.product_name} · {faNumber(e.quantity)} عدد · {e.entry_mode === "scan" ? `کد ${e.scanned_code}` : `ورود دستی: ${e.reason_label}${e.note ? ` (${e.note})` : ""}`}{e.created_by_name ? ` · ${e.created_by_name}` : ""}</li>)}
+                </ul>
+              </div>
+            )}
             {(r.documents.length > 0 || r.putaway_tasks.length > 0) && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -284,7 +292,36 @@ function ReceiptModal({ id, onClose }: { id: number | null; onClose: () => void 
   );
 }
 
-type ReceiveRow = { line: string; product: string; quantity: string; lot: string; expiry: string; serials: string; condition: "good" | "damaged"; over: string };
+type ReceiveRow = { mode: "scan" | "manual"; scan: string; reason: string; reasonNote: string; line: string; product: string; quantity: string; lot: string; expiry: string; serials: string; condition: "good" | "damaged"; over: string };
+
+type ManualReason = "no_barcode" | "label_damaged" | "scanner_down" | "other";
+export const MANUAL_REASONS: [ManualReason, string][] = [["no_barcode", "کالا بارکد ندارد"], ["label_damaged", "برچسب خراب است"], ["scanner_down", "بارکدخوان کار نمی‌کند"], ["other", "سایر"]];
+
+/** اسکن یا ورود دستی را کاربر صریح انتخاب می‌کند؛ سرور کد و دلیل را می‌سنجد و نمی‌داند کد با بارکدخوان وارد شده یا با تایپ. */
+function EntryModeFields({ row, expected, onChange }: { row: ReceiveRow; expected: string; onChange: (patch: Partial<ReceiveRow>) => void }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2" data-testid="receive-entry">
+      <Field label="روش ورود">
+        <SegmentedControl value={row.mode} onChange={mode => onChange({ mode })} options={[{ value: "scan", label: "اسکن" }, { value: "manual", label: "ورود دستی" }]} />
+      </Field>
+      {row.mode === "scan" ? (
+        <Field label="کد کالا" hint={expected}>
+          <Input required className="ltr font-mono" autoComplete="off" value={row.scan} onChange={e => onChange({ scan: e.target.value })} data-testid="receive-scan" />
+        </Field>
+      ) : (
+        <Field label="دلیل ورود دستی">
+          <Select required value={row.reason} onChange={e => onChange({ reason: e.target.value })} data-testid="receive-reason">
+            <option value="">انتخاب کنید</option>
+            {MANUAL_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </Select>
+        </Field>
+      )}
+      {row.mode === "manual" && row.reason === "other" && (
+        <Field label="توضیح" className="sm:col-span-2"><Input required minLength={3} maxLength={300} value={row.reasonNote} onChange={e => onChange({ reasonNote: e.target.value })} data-testid="receive-reason-note" /></Field>
+      )}
+    </div>
+  );
+}
 
 function ReceiveModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
   const toast = useToast();
@@ -292,7 +329,7 @@ function ReceiveModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
   const { data: products = [] } = useProducts();
   const [location, setLocation] = useState(receipt.receiving_location_id ? String(receipt.receiving_location_id) : "");
   const [rows, setRows] = useState<ReceiveRow[]>(receipt.lines.filter(l => l.outstanding > 0 || receipt.receipt_type === "unexpected").map(l => ({
-    line: String(l.id), product: String(l.product_id), quantity: String(l.outstanding || 1), lot: l.lot_number ?? "", expiry: "", serials: "", condition: "good", over: "",
+    mode: "scan" as const, scan: "", reason: "", reasonNote: "", line: String(l.id), product: String(l.product_id), quantity: String(l.outstanding || 1), lot: l.lot_number ?? "", expiry: "", serials: "", condition: "good", over: "",
   })));
   const [note, setNote] = useState("");
   const [key, setKey] = useState(newIdempotencyKey);
@@ -307,6 +344,8 @@ function ReceiveModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
           line_id: r.line ? Number(r.line) : null, product_id: r.line ? null : Number(r.product), quantity: Number(r.quantity),
           lot_number: r.lot || null, expiry_date: r.expiry || null, condition: r.condition, over_reason: r.over || null,
           serial_numbers: r.serials.split(/[\s,،]+/).map(s => s.trim()).filter(Boolean),
+          entry_mode: r.mode, product_scan: r.mode === "scan" ? r.scan : null, manual_reason: r.mode === "manual" ? (r.reason as ManualReason) : null,
+          manual_note: r.mode === "manual" && r.reason === "other" ? r.reasonNote : null,
         })),
       },
     })),
@@ -340,6 +379,7 @@ function ReceiveModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
                 )}
                 <Button type="button" variant="ghost" size="icon" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="حذف"><Trash2 className="size-4" /></Button>
               </div>
+              <EntryModeFields row={row} expected={line?.product_sku ?? product?.sku ?? ""} onChange={patch => update(i, patch)} />
               <div className="grid gap-3 sm:grid-cols-4">
                 <Field label="تعداد شمارش‌شده"><Input type="number" min={1} required value={row.quantity} onChange={e => update(i, { quantity: e.target.value })} data-testid="receive-qty" /></Field>
                 <Field label="وضعیت ظاهری">
@@ -366,7 +406,7 @@ function ReceiveModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
         })}
         {receipt.receipt_type !== "transfer" && (
           <Button type="button" size="sm" variant="soft" icon={<Plus className="size-4" />} data-testid="receive-add"
-            onClick={() => setRows([...rows, { line: "", product: "", quantity: "1", lot: "", expiry: "", serials: "", condition: "good", over: "" }])}>
+            onClick={() => setRows([...rows, { mode: "scan", scan: "", reason: "", reasonNote: "", line: "", product: "", quantity: "1", lot: "", expiry: "", serials: "", condition: "good", over: "" }])}>
             {receipt.receipt_type === "unexpected" ? "کالای دریافتی" : "کالای خارج از برنامه"}
           </Button>
         )}

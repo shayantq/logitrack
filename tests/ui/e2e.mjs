@@ -153,6 +153,7 @@ await session("org_admin", "qazvin_admin", "admin123", async page => {
   await choose(page, "[data-testid=movement-product]", { index: 1 });
   await choose(page, "[data-testid=movement-warehouse]", { index: 1 });
   await page.fill("[data-testid=movement-qty]", "7");
+  await choose(page, "[data-testid=movement-manual-reason]", "no_barcode");
   await page.click("button[form=movement-form]");
   await page.waitForSelector("[data-testid=toast]:has-text('گردش کالا ثبت شد')", { timeout: 10000 });
   check("org_admin", "stock receipt recorded", true);
@@ -1234,6 +1235,7 @@ await session("wms", "qazvin_admin", "admin123", async page => {
   await choose(page, "[data-testid=movement-status]", "quarantine");
   await choose(page, "[data-testid=movement-supplier]", { index: 1 });
   await page.fill("[data-testid=movement-qty]", "4");
+  await choose(page, "[data-testid=movement-manual-reason]", "no_barcode");
   await page.click("button[form=movement-form]");
   await page.waitForSelector("[data-testid=toast]:has-text('گردش کالا ثبت شد')", { timeout: 10000 });
   await page.waitForSelector(`[data-testid=product-row][data-sku="${sku}"] [data-testid=product-stock] >> text=قرنطینه`);
@@ -1303,6 +1305,7 @@ await session("wms-ops", "qazvin_manager", "manager123", async page => {
   await page.click("[data-testid=receipt-receive]");
   await choose(page, "[data-testid=receive-location]", String(rcv.id));
   await page.fill("[data-testid=receive-qty]", "4");
+  await page.fill("[data-testid=receive-scan]", opsProduct.sku);
   await page.click("[data-testid=receive-save]");
   await page.waitForSelector("[data-testid=receipt-line][data-received='4']", { timeout: 10000 });
   check("wms-ops", "physical receipt recorded on the receipt line", true);
@@ -1342,7 +1345,7 @@ await session("wms-ops", "qazvin_manager", "manager123", async page => {
   // ۴. مرجوعی (همیشه در انتظار بازرسی) ← بازرسی در صفحه بازرسی کیفی
   const back = await apiCall(opsToken, "POST", "/inbound/receipts", { receipt_type: "return", warehouse_id: opsWarehouse,
     lines: [{ product_id: opsProduct.id, expected_quantity: 2 }] });
-  await apiCall(opsToken, "POST", `/inbound/receipts/${back.id}/receive`, { location_id: rcv.id, lines: [{ line_id: back.lines[0].id, quantity: 2 }] });
+  await apiCall(opsToken, "POST", `/inbound/receipts/${back.id}/receive`, { location_id: rcv.id, lines: [{ line_id: back.lines[0].id, quantity: 2, entry_mode: "manual", manual_reason: "label_damaged" }] });
   await page.click("[data-testid=app-nav] >> text=بازرسی کیفی");
   const pendingRow = page.locator(`[data-testid=quality-row][data-sku="${opsProduct.sku}"]`).first();
   await pendingRow.locator("[data-testid=quality-inspect]").click();
@@ -2116,6 +2119,7 @@ const operatorOrder = await apiCall(adminToken, "POST", "/orders/", {
 });
 const operatorList = await apiCall(opsToken, "POST", "/picking/lists", { warehouse_id: opsWarehouse, strategy: "single", order_ids: [operatorOrder.id],
   staging_location_id: (await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`)).find(l => l.code === stgCode).id });
+const operatorReceipt = await apiCall(opsToken, "POST", "/inbound/receipts", { receipt_type: "return", warehouse_id: opsWarehouse, lines: [{ product_id: (await apiCall(adminToken, "POST", "/inventory/products", { name: "کالای دریافت اپراتور", sku: `RCV-${runId}`, price: 1000, weight_kg: 1 })).product.id, expected_quantity: 1 }] });
 await apiCall(adminToken, "POST", "/auth/", { username: operatorName, email: `${operatorName}@example.com`, password: "Operator2026", full_name: "اپراتور آزمون", role: "warehouse_operator", warehouse_id: opsWarehouse });
 await session("operator", operatorName, "Operator2026", async page => {
   await page.waitForSelector("[data-testid=my-tasks-page]");
@@ -2137,6 +2141,16 @@ await session("operator", operatorName, "Operator2026", async page => {
   await page.waitForSelector("[data-testid=task-run]", { state: "detached", timeout: 10000 });
   const done = (await apiCall(opsToken, "GET", `/picking/lists/${operatorList.id}`)).lines[0];
   check("operator", "operator completes the pick", done.status === "picked" && !done.claimed_by_id, JSON.stringify(done.status));
+  const receiveCard = page.locator("[data-kind=receive]", { hasText: operatorReceipt.code }).first();
+  await receiveCard.locator("[data-testid=task-start]").click();
+  await page.waitForSelector("[data-testid=task-run]");
+  await page.click("[data-testid=task-toggle-manual]");
+  await choose(page, "[data-testid=task-reason]", "label_damaged");
+  await page.click("[data-testid=task-submit]");
+  await page.click("[data-testid=task-submit]");
+  await page.waitForSelector("[data-testid=task-run]", { state: "detached", timeout: 10000 });
+  const entries = (await apiCall(opsToken, "GET", `/inbound/receipts/${operatorReceipt.id}`)).entries;
+  check("operator", "manual receiving records the reason", entries.length === 1 && entries[0].reason_code === "label_damaged" && entries[0].created_by_name === "اپراتور آزمون", JSON.stringify(entries));
 }, { viewport: { width: 390, height: 844 } });
 
 // ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------

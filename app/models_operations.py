@@ -205,6 +205,7 @@ class InboundReceipt(TenantScoped, Base):
     owner = relationship("Partner", foreign_keys=[owner_id])
     receiving_location = relationship("Location")
     created_by = relationship("User", foreign_keys=[created_by_id])
+    entries = relationship("InboundEntry", order_by="InboundEntry.id", viewonly=True)
 
 
 class InboundReceiptLine(TenantScoped, Base):
@@ -364,3 +365,30 @@ class PutawayTask(TenantScoped, Base):
     def remaining(self) -> int:
         return (self.quantity or 0) - (self.quantity_done or 0)
     claimed_by = relationship("User", foreign_keys=[claimed_by_id])
+
+
+class InboundEntry(TenantScoped, Base):
+    """
+    روش ورود یک مقدار کالا (WH-IN-12). entry_mode=scan یعنی کد درست به سرور رسید؛ این ثابت نمی‌کند با بارکدخوان فیزیکی وارد شده باشد.
+    """
+    __tablename__ = "inbound_entries"
+    __table_args__ = (
+        CheckConstraint("entry_mode IN ('scan', 'manual')", name="ck_inbound_entries_mode"),
+        CheckConstraint("reason_code IS NULL OR reason_code IN ('no_barcode', 'label_damaged', 'scanner_down', 'other')", name="ck_inbound_entries_reason"),
+        CheckConstraint("entry_mode = 'scan' OR reason_code IS NOT NULL", name="ck_inbound_entries_manual_reason"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    receipt_id = Column(Integer, ForeignKey("inbound_receipts.id", ondelete="SET NULL"), nullable=True, index=True)
+    movement_id = Column(Integer, ForeignKey("stock_movements.id", ondelete="SET NULL"), nullable=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    quantity = Column(Integer, nullable=False)
+    entry_mode = Column(String(8), nullable=False)
+    scanned_code = Column(String(64), nullable=True)
+    reason_code = Column(String(16), nullable=True)
+    note = Column(String(300), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+    product = relationship("Product")
+    created_by = relationship("User", foreign_keys=[created_by_id])

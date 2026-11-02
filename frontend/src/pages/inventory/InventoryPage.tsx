@@ -97,6 +97,8 @@ function MovementModal({ product, onClose, products }: { product: Product | null
   const [quantity, setQuantity] = useState("1");
   const [uom, setUom] = useState("");
   const [reason, setReason] = useState("");
+  const [manualReason, setManualReason] = useState("");
+  const [manualNote, setManualNote] = useState("");
   const [status, setStatus] = useState<StockStatus | "">("");
   const [toStatus, setToStatus] = useState<StockStatus>("available");
   const [supplier, setSupplier] = useState("");
@@ -144,6 +146,8 @@ function MovementModal({ product, onClose, products }: { product: Product | null
       }
       return unwrap(api.POST("/inventory/movements", { params: { header }, body: {
         ...common, ...where, movement_type: kind, warehouse_id: fromWarehouse ? Number(fromWarehouse) : null, stock_status: status || null,
+        manual_reason: kind === "receipt" ? manualReason as "no_barcode" | "label_damaged" | "scanner_down" | "other" : null,
+        manual_note: kind === "receipt" && manualReason === "other" ? manualNote : null,
         partner_id: kind === "receipt" && supplier ? Number(supplier) : null, external_ref: kind === "receipt" ? externalRef || null : null,
         expiry_date: incoming && expiry ? expiry : null,
         serial_numbers: incoming ? serials.split(/[\s,،]+/).map(s => s.trim()).filter(Boolean) : [],
@@ -250,6 +254,18 @@ function MovementModal({ product, onClose, products }: { product: Product | null
             <Field label="شماره فاکتور / بارنامه" hint="اختیاری"><Input className="ltr" maxLength={64} value={externalRef} onChange={e => setExternalRef(e.target.value)} /></Field>
           </div>
         )}
+        {kind === "receipt" && (
+          <Field label="دلیل ورود دستی" hint="ورود با اسکن از صفحه رسید و دریافت انجام می‌شود.">
+            <Select required value={manualReason} onChange={e => setManualReason(e.target.value)} data-testid="movement-manual-reason">
+              <option value="">انتخاب کنید</option>
+              <option value="no_barcode">کالا بارکد ندارد</option>
+              <option value="label_damaged">برچسب خراب است</option>
+              <option value="scanner_down">بارکدخوان کار نمی‌کند</option>
+              <option value="other">سایر</option>
+            </Select>
+          </Field>
+        )}
+        {kind === "receipt" && manualReason === "other" && <Field label="توضیح دلیل"><Input required minLength={3} maxLength={300} value={manualNote} onChange={e => setManualNote(e.target.value)} data-testid="movement-manual-note" /></Field>}
         <Field label={reasonRequired ? "دلیل (الزامی)" : "توضیح (اختیاری)"}>
           <Input required={reasonRequired} minLength={reasonRequired ? 3 : undefined} maxLength={500}
             placeholder={kind === "status" ? "مثلاً بازرسی کیفی تأیید شد" : "مثلاً علت کسری"} value={reason} onChange={e => setReason(e.target.value)} />

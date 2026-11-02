@@ -130,7 +130,7 @@ def test_movement_history_query_count_does_not_grow_with_rows(env):
     def add(count):
         for _ in range(count):
             res = env.client.post("/inventory/movements", headers=headers, json={
-                "product_id": product.id, "warehouse_id": warehouse.id, "movement_type": "receipt", "quantity": 1, "reason": "ورود"})
+                "product_id": product.id, "warehouse_id": warehouse.id, "movement_type": "receipt", "manual_reason": "no_barcode", "quantity": 1, "reason": "ورود"})
             assert res.status_code == 201, res.text
 
     def queries():

@@ -3,7 +3,7 @@ from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, constr, model_validator
 
-from app.core.wms import STOCK_STATUSES
+from app.core.wms import MANUAL_ENTRY_REASONS, STOCK_STATUSES
 
 StockStatus = Literal[STOCK_STATUSES]
 # SKU: کد یکتا و تغییرناپذیر، بدون فاصله
@@ -129,10 +129,15 @@ class StockMovementCreate(BaseModel):
     lot_number: Optional[LotNumber] = None
     expiry_date: Optional[date] = None
     serial_numbers: list[SerialNumber] = Field(default_factory=list, max_length=1000)
+    # ورود مستقیم کالا همیشه دستی است و کد دلیل می‌خواهد (الزام در app/routers/inventory.py)
+    manual_reason: Optional[Literal[MANUAL_ENTRY_REASONS]] = None
+    manual_note: Optional[Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)]] = None
 
     @model_validator(mode="after")
     def check_quantity_and_reason(self):
         _unique_serials(self.serial_numbers)
+        if self.manual_reason == "other" and not self.manual_note:
+            raise ValueError("برای دلیل «سایر» توضیح بنویسید.")
         if self.quantity == 0:
             raise ValueError("مقدار گردش نمی‌تواند صفر باشد.")
         if self.movement_type in ("receipt", "damage") and self.quantity < 0:
