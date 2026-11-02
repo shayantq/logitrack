@@ -7,4 +7,5 @@ useDefault = true
 description = "مقدارهای ساختگی تست‌های امنیتی"
 # Tmp-Secret-9921: رمز موقت ساختگی تست لاگ؛ GEZDGNBV...: کلید آزمون عمومی RFC 6238 (= "12345678901234567890")
 # Secret-pass-123: رمز ساختگی کاربر تازه در tests/api/test_platform_operations.py
-regexes = ['''Tmp-Secret-9921''', '''GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ''', '''Secret-pass-123''']
+# Owner-Pass-2026: رمز ساختگی تغییر رمز موقت در tests/api/test_onboarding.py
+regexes = ['''Tmp-Secret-9921''', '''GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ''', '''Secret-pass-123''', '''Owner-Pass-2026''']
