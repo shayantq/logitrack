@@ -2107,6 +2107,38 @@ await session("my-tasks", "qazvin_manager", "manager123", async page => {
   check("my-tasks", "steps record the pick", line.status === "picked" && line.picked_quantity === 1, JSON.stringify(line));
 }, { viewport: { width: 390, height: 844 } });
 
+// ---------------- اپراتور انبار: فقط صف کار انبار خودش ----------------
+const operatorName = `op_${runId}`.toLowerCase();
+const operatorOrder = await apiCall(adminToken, "POST", "/orders/", {
+  items: [{ product_id: opsProduct.id, quantity: 1 }], customer: { name: "مشتری اپراتور", mobile: "09121112233" },
+  destination_province: "قزوین", destination_city: "قزوین", destination_address: "خیابان اپراتور، پلاک ۵", size: "m", priority: false,
+  delivery_window_start: `${iranDate(0)}T00:00:00+03:30`, delivery_window_end: `${iranDate(0)}T23:59:00+03:30`, warehouse_id: opsWarehouse, auto_assign: false,
+});
+const operatorList = await apiCall(opsToken, "POST", "/picking/lists", { warehouse_id: opsWarehouse, strategy: "single", order_ids: [operatorOrder.id],
+  staging_location_id: (await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`)).find(l => l.code === stgCode).id });
+await apiCall(adminToken, "POST", "/auth/", { username: operatorName, email: `${operatorName}@example.com`, password: "Operator2026", full_name: "اپراتور آزمون", role: "warehouse_operator", warehouse_id: opsWarehouse });
+await session("operator", operatorName, "Operator2026", async page => {
+  await page.waitForSelector("[data-testid=my-tasks-page]");
+  check("operator", "lands on the task queue", page.url().endsWith("/app/my-tasks"), page.url());
+  const token = await page.evaluate(() => localStorage.getItem("access_token"));
+  const blocked = await page.evaluate(async t => (await fetch("/orders/", { headers: { Authorization: `Bearer ${t}` } })).status, token);
+  check("operator", "backend rejects orders", blocked === 403, String(blocked));
+  const line = operatorList.lines[0];
+  await page.locator("[data-kind=pick]", { hasText: operatorOrder.tracking_code }).first().locator("[data-testid=task-start]").click();
+  await page.waitForSelector("[data-testid=task-run]");
+  const held = (await apiCall(opsToken, "GET", `/picking/lists/${operatorList.id}`)).lines[0];
+  check("operator", "starting claims the line", !!held.claimed_by_id && held.claimed_by_name === "اپراتور آزمون", JSON.stringify(held.claimed_by_name));
+  await page.fill("[data-testid=task-input]", line.location_code ?? operatorList.warehouse_code);
+  await page.click("[data-testid=task-submit]");
+  await page.fill("[data-testid=task-input]", opsProduct.sku);
+  await page.click("[data-testid=task-submit]");
+  if (line.lot_number) { await page.fill("[data-testid=task-input]", line.lot_number); await page.click("[data-testid=task-submit]"); }
+  await page.click("[data-testid=task-submit]");
+  await page.waitForSelector("[data-testid=task-run]", { state: "detached", timeout: 10000 });
+  const done = (await apiCall(opsToken, "GET", `/picking/lists/${operatorList.id}`)).lines[0];
+  check("operator", "operator completes the pick", done.status === "picked" && !done.claimed_by_id, JSON.stringify(done.status));
+}, { viewport: { width: 390, height: 844 } });
+
 // ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------
 const reliabilityAdmin = await apiToken("qazvin_admin", "admin123");
 const reliabilityDriver = await apiToken("qazvin_driver1", "driver123");

@@ -346,6 +346,9 @@ class PutawaySuggestionOut(BaseModel):
 
 class PutawayTaskOut(BaseModel):
     id: int
+    claimed_by_id: Optional[int] = None
+    claimed_by_name: Optional[str] = None
+    claimed_until: Optional[datetime] = None
     code: str
     status: str
     status_label: str

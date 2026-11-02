@@ -4,7 +4,8 @@
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMe } from "@/auth/AuthContext";
 import { AlertTriangle, ArrowRight, CheckCircle2, MapPin, Package, ScanLine } from "lucide-react";
 import { api, errorMessage, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useToast } from "@/components/Toast";
@@ -56,6 +57,29 @@ export default function MyTasksPage() {
     ...[...(putaways.data ?? [])].reverse().map(task => ({ kind: "putaway" as const, id: `putaway-${task.id}`, task })),
   ], [picks.data, putaways.data]);
   const active = tasks.find(t => t.id === activeId) ?? null;
+  const me = useMe();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const refresh = () => ["pick-lists", "putaway-tasks"].forEach(key => queryClient.invalidateQueries({ queryKey: [key] }));
+  const claim = useMutation({
+    mutationFn: (t: Task) => t.kind === "pick"
+      ? unwrap(api.POST("/picking/lines/{line_id}/claim", { params: { path: { line_id: t.line.id } } }))
+      : unwrap(api.POST("/putaway/tasks/{task_id}/claim", { params: { path: { task_id: t.task.id } } })),
+    onSuccess: (_, t) => { setActiveId(t.id); refresh(); },
+    onError: e => { toast.error(errorMessage(e)); refresh(); },
+  });
+  const release = (t: Task) => {
+    setActiveId(null);
+    void (t.kind === "pick"
+      ? api.POST("/picking/lines/{line_id}/release", { params: { path: { line_id: t.line.id } } })
+      : api.POST("/putaway/tasks/{task_id}/release", { params: { path: { task_id: t.task.id } } })).then(refresh);
+  };
+  const heldByOther = (t: Task) => {
+    const by = t.kind === "pick" ? t.line.claimed_by_id : t.task.claimed_by_id;
+    const until = t.kind === "pick" ? t.line.claimed_until : t.task.claimed_until;
+    const name = t.kind === "pick" ? t.line.claimed_by_name : t.task.claimed_by_name;
+    return by && by !== me.id && until && new Date(`${until}Z`) > new Date() ? name ?? "همکار" : null;
+  };
   const [next, ...rest] = tasks;
   const error = picks.error ?? putaways.error;
   const loading = !!warehouseId && (picks.isLoading || putaways.isLoading);
@@ -64,21 +88,21 @@ export default function MyTasksPage() {
     <div data-testid="my-tasks-page">
       <PageHeader eyebrow="انبار" title="صف کار من" subtitle="برداشت و جانمایی، به ترتیب اجرا" actions={<UpdatedAt at={picks.dataUpdatedAt} />} />
       {!choice.isManager && <div className="mb-4 max-w-sm"><WarehousePicker choice={choice} /></div>}
-      {active ? <TaskRun key={active.id} task={active} onClose={() => setActiveId(null)} /> :
+      {active ? <TaskRun key={active.id} task={active} onDone={() => setActiveId(null)} onBack={() => release(active)} /> :
         error ? <ErrorState error={error} onRetry={() => { void picks.refetch(); void putaways.refetch(); }} /> :
         loading ? <Skeleton className="h-64 rounded-2xl" /> :
         !next ? <Card><EmptyState icon={<CheckCircle2 className="size-5" />} title="کاری در صف نیست" text="کار تازه که برسد همین‌جا نمایش داده می‌شود." /></Card> : (
           <div className="space-y-4">
-            <TaskCard task={next} primary onStart={() => setActiveId(next.id)} />
+            <TaskCard task={next} primary holder={heldByOther(next)} busy={claim.isPending} onStart={() => claim.mutate(next)} />
             {rest.length > 0 && <h2 className="pt-2 text-sm font-bold text-muted">بعدی‌ها ({faNumber(rest.length)})</h2>}
-            {rest.map(t => <TaskCard key={t.id} task={t} onStart={() => setActiveId(t.id)} />)}
+            {rest.map(t => <TaskCard key={t.id} task={t} holder={heldByOther(t)} busy={claim.isPending} onStart={() => claim.mutate(t)} />)}
           </div>
         )}
     </div>
   );
 }
 
-function TaskCard({ task, primary, onStart }: { task: Task; primary?: boolean; onStart: () => void }) {
+function TaskCard({ task, primary, holder, busy, onStart }: { task: Task; primary?: boolean; holder: string | null; busy: boolean; onStart: () => void }) {
   const product = productOf(task);
   return (
     <Card className="p-4" data-testid={primary ? "task-next" : "task-row"} data-kind={task.kind}>
@@ -89,12 +113,12 @@ function TaskCard({ task, primary, onStart }: { task: Task; primary?: boolean; o
       <div className="mt-3 flex items-center gap-2 text-lg font-black"><MapPin className="size-5 shrink-0 text-brand" /><span className="font-mono ltr">{sourceOf(task) || "—"}</span></div>
       <div className="mt-2 flex items-center gap-2"><Package className="size-5 shrink-0 text-muted" /><span className="font-semibold">{product.name}</span></div>
       <div className="mt-1 text-sm text-muted">تعداد: <span className="font-bold text-text tnum">{faNumber(remaining(task))}</span></div>
-      <Button className="mt-4 h-12 w-full" variant={primary ? "primary" : "secondary"} icon={<ScanLine className="size-5" />} onClick={onStart} data-testid="task-start">شروع</Button>
+      <Button className="mt-4 h-12 w-full" variant={primary ? "primary" : "secondary"} icon={<ScanLine className="size-5" />} loading={busy} disabled={!!holder} onClick={onStart} data-testid="task-start">{holder ? `در دست ${holder}` : "شروع"}</Button>
     </Card>
   );
 }
 
-function TaskRun({ task, onClose }: { task: Task; onClose: () => void }) {
+function TaskRun({ task, onDone, onBack }: { task: Task; onDone: () => void; onBack: () => void }) {
   const toast = useToast();
   const invalidate = useInvalidateOperations();
   const steps = useMemo(() => stepsOf(task), [task]);
@@ -106,7 +130,7 @@ function TaskRun({ task, onClose }: { task: Task; onClose: () => void }) {
   const last = index === steps.length - 1;
   useEffect(() => { input.current?.focus(); input.current?.select(); }, [index]);
 
-  const done = () => { invalidate(); setKey(newIdempotencyKey()); onClose(); };
+  const done = () => { invalidate(); setKey(newIdempotencyKey()); onDone(); };
   const run = useMutation({
     mutationFn: async () => { await (task.kind === "pick"
       ? unwrap(api.POST("/picking/lines/{line_id}/pick", {
@@ -135,7 +159,7 @@ function TaskRun({ task, onClose }: { task: Task; onClose: () => void }) {
   return (
     <Card className="p-4" data-testid="task-run">
       <div className="flex items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" icon={<ArrowRight className="size-4" />} onClick={() => index ? setIndex(i => i - 1) : onClose()} data-testid="task-back">{index ? "قدم قبل" : "بازگشت به صف"}</Button>
+        <Button variant="ghost" size="sm" icon={<ArrowRight className="size-4" />} onClick={() => index ? setIndex(i => i - 1) : onBack()} data-testid="task-back">{index ? "قدم قبل" : "بازگشت به صف"}</Button>
         <span className="text-sm font-semibold tnum" data-testid="task-progress">قدم {faNumber(index + 1)} از {faNumber(steps.length)}</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>

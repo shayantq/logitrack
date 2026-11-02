@@ -4234,6 +4234,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/putaway/tasks/{task_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✋ برداشتن وظیفه جانمایی از صف */
+        post: operations["claim_task_putaway_tasks__task_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/putaway/tasks/{task_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ↩️ برگرداندن وظیفه جانمایی به صف */
+        post: operations["release_task_putaway_tasks__task_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/putaway/tasks/{task_id}/execute": {
         parameters: {
             query?: never;
@@ -4607,6 +4641,40 @@ export interface paths {
         get: operations["get_pick_list_picking_lists__pick_list_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lines/{line_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ✋ برداشتن سطر برداشت از صف */
+        post: operations["claim_pick_line_picking_lines__line_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/picking/lines/{line_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ↩️ برگرداندن سطر برداشت به صف */
+        post: operations["release_pick_line_picking_lines__line_id__release_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5985,7 +6053,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "org_admin" | "warehouse_manager" | "driver";
+            role: "org_admin" | "warehouse_manager" | "warehouse_operator" | "driver";
             /** Password */
             password: string;
             /** City */
@@ -9680,6 +9748,12 @@ export interface components {
             status: string;
             /** Short Reason */
             short_reason?: string | null;
+            /** Claimed By Id */
+            claimed_by_id?: number | null;
+            /** Claimed By Name */
+            claimed_by_name?: string | null;
+            /** Claimed Until */
+            claimed_until?: string | null;
         };
         /** PickListCreate */
         PickListCreate: {
@@ -10496,6 +10570,12 @@ export interface components {
         PutawayTaskOut: {
             /** Id */
             id: number;
+            /** Claimed By Id */
+            claimed_by_id?: number | null;
+            /** Claimed By Name */
+            claimed_by_name?: string | null;
+            /** Claimed Until */
+            claimed_until?: string | null;
             /** Code */
             code: string;
             /** Status */
@@ -13074,7 +13154,7 @@ export interface components {
             /** Mobile */
             mobile?: string | null;
             /** Role */
-            role?: ("org_admin" | "warehouse_manager" | "driver") | null;
+            role?: ("org_admin" | "warehouse_manager" | "warehouse_operator" | "driver") | null;
             /** City */
             city?: string | null;
             /** Warehouse Id */
@@ -13448,6 +13528,13 @@ export interface components {
             count: number;
             /** Link */
             link: string;
+        };
+        /** WorkClaimOut */
+        WorkClaimOut: {
+            /** Claimed By Id */
+            claimed_by_id?: number | null;
+            /** Claimed Until */
+            claimed_until?: string | null;
         };
         /** WorkflowOut */
         WorkflowOut: {
@@ -22521,6 +22608,68 @@ export interface operations {
             };
         };
     };
+    claim_task_putaway_tasks__task_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkClaimOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_task_putaway_tasks__task_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkClaimOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     execute_task_putaway_tasks__task_id__execute_post: {
         parameters: {
             query?: never;
@@ -23400,6 +23549,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PickListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_pick_line_picking_lines__line_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                line_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkClaimOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_pick_line_picking_lines__line_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                line_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkClaimOut"];
                 };
             };
             /** @description Validation Error */

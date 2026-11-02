@@ -222,7 +222,7 @@ def _lock_receipt(db: Session, user: User, receipt_id: int) -> InboundReceipt:
     receipt = db.query(InboundReceipt).filter(InboundReceipt.id == receipt_id).with_for_update().first()
     if receipt is None:
         raise NotFoundError("رسید یافت نشد.")
-    location_service.scope_warehouse(user, receipt.warehouse_id)
+    location_service.scope_warehouse_work(user, receipt.warehouse_id)
     return receipt
 
 
@@ -356,6 +356,7 @@ def receive(db: Session, user: User, receipt_id: int, data, idempotency_key: str
 # ---------------------------------------------------------------------------
 def close(db: Session, user: User, receipt_id: int, data) -> dict:
     try:
+        location_service.ensure_staff(user)
         receipt = _lock_receipt(db, user, receipt_id)
         if receipt.status not in ("open", "receiving"):
             raise ConflictError(f"رسید {receipt.code} {RECEIPT_STATUS_LABELS[receipt.status]} است.")
@@ -389,6 +390,7 @@ def close(db: Session, user: User, receipt_id: int, data) -> dict:
 
 def cancel(db: Session, user: User, receipt_id: int, reason: str) -> dict:
     try:
+        location_service.ensure_staff(user)
         receipt = _lock_receipt(db, user, receipt_id)
         if receipt.status != "open" or any(line.received_quantity for line in receipt.lines):
             raise ConflictError("فقط رسیدی که هنوز هیچ کالایی از آن دریافت نشده لغو می‌شود؛ رسید در حال دریافت را با ثبت کسری ببندید.")
@@ -462,7 +464,7 @@ def get_receipt(db: Session, user: User, receipt_id: int) -> dict:
     receipt = _options(db.query(InboundReceipt)).filter(InboundReceipt.id == receipt_id).first()
     if receipt is None:
         raise NotFoundError("رسید یافت نشد.")
-    location_service.scope_warehouse(user, receipt.warehouse_id)
+    location_service.scope_warehouse_work(user, receipt.warehouse_id)
     documents = db.query(StockDocument).options(selectinload(StockDocument.movements)).filter(
         StockDocument.reference_type == "inbound_receipt", StockDocument.reference_id == receipt.id,
         StockDocument.doc_type == "inbound_receipt").order_by(StockDocument.id).all()
@@ -473,7 +475,7 @@ def get_receipt(db: Session, user: User, receipt_id: int) -> dict:
 
 def list_receipts(db: Session, user: User, *, status: str | None = None, receipt_type: str | None = None,
                   warehouse_id: int | None = None, q: str | None = None, skip: int = 0, limit: int = 50) -> list[dict]:
-    warehouse_id = location_service.scope_warehouse(user, warehouse_id)
+    warehouse_id = location_service.scope_warehouse_work(user, warehouse_id)
     query = _options(db.query(InboundReceipt))
     if warehouse_id is not None:
         query = query.filter(InboundReceipt.warehouse_id == warehouse_id)

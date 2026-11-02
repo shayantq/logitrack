@@ -28,6 +28,7 @@ from app.models import (
     Location, Order, PickLine, PickList, Product, StockBalance, StockReservation, User, Warehouse,
 )
 from app.services import (
+    work_claim_service,
     catalog_service, dispatch_service, event_bus, location_service, stock_document_service, stock_ledger,
 )
 from app.services.exceptions import ConflictError, NotFoundError
@@ -270,9 +271,10 @@ def _lock_line(db: Session, user: User, line_id: int) -> PickLine:
     line = db.query(PickLine).filter(PickLine.id == line_id).with_for_update().first()
     if line is None:
         raise NotFoundError("سطر برداشت یافت نشد.")
-    location_service.scope_warehouse(user, line.warehouse_id)
+    location_service.scope_warehouse_work(user, line.warehouse_id)
     if line.status != "open":
         raise ConflictError("این سطر قبلاً بسته شده است.")
+    work_claim_service.ensure_holder(line, user)
     return line
 
 
@@ -317,6 +319,7 @@ def pick(db: Session, user: User, line_id: int, data, idempotency_key: str | Non
                                   reason=f"برداشت {pick_list.code}", reference_type="order", reference_id=line.order_id)
             if line.picked_quantity == line.quantity:
                 line.status = "picked"
+                work_claim_service.clear(line)
             _refresh_list(pick_list)
             _refresh_order(db, line.order_id)
             event_bus.emit(db, "pick.line.picked", "pick_list", pick_list.id,
@@ -352,6 +355,7 @@ def short(db: Session, user: User, line_id: int, data) -> dict:
         pick_list = db.get(PickList, line.pick_list_id)
         missing = line.quantity - line.picked_quantity
         line.status, line.short_reason = "short", data.reason[:300]
+        work_claim_service.clear(line)
         zone = zone_leaves(db, pick_list.zone_location_id) if pick_list.zone_location_id else None
         plan = _plan(db, line.warehouse_id, line.product_id, missing, zone=zone, exclude_location=line.location_id)
         added = 0
@@ -512,6 +516,7 @@ def _serialize(pick_list: PickList, orders: dict[int, Order], codes: dict[int, s
             "location_code": codes.get(ln.location_id), "lot_number": ln.lot_number, "expiry_date": ln.expiry_date,
             "quantity": ln.quantity, "picked_quantity": ln.picked_quantity, "status": ln.status,
             "short_reason": ln.short_reason,
+            "claimed_by_id": ln.claimed_by_id, "claimed_until": ln.claimed_until, "claimed_by_name": (ln.claimed_by.full_name or ln.claimed_by.username) if ln.claimed_by else None,
         } for ln in sorted(lines, key=lambda x: (x.sequence, x.id))],
     }
 
@@ -531,13 +536,13 @@ def get_pick_list(db: Session, user: User, pick_list_id: int) -> dict:
         .filter(PickList.id == pick_list_id).first()
     if pick_list is None:
         raise NotFoundError("فهرست برداشت یافت نشد.")
-    location_service.scope_warehouse(user, pick_list.warehouse_id)
+    location_service.scope_warehouse_work(user, pick_list.warehouse_id)
     orders, codes, warehouses = _context(db, [pick_list])
     return _serialize(pick_list, orders, codes, warehouses.get(pick_list.warehouse_id))
 
 
 def list_pick_lists(db: Session, user: User, *, warehouse_id: int | None = None, status: str | None = None) -> list[dict]:
-    warehouse_id = location_service.scope_warehouse(user, warehouse_id)
+    warehouse_id = location_service.scope_warehouse_work(user, warehouse_id)
     query = db.query(PickList).options(selectinload(PickList.lines).joinedload(PickLine.product))
     if warehouse_id is not None:
         query = query.filter(PickList.warehouse_id == warehouse_id)

@@ -14,7 +14,8 @@ import { Menu, MenuItem, MenuSeparator, Modal } from "@/ui/overlays";
 import { Badge, Button, Checkbox, Field, Input, Select, type Tone } from "@/ui/primitives";
 
 export type UserRow = Schemas["UserResponse"];
-export const ROLE_TONE: Record<string, Tone> = { org_admin: "violet", warehouse_manager: "info", driver: "brand" };
+const WAREHOUSE_ROLES = ["warehouse_manager", "warehouse_operator"];
+export const ROLE_TONE: Record<string, Tone> = { org_admin: "violet", warehouse_operator: "info", warehouse_manager: "info", driver: "brand" };
 
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 export const randomPassword = () => Array.from(crypto.getRandomValues(new Uint32Array(10)), n => ALPHABET[n % ALPHABET.length]).join("");
@@ -91,15 +92,15 @@ export function UserFormModal({ open, onClose, user }: { open: boolean; onClose:
     mutationFn: () => editing
       ? unwrap(api.PUT("/users/{user_id}", { params: { path: { user_id: user!.id } }, body: {
         full_name: form.full_name, email: form.email, mobile,
-        ...(user!.role !== "driver" && user!.id !== me.id ? { role: form.role as "org_admin" | "warehouse_manager" } : {}),
-        ...(form.role === "warehouse_manager" && form.warehouse_id ? { warehouse_id: Number(form.warehouse_id) } : {}),
+        ...(user!.role !== "driver" && user!.id !== me.id ? { role: form.role as "org_admin" | "warehouse_manager" | "warehouse_operator" } : {}),
+        ...(WAREHOUSE_ROLES.includes(form.role) && form.warehouse_id ? { warehouse_id: Number(form.warehouse_id) } : {}),
         ...(form.role === "driver" ? { city: form.city || null } : {}),
       } }))
       : unwrap(api.POST("/auth/", { body: {
         username: form.username, email: form.email, password: form.password, full_name: form.full_name || null, mobile: mobile || null,
         role: form.role as Schemas["CreateUserRequest"]["role"], must_change_password: form.must_change,
         city: form.role === "driver" ? form.city || null : null,
-        warehouse_id: form.role === "warehouse_manager" && form.warehouse_id ? Number(form.warehouse_id) : null,
+        warehouse_id: WAREHOUSE_ROLES.includes(form.role) && form.warehouse_id ? Number(form.warehouse_id) : null,
       } })),
     onSuccess: () => done(editing ? "تغییرات ذخیره شد." : "کاربر ساخته شد."),
     onError: e => toast.error(errorMessage(e)),
@@ -114,7 +115,7 @@ export function UserFormModal({ open, onClose, user }: { open: boolean; onClose:
           hint={roleLocked ? (user!.role === "driver" ? "حساب راننده به نقش دیگری تبدیل نمی‌شود." : "نقش خودتان را نمی‌توانید عوض کنید.") : undefined}>
           <Select value={form.role} onChange={set("role")} disabled={roleLocked} data-testid="user-role">
             {(!editing || user!.role === "driver") && <option value="driver">راننده</option>}
-            <option value="warehouse_manager">مدیر انبار</option><option value="org_admin">ادمین سازمان</option>
+            <option value="warehouse_operator">اپراتور انبار</option><option value="warehouse_manager">مدیر انبار</option><option value="org_admin">ادمین سازمان</option>
           </Select>
         </Field>
         <Field label="نام و نام خانوادگی" className="sm:col-span-2"><Input value={form.full_name} onChange={set("full_name")} data-testid="user-fullname" /></Field>
@@ -140,8 +141,8 @@ export function UserFormModal({ open, onClose, user }: { open: boolean; onClose:
           </>
         )}
         {form.role === "driver" && <Field label="شهر محل فعالیت" className="sm:col-span-2"><CityPicker value={form.city} onChange={v => setForm(f => ({ ...f, city: v }))} testId="user-city" /></Field>}
-        {form.role === "warehouse_manager" && (
-          <Field label="انبار تحت مدیریت *" className="sm:col-span-2">
+        {WAREHOUSE_ROLES.includes(form.role) && (
+          <Field label={form.role === "warehouse_operator" ? "انبار *" : "انبار تحت مدیریت *"} className="sm:col-span-2">
             <Select value={form.warehouse_id} onChange={set("warehouse_id")} required data-testid="user-warehouse">
               <option value="">—</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </Select>

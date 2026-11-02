@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import SECRET_KEY, ALGORITHM
 from app.core.tenancy import set_tenant
 from app.services.event_bus import set_actor
-from app.core import request_context
+from app.core import request_context, role_access
 from app.database import get_db
 from app.models import User, RoleEnum, PLATFORM_ROLES
 
@@ -70,6 +70,8 @@ def get_current_user(
     else:
         set_tenant(db, None)
     set_actor(db, user)
+    if not role_access.allows(getattr(user.role, "value", user.role), request.method, request.url.path):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="این بخش برای نقش شما باز نیست.")
     state = request_context.current.get()
     if state is not None:
         state.update(organization_id=user.organization_id, user_id=user.id)

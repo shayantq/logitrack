@@ -345,6 +345,8 @@ class PutawayTask(TenantScoped, Base):
     last_error = Column(String(300), nullable=True)
     note = Column(String(300), nullable=True)
     assigned_to_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    claimed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    claimed_until = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_now, index=True)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -361,3 +363,4 @@ class PutawayTask(TenantScoped, Base):
     @property
     def remaining(self) -> int:
         return (self.quantity or 0) - (self.quantity_done or 0)
+    claimed_by = relationship("User", foreign_keys=[claimed_by_id])

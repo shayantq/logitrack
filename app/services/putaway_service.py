@@ -28,7 +28,7 @@ from app.core.wms import (
 from app.models import (
     Location, Product, ProductUom, PutawayTask, StockBalance, StockDocument, StockMovement, User, Warehouse,
 )
-from app.services import event_bus, location_service, stock_document_service, stock_ledger
+from app.services import event_bus, location_service, stock_document_service, stock_ledger, work_claim_service
 from app.services.exceptions import ConflictError, DomainError, ForbiddenError, NotFoundError
 
 
@@ -233,9 +233,10 @@ def _lock_task(db: Session, user: User, task_id: int) -> PutawayTask:
     task = db.query(PutawayTask).filter(PutawayTask.id == task_id).with_for_update().first()
     if task is None:
         raise NotFoundError("وظیفه جانمایی یافت نشد.")
-    location_service.scope_warehouse(user, task.warehouse_id)
+    location_service.scope_warehouse_work(user, task.warehouse_id)
     if task.status not in ("open", "partial"):
         raise ConflictError(f"وظیفه {task.code} {PUTAWAY_STATUS_LABELS[task.status]} است.")
+    work_claim_service.ensure_holder(task, user)
     return task
 
 
@@ -317,6 +318,7 @@ def execute(db: Session, user: User, task_id: int, data, idempotency_key: str | 
             task.last_problem = task.last_error = None
             if task.remaining == 0:
                 task.status, task.completed_at, task.completed_by_id = "done", _now(), user.id
+                work_claim_service.clear(task)
                 event_bus.emit(db, "putaway.task.completed", "putaway_task", task.id,
                                {"code": task.code, "destination_location_id": destination.id,
                                 "suggested_location_id": task.suggested_location_id, "quantity": task.quantity},
@@ -380,6 +382,7 @@ def report_problem(db: Session, user: User, task_id: int, data) -> dict:
 
 def cancel(db: Session, user: User, task_id: int, reason: str) -> dict:
     try:
+        location_service.ensure_staff(user)
         task = _lock_task(db, user, task_id)
         task.status, task.cancel_reason = "canceled", reason[:300]
         event_bus.emit(db, "putaway.task.canceled", "putaway_task", task.id, {"code": task.code, "reason": reason[:300]},
@@ -393,6 +396,7 @@ def cancel(db: Session, user: User, task_id: int, reason: str) -> dict:
 
 def refresh_suggestion(db: Session, user: User, task_id: int) -> dict:
     try:
+        location_service.ensure_staff(user)
         task = _lock_task(db, user, task_id)
         _resuggest(db, task)
         db.commit()
@@ -423,6 +427,7 @@ def _serialize(task: PutawayTask, warehouse_code: str | None = None) -> dict:
         "owner_name": task.owner.name if task.owner else None, "receipt_id": task.receipt_id,
         "inspection_id": task.inspection_id, "failure_count": task.failure_count or 0, "last_problem": task.last_problem,
         "last_error": task.last_error, "note": task.note, "cancel_reason": task.cancel_reason,
+        "claimed_by_id": task.claimed_by_id, "claimed_until": task.claimed_until, "claimed_by_name": (task.claimed_by.full_name or task.claimed_by.username) if task.claimed_by else None,
         "created_at": task.created_at, "completed_at": task.completed_at,
     }
 
@@ -437,7 +442,7 @@ def get_task(db: Session, user: User, task_id: int) -> dict:
     task = _options(db.query(PutawayTask)).filter(PutawayTask.id == task_id).first()
     if task is None:
         raise NotFoundError("وظیفه جانمایی یافت نشد.")
-    location_service.scope_warehouse(user, task.warehouse_id)
+    location_service.scope_warehouse_work(user, task.warehouse_id)
     warehouse = db.get(Warehouse, task.warehouse_id)
     return _serialize(task, warehouse.code if warehouse else None)
 
@@ -447,7 +452,7 @@ def suggestions(db: Session, user: User, task_id: int, limit: int = 5) -> list[d
     task = db.get(PutawayTask, task_id)
     if task is None:
         raise NotFoundError("وظیفه جانمایی یافت نشد.")
-    location_service.scope_warehouse(user, task.warehouse_id)
+    location_service.scope_warehouse_work(user, task.warehouse_id)
     exclude = set(task.excluded_location_ids or []) | ({task.source_location_id} if task.source_location_id else set())
     ranked = ranked_options(db, warehouse_id=task.warehouse_id, product=db.get(Product, task.product_id),
                             quantity=task.remaining or 1, stock_status=task.stock_status, lot_number=task.lot_number,
@@ -458,7 +463,7 @@ def suggestions(db: Session, user: User, task_id: int, limit: int = 5) -> list[d
 
 def list_tasks(db: Session, user: User, *, status: str | None = None, warehouse_id: int | None = None,
                receipt_id: int | None = None, task_type: str | None = None, limit: int = 200) -> list[dict]:
-    warehouse_id = location_service.scope_warehouse(user, warehouse_id)
+    warehouse_id = location_service.scope_warehouse_work(user, warehouse_id)
     query = _options(db.query(PutawayTask))
     if task_type:
         query = query.filter(PutawayTask.task_type == task_type)

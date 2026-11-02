@@ -1,13 +1,14 @@
 /** برچسب‌ها و قوانین مشترک — هم‌خوان با بک‌اند (app/services/order_service.py و app/models.py) */
 import type { Tone } from "@/ui/primitives";
 
-export type Role = "platform_admin" | "platform_support" | "org_admin" | "warehouse_manager" | "driver";
+export type Role = "platform_admin" | "platform_support" | "org_admin" | "warehouse_manager" | "warehouse_operator" | "driver";
 
 export const ROLE_LABELS: Record<Role, string> = {
   platform_admin: "ادمین پلتفرم",
   platform_support: "پشتیبان پلتفرم",
   org_admin: "ادمین سازمان",
   warehouse_manager: "مدیر انبار",
+  warehouse_operator: "اپراتور انبار",
   driver: "راننده",
 };
 

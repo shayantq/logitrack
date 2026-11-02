@@ -6,11 +6,13 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from app.core.wms import PUTAWAY_STATUSES, RECEIPT_STATUSES, RECEIPT_TYPES, TASK_TYPES
 from app.database import db_dependency
 from app.dependencies import IdempotencyKey, user_dependency
+from app.models_operations import PutawayTask
+from app.schemas.fulfillment import WorkClaimOut
 from app.schemas.operations import (
     InspectionCreate, InspectionOut, PutawayExecute, PutawayProblemIn, PutawaySuggestionOut, PutawayTaskCreate, PutawayTaskOut,
     QualityTransitionOut, ReasonIn, ReceiptCloseIn, ReceiptCreate, ReceiptOut, ReceiveIn,
 )
-from app.services import putaway_service, quality_service, receiving_service
+from app.services import putaway_service, quality_service, receiving_service, work_claim_service
 from app.services.exceptions import DomainError
 
 router = APIRouter(prefix="/inbound", tags=["📥 رسید و دریافت کالا"])
@@ -116,6 +118,16 @@ def create_task(data: PutawayTaskCreate, db: db_dependency, user: user_dependenc
 @putaway_router.get("/tasks/{task_id}", response_model=PutawayTaskOut, summary="📄 جزئیات وظیفه")
 def get_task(db: db_dependency, user: user_dependency, task_id: int = Path(gt=0)):
     return _call(putaway_service.get_task, db, user, task_id)
+
+
+@putaway_router.post("/tasks/{task_id}/claim", response_model=WorkClaimOut, summary="✋ برداشتن وظیفه جانمایی از صف")
+def claim_task(db: db_dependency, user: user_dependency, task_id: int = Path(gt=0)):
+    return _call(work_claim_service.claim, db, user, PutawayTask, task_id, ("open", "partial"))
+
+
+@putaway_router.post("/tasks/{task_id}/release", response_model=WorkClaimOut, summary="↩️ برگرداندن وظیفه جانمایی به صف")
+def release_task(db: db_dependency, user: user_dependency, task_id: int = Path(gt=0)):
+    return _call(work_claim_service.release, db, user, PutawayTask, task_id)
 
 
 @putaway_router.post("/tasks/{task_id}/execute", response_model=PutawayTaskOut,

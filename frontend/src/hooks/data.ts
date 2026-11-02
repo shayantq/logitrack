@@ -6,8 +6,8 @@ import { api, authFetch, unwrap } from "@/api/client";
 export const useProducts = () =>
   useQuery({ queryKey: ["products"], queryFn: () => unwrap(api.GET("/inventory/products")) });
 
-export const useWarehouses = () =>
-  useQuery({ queryKey: ["warehouses"], queryFn: () => unwrap(api.GET("/warehouses/")), staleTime: 60_000 });
+export const useWarehouses = (enabled = true) =>
+  useQuery({ queryKey: ["warehouses"], queryFn: () => unwrap(api.GET("/warehouses/")), staleTime: 60_000, enabled });
 
 /** طرف‌های تجاری فعال (مثلاً role="supplier" برای انتخاب تأمین‌کننده در رسید) */
 export const usePartners = (role?: "supplier" | "customer" | "carrier" | "owner", enabled = true) =>

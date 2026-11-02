@@ -213,12 +213,15 @@ class PickLine(TenantScoped, Base):
     short_reason = Column(String(300), nullable=True)
     issued = Column(Boolean, nullable=False, default=False, server_default="false")   # حواله خروج سفارش صادر شد
     picked_at = Column(DateTime, nullable=True)
+    claimed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    claimed_until = Column(DateTime, nullable=True)
     picked_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     pick_list = relationship("PickList", back_populates="lines")
     product = relationship("Product")
     location = relationship("Location", foreign_keys=[location_id])
     staged_location = relationship("Location", foreign_keys=[staged_location_id])
+    claimed_by = relationship("User", foreign_keys=[claimed_by_id])
 
 
 class Shipment(TenantScoped, Base):

@@ -160,6 +160,17 @@ def scope_warehouse(user: User, warehouse_id: int | None) -> int | None:
     return warehouse_id
 
 
+def scope_warehouse_work(user: User, warehouse_id: int | None) -> int | None:
+    """برای کار روزانه انبار: مثل scope_warehouse، به‌علاوه اپراتور که فقط انبار خودش را دارد."""
+    if _role(user) != "warehouse_operator":
+        return scope_warehouse(user, warehouse_id)
+    if not user.warehouse_id:
+        raise ConflictError("حساب کاربری شما به هیچ انباری متصل نشده است؛ با ادمین سازمان تماس بگیرید.")
+    if warehouse_id is not None and warehouse_id != user.warehouse_id:
+        raise ForbiddenError("اپراتور فقط به انبار خودش دسترسی دارد.")
+    return user.warehouse_id
+
+
 def _ensure_masterdata(db: Session, user: User) -> None:
     from app.services import permission_service
     permission_service.ensure(db, user, "masterdata.locations")

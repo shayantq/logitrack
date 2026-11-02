@@ -29,7 +29,7 @@ ACTIVE_DRIVER_STATUSES = ("assigned", "picking_up", "picked_up", "in_transit")
 # جدول‌هایی که «پرونده» کاربرند و سابقه کاری حساب نمی‌شوند (با حذف کاربر پاک می‌شوند یا بی‌اهمیت‌اند)
 _NOT_HISTORY = {"audit_logs", "driver_documents", "driver_shifts", "driver_time_off", "driver_profiles", "driver_requests",
                 "driver_invites", "vehicles", "commission_plans", "organization_requests"}
-ROLE_FA = {"org_admin": "ادمین سازمان", "warehouse_manager": "مدیر انبار", "driver": "راننده"}
+ROLE_FA = {"org_admin": "ادمین سازمان", "warehouse_manager": "مدیر انبار", "warehouse_operator": "اپراتور انبار", "driver": "راننده"}
 _TEMP_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
 GENERIC_LOGIN_ERROR = 'نام کاربری یا رمز عبور اشتباه است. لطفاً اطلاعات ورود را بررسی و دوباره تلاش کنید.'
 
@@ -77,6 +77,8 @@ def create_user(db: Session, current_user: User, request: CreateUserRequest) -> 
     if existing:
         raise ConflictError('کاربری با این نام کاربری یا ایمیل قبلاً ثبت شده است.')
 
+    if str(getattr(request.role, "value", request.role)) == "warehouse_operator" and request.warehouse_id is None:
+        raise ConflictError("برای اپراتور انبار، انبار را انتخاب کنید.")
     if request.warehouse_id is not None and db.get(Warehouse, request.warehouse_id) is None:
         raise NotFoundError('انبار انتخاب‌شده یافت نشد.')
 
@@ -150,7 +152,7 @@ def update_user(db: Session, admin: User, user_id: int, data: dict) -> User:
                 continue                                  # ایمیل پاک نمی‌شود
             changes[field] = [getattr(target, field), data[field] or None]
             setattr(target, field, data[field] or None)
-    if _role(target) == "warehouse_manager":
+    if _role(target) in ("warehouse_manager", "warehouse_operator"):
         wid = data.get("warehouse_id") or target.warehouse_id
         if not wid:
             raise ConflictError("برای مدیر انبار، انبار تحت مدیریت را انتخاب کنید.")

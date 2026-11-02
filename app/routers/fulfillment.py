@@ -6,7 +6,9 @@ from fastapi import APIRouter, HTTPException, Path, Query, status
 from app.core.wms import BACKORDER_STATUSES, DISPOSITION_ACTIONS, PICK_LIST_STATUSES, SHIPMENT_STATUSES, TRANSFER_STATUSES
 from app.database import db_dependency
 from app.dependencies import IdempotencyKey, user_dependency
+from app.models_fulfillment import PickLine
 from app.schemas.fulfillment import (
+    WorkClaimOut,
     AbcRowOut, AbcRunIn, AbcRunOut, AllocateIn, AllocateOut, BackorderOut, DispatchIn, DispositionCreate, DispositionOut,
     FulfillIn, GenerateOut, PackIn, PackingQueueOut, PackingSlipOut, PickCandidateOut, PickIn, PickListCreate, PickListOut,
     ReasonIn, ReplenishmentRuleIn, ReplenishmentRuleOut, ShipmentCreate, ShipmentOut, ShipmentPreviewOut, ShortIn, TransferCloseIn,
@@ -14,6 +16,7 @@ from app.schemas.fulfillment import (
 )
 from app.schemas.order import OrderResponse
 from app.services import (
+    work_claim_service,
     audit_service, backorder_service, disposition_service, picking_service, replenishment_rule_service, shipping_service,
     transfer_order_service,
 )
@@ -155,6 +158,16 @@ def create_pick_list(data: PickListCreate, db: db_dependency, user: user_depende
 @picking.get("/lists/{pick_list_id}", response_model=PickListOut, summary="📄 جزئیات فهرست برداشت")
 def get_pick_list(db: db_dependency, user: user_dependency, pick_list_id: int = Path(gt=0)):
     return _call(picking_service.get_pick_list, db, user, pick_list_id)
+
+
+@picking.post("/lines/{line_id}/claim", response_model=WorkClaimOut, summary="✋ برداشتن سطر برداشت از صف")
+def claim_pick_line(db: db_dependency, user: user_dependency, line_id: int = Path(gt=0)):
+    return _call(work_claim_service.claim, db, user, PickLine, line_id, ("open",))
+
+
+@picking.post("/lines/{line_id}/release", response_model=WorkClaimOut, summary="↩️ برگرداندن سطر برداشت به صف")
+def release_pick_line(db: db_dependency, user: user_dependency, line_id: int = Path(gt=0)):
+    return _call(work_claim_service.release, db, user, PickLine, line_id)
 
 
 @picking.post("/lines/{line_id}/pick", response_model=PickListOut, summary="📲 برداشت با اسکن محل، کالا و بچ")

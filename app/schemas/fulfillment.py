@@ -239,6 +239,14 @@ class PickLineOut(BaseModel):
     picked_quantity: int
     status: str
     short_reason: Optional[str] = None
+    claimed_by_id: Optional[int] = None
+    claimed_by_name: Optional[str] = None
+    claimed_until: Optional[datetime] = None
+
+
+class WorkClaimOut(BaseModel):
+    claimed_by_id: Optional[int] = None
+    claimed_until: Optional[datetime] = None
 
 
 class PickListOut(BaseModel):

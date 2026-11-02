@@ -39,10 +39,10 @@ export function useInvalidateOperations() {
 /** انبار جاری صفحه: ادمین انتخاب می‌کند (پیش‌فرض اولین انبار کالادار)، مدیر انبار همیشه انبار خودش */
 export function useWarehouseChoice(initial?: string | null, defaultFirst = true) {
   const me = useMe();
-  const { data: warehouses = [] } = useWarehouses();
+  const isManager = me.role === "warehouse_manager" || me.role === "warehouse_operator";
+  const { data: warehouses = [] } = useWarehouses(me.role !== "warehouse_operator");
   const stockWarehouses = warehouses.filter(w => w.holds_stock);
   const [chosen, setChosen] = useState(initial ?? "");
-  const isManager = me.role === "warehouse_manager";
   const value = isManager ? String(me.warehouse_id ?? "")
     : chosen || (defaultFirst && stockWarehouses[0] ? String(stockWarehouses[0].id) : "");
   return { value, set: setChosen, isManager, warehouses: stockWarehouses, current: warehouses.find(w => String(w.id) === value) };

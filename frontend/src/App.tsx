@@ -185,7 +185,7 @@ export function App() {
             <Route path="receipts" element={guard(ORG_STAFF, <ReceiptsPage />)} />
             <Route path="quality" element={guard(ORG_STAFF, <QualityPage />)} />
             <Route path="putaway" element={guard(ORG_STAFF, <PutawayPage />)} />
-            <Route path="my-tasks" element={guard(ORG_STAFF, <MyTasksPage />)} />
+            <Route path="my-tasks" element={guard([...ORG_STAFF, "warehouse_operator"], <MyTasksPage />)} />
             <Route path="picking" element={guard(ORG_STAFF, <PickingPage />)} />
             <Route path="shipping" element={guard(ORG_STAFF, <ShippingPage />)} />
             <Route path="transfers" element={guard(ORG_STAFF, <TransfersPage />)} />
