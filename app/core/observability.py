@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+import re
 import sys
 import time
 import traceback
@@ -66,8 +67,30 @@ def _json_logs() -> bool:
     return os.getenv("LOG_FORMAT", "json").lower() == "json"
 
 
+# بخشی از مسیر که خودش رمز دسترسی است (لینک خصوصی دمو، لینک نظرسنجی، کد پیگیری) در لاگ درخواست ستاره می‌شود
+SECRET_PATH = re.compile(r"^(/app/d/|/public/ratings/|/rate/|/public/track/|/track/|/organization-requests/status/)[^/?#]+")
+
+
+def redact_path(path: str) -> str:
+    """رشته پرس‌وجو (جست‌وجو، فیلتر، توکن احتمالی) هم در لاگ نمی‌آید."""
+    return SECRET_PATH.sub(r"\1***", path.split("?", 1)[0])
+
+
+class _AccessLogRedaction(logging.Filter):
+    """آرگومان سوم رکورد uvicorn.access مسیر کامل درخواست است."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], redact_path(args[2]), *args[3:])
+        return True
+
+
 def configure_logging() -> None:
-    """برای وب و worker. لاگ‌های uvicorn هم همین قالب را می‌گیرند تا یک نوع خط در فایل باشد."""
+    """برای وب و worker. لاگ‌های uvicorn هم همین قالب را می‌گیرند تا یک نوع خط در فایل باشد. مسیرهای محرمانه در هر حالت ستاره می‌شوند."""
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _AccessLogRedaction) for f in access.filters):
+        access.addFilter(_AccessLogRedaction())
     if not _json_logs():
         return
     formatter = JsonFormatter()

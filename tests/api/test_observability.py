@@ -219,3 +219,28 @@ def test_deadlock_is_a_retryable_busy_answer_not_a_server_error():
         pass
     response = asyncio.run(database_busy_handler(None, OperationalError("x", {}, DeadlockDetected())))
     assert response.status_code == 503
+
+
+@pytest.mark.parametrize("path,expected", [
+    ("/app/d/SECRET-DEMO-TOKEN", "/app/d/***"),
+    ("/app/d/SECRET-DEMO-TOKEN/orders?x=1", "/app/d/***/orders"),
+    ("/public/ratings/abc123", "/public/ratings/***"),
+    ("/rate/abc123", "/rate/***"),
+    ("/public/track/LT-12345", "/public/track/***"),
+    ("/track/LT-12345", "/track/***"),
+    ("/organization-requests/status/REQ-1", "/organization-requests/status/***"),
+    ("/orders/?search=09121112233", "/orders/"),
+    ("/health", "/health"),
+])
+def test_access_log_hides_secret_paths_and_queries(path, expected):
+    assert observability.redact_path(path) == expected
+
+
+def test_access_log_filter_rewrites_the_uvicorn_record():
+    import logging
+    observability.configure_logging()
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d',
+                               ("1.2.3.4", "GET", "/app/d/SECRET-DEMO-TOKEN?a=1", "1.1", 200), None)
+    for f in logging.getLogger("uvicorn.access").filters:
+        f.filter(record)
+    assert "SECRET-DEMO-TOKEN" not in record.getMessage() and "/app/d/***" in record.getMessage()
