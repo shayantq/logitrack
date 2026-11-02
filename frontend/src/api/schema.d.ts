@@ -1546,6 +1546,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/operations/messages/{message_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ⚖️ حل دستی پیام با نتیجه نامعلوم */
+        post: operations["resolve_message_platform_operations_messages__message_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/platform/operations/tasks/{failure_id}/replay": {
         parameters: {
             query?: never;
@@ -8568,8 +8585,24 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** First Attempt At */
+            first_attempt_at?: string | null;
+            /**
+             * Sensitive
+             * @default false
+             */
+            sensitive: boolean;
             /** Replayable */
             replayable: boolean;
+            /**
+             * Conflict
+             * @default false
+             */
+            conflict: boolean;
+            /** Provider Status */
+            provider_status?: number | null;
+            /** Provider Status Label */
+            provider_status_label?: string | null;
         };
         /** MessageResponse */
         MessageResponse: {
@@ -8763,6 +8796,11 @@ export interface components {
             queue_depth?: number | null;
             /** Messages */
             messages: components["schemas"]["MessageFailureOut"][];
+            /**
+             * Unconfirmed
+             * @default []
+             */
+            unconfirmed: components["schemas"]["MessageFailureOut"][];
             /** Tasks */
             tasks: components["schemas"]["TaskFailureOut"][];
         };
@@ -11400,6 +11438,11 @@ export interface components {
         ReplayIn: {
             /** Reason */
             reason: string;
+            /**
+             * Conflict Reviewed
+             * @default false
+             */
+            conflict_reviewed: boolean;
         };
         /** ReplenishmentRuleIn */
         ReplenishmentRuleIn: {
@@ -11552,6 +11595,21 @@ export interface components {
             delivery_window_end?: string | null;
             /** Vehicle Id */
             vehicle_id?: number | null;
+        };
+        /** ResolveIn */
+        ResolveIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "confirm_accepted" | "resend";
+            /** Reason */
+            reason: string;
+            /**
+             * Accept Duplicate Risk
+             * @default false
+             */
+            accept_duplicate_risk: boolean;
         };
         /** ReturnCountIn */
         ReturnCountIn: {
@@ -17186,6 +17244,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReplayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageFailureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_message_platform_operations_messages__message_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveIn"];
             };
         };
         responses: {

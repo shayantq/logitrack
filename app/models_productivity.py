@@ -9,7 +9,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    JSON, Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
+    JSON, BigInteger, Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.orm import relationship
 
@@ -290,18 +290,22 @@ class OperationExceptionEvent(TenantScoped, Base):
 
 
 MESSAGE_ACTIVE_STATUSES = ("pending", "sending")
+# نتیجه نامعلوم: نه فعال است و نه پایان‌یافته؛ ناشر برنمی‌دارد و پاک‌سازی روزانه پاک نمی‌کند
+MESSAGE_UNCONFIRMED = "unconfirmed"
 
 
 class OutboundMessage(Base):
     """
     پیام بیرونی در صف پایدار. سازمانی نیست چون پیام‌های درخواست سازمان و بازیابی رمز به هیچ سازمانی وابسته نیستند
     و ناشر برای همه سازمان‌ها کار می‌کند. متن فقط تا پایان ارسال می‌ماند (app/services/outbox_service.py).
+    sent یعنی سرویس‌دهنده پیام را پذیرفته است؛ وضعیت رسیدن به گیرنده در provider_status می‌ماند.
     """
     __tablename__ = "outbound_messages"
     __table_args__ = (
         CheckConstraint("channel IN ('sms', 'email')", name="ck_outbound_messages_channel"),
-        CheckConstraint("status IN ('pending', 'sending', 'sent', 'skipped', 'failed', 'expired')", name="ck_outbound_messages_status"),
+        CheckConstraint("status IN ('pending', 'sending', 'sent', 'skipped', 'failed', 'expired', 'unconfirmed')", name="ck_outbound_messages_status"),
         Index("ix_outbound_messages_due", "status", "next_attempt_at"),
+        UniqueConstraint("provider_ref", name="uq_outbound_messages_provider_ref"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -320,6 +324,11 @@ class OutboundMessage(Base):
     created_at = Column(DateTime, nullable=False, default=_now)
     sent_at = Column(DateTime, nullable=True)
     last_error = Column(String(300), nullable=True)
+    # همان localid کاوه‌نگار: تصادفی ۵۳ بیتی برای پیام تازه، شناسه ردیف برای پیام‌های پیش از مایگریشن ۰۰۴۴
+    provider_ref = Column(BigInteger, nullable=False)
+    provider_message_id = Column(BigInteger, nullable=True)
+    provider_status = Column(Integer, nullable=True)
+    first_attempt_at = Column(DateTime, nullable=True)
 
 
 class TaskFailure(Base):

@@ -197,17 +197,19 @@ def test_expired_code_is_not_sent(env, sms_on):
     db.close()
 
 
-def test_dead_worker_lease_is_picked_up_again(env, sms_on):
+def test_dead_worker_lease_is_picked_up_again(env, sms_on, monkeypatch):
+    # پیش از تکرار با localid پرسیده می‌شود؛ ۱۰۰ در بازه ۱۲ ساعته یعنی رکوردی نیست و همان localid دوباره می‌رود
+    monkeypatch.setattr(messaging, "sms_status_by_localid", lambda ref: messaging.PROVIDER_NOT_RECORDED)
     db = _publisher_session(env)
     outbox_service.enqueue(db, "sms", "09121112233", "متن")
     db.commit()
     row = db.query(OutboundMessage).one()
     now = _now()
-    row.status, row.attempts, row.lease_until = "sending", 1, now + timedelta(minutes=1)   # worker وسط ارسال مرد
+    row.status, row.attempts, row.lease_until, row.first_attempt_at = "sending", 1, now + timedelta(minutes=1), now   # worker وسط ارسال مرد
     db.commit()
     assert outbox_service.publish_due(db, now)["sent"] == 0    # lease هنوز معتبر است
     assert outbox_service.publish_due(db, now + timedelta(minutes=2))["sent"] == 1
-    assert len(sms_on) == 1
+    assert len(sms_on) == 1 and sms_on[0][2] == row.provider_ref
     db.close()
 
 
@@ -220,11 +222,12 @@ def test_unconfigured_channel_queues_nothing(env, monkeypatch):
 def test_purge_keeps_active_messages(env, sms_on):
     db = _publisher_session(env)
     old = _now() - timedelta(days=40)
-    db.add_all([OutboundMessage(channel="sms", recipient="0912***", status="sent", created_at=old, next_attempt_at=old),
-                 OutboundMessage(channel="sms", recipient="0912", body="x", status="pending", created_at=old, next_attempt_at=old)])
+    db.add_all([OutboundMessage(channel="sms", recipient="0912***", status="sent", created_at=old, next_attempt_at=old, provider_ref=1),
+                 OutboundMessage(channel="sms", recipient="0912", body="x", status="pending", created_at=old, next_attempt_at=old, provider_ref=2),
+                 OutboundMessage(channel="sms", recipient="0912", status="unconfirmed", created_at=old, next_attempt_at=old, provider_ref=3)])
     db.commit()
     assert outbox_service.purge_old(db)["messages"] == 1
-    assert db.query(OutboundMessage).one().status == "pending"
+    assert {m.status for m in db.query(OutboundMessage).all()} == {"pending", "unconfirmed"}   # نامعلوم تا حل شدن می‌ماند
     db.close()
 
 

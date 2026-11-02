@@ -38,8 +38,8 @@ def factory():
 def test_two_publishers_never_send_the_same_message(factory, monkeypatch):
     db = factory()
     now = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=1)
-    db.add_all([OutboundMessage(channel="sms", recipient=f"0912000000{i}", body="متن", status="pending", created_at=now, next_attempt_at=now)
-                for i in range(outbox_service.BATCH)])
+    db.add_all([OutboundMessage(channel="sms", recipient=f"0912000000{i}", body="متن", status="pending", created_at=now, next_attempt_at=now,
+                                provider_ref=outbox_service.new_provider_ref()) for i in range(outbox_service.BATCH)])
     db.commit()
     db.close()
     sent, lock = [], threading.Lock()
@@ -128,4 +128,46 @@ def test_erasing_an_organization_respects_ledger_triggers(factory, monkeypatch, 
     assert db.query(StockDocument).filter(StockDocument.organization_id == org.id).count() == before
     customer = db.query(Customer).filter(Customer.organization_id == org.id).one()
     assert customer.name == "حذف‌شده" and "0912" not in customer.mobile
+    db.close()
+
+
+def test_concurrent_manual_resolution_settles_once(factory):
+    """دو ادمین هم‌زمان یک پیام نامعلوم را حل می‌کنند؛ قفل ردیف فقط یکی را می‌پذیرد و فقط یک رکورد گزارش فعالیت می‌ماند."""
+    from app.core.tenancy import set_tenant
+    from app.models import AuditLog, RoleEnum, User
+    from app.services.exceptions import ConflictError
+    from tests.integration.test_wms_postgres import _run_parallel
+    db = factory()
+    set_tenant(db, None)
+    admins = [User(username=f"msg_root{i}", email=f"msg{i}@test.local", role=RoleEnum.PLATFORM_ADMIN, hashed_password="x") for i in range(4)]
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    message = OutboundMessage(channel="sms", recipient="09120000000", body="متن", status="unconfirmed", created_at=now, next_attempt_at=now,
+                              first_attempt_at=now - timedelta(days=1), attempts=1, provider_ref=outbox_service.new_provider_ref())
+    db.add_all([*admins, message])
+    db.commit()
+    admin_ids, message_id = [a.id for a in admins], message.id
+    db.close()
+
+    def settle(index):
+        session = factory()
+        try:
+            set_tenant(session, None)
+            action = "confirm_accepted" if index % 2 else "resend"
+            outbox_service.resolve_unconfirmed(session, session.get(User, admin_ids[index]), message_id, action, "بررسی هم‌زمان", accept_duplicate_risk=True)
+            return action
+        except ConflictError:
+            session.rollback()
+            return None
+        finally:
+            session.close()
+
+    winners = [w for w in _run_parallel(len(admin_ids), settle) if w]
+    db = factory()
+    set_tenant(db, None)
+    row = db.get(OutboundMessage, message_id)
+    assert len(winners) == 1 and row.status == ("sent" if winners[0] == "confirm_accepted" else "pending")
+    assert db.query(AuditLog).filter(AuditLog.action == "platform.message_resolve", AuditLog.target_id == message_id).count() == 1
+    db.execute(text("SELECT set_config('pasineh.ledger_maintenance', 'on', true)"))
+    db.query(User).filter(User.id.in_(admin_ids)).delete(synchronize_session=False)
+    db.commit()
     db.close()

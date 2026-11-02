@@ -15,7 +15,13 @@ class MessageFailureOut(BaseModelWithDateFormatting):
     attempts: int
     last_error: Optional[str] = None
     created_at: datetime
+    first_attempt_at: Optional[datetime] = None
+    sensitive: bool = False
     replayable: bool
+    conflict: bool = False
+    # پذیرش سرویس‌دهنده (status=sent) با رسیدن به گیرنده یکی نیست؛ این کد خام کاوه‌نگار است
+    provider_status: Optional[int] = None
+    provider_status_label: Optional[str] = None
 
 
 class TaskFailureOut(BaseModelWithDateFormatting):
@@ -33,8 +39,19 @@ class OperationsOverview(BaseModel):
     oldest_pending_seconds: int = 0
     queue_depth: Optional[int] = None
     messages: list[MessageFailureOut]
+    unconfirmed: list[MessageFailureOut] = []
     tasks: list[TaskFailureOut]
 
 
+Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+
+
 class ReplayIn(BaseModel):
-    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    reason: Reason
+    conflict_reviewed: bool = False
+
+
+class ResolveIn(BaseModel):
+    action: Literal["confirm_accepted", "resend"]
+    reason: Reason
+    accept_duplicate_risk: bool = False

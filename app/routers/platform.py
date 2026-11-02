@@ -11,7 +11,7 @@ from app.schemas.organization import (
     OrganizationApproved, OrganizationCreate, OrganizationProfileResponse, OrganizationRequestApprove,
     OrganizationRequestReject, OrganizationRequestResponse, OrganizationStats, OrganizationUpdate,
 )
-from app.schemas.operations_health import MessageFailureOut, OperationsOverview, ReplayIn, TaskFailureOut
+from app.schemas.operations_health import MessageFailureOut, OperationsOverview, ReplayIn, ResolveIn, TaskFailureOut
 from app.schemas.platform_ops import DeprovisionOut, ExportOut, FlagIn, FlagOut, GrantIn, GrantOut, PlanIn, PlanSummary, ReasonIn, SupportView, SuspendIn
 from app.schemas.user import UserResponse
 from app.services import organization_request_service, organization_service, outbox_service, platform_service
@@ -137,9 +137,14 @@ def operations(db: db_dependency, _=Depends(platform_staff)):
 @router.post("/operations/messages/{message_id}/retry", response_model=MessageFailureOut, summary="🔁 ارسال دوباره پیام ناموفق غیرحساس")
 def retry_message(data: ReplayIn, db: db_dependency, message_id: int = Path(gt=0), user=Depends(platform_admin)):
     try:
-        return outbox_service.retry_message(db, user, message_id, data.reason)
+        return outbox_service.retry_message(db, user, message_id, data.reason, data.conflict_reviewed)
     except DomainError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/operations/messages/{message_id}/resolve", response_model=MessageFailureOut, summary="⚖️ حل دستی پیام با نتیجه نامعلوم")
+def resolve_message(data: ResolveIn, db: db_dependency, message_id: int = Path(gt=0), user=Depends(platform_admin)):
+    return _ops(outbox_service.resolve_unconfirmed, db, user, message_id, data.action, data.reason, data.accept_duplicate_risk)
 
 
 @router.post("/operations/tasks/{failure_id}/replay", response_model=TaskFailureOut, summary="🔁 اجرای دوباره وظیفه دوره‌ای")

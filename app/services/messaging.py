@@ -12,11 +12,14 @@
 پیام در همان تراکنش عملیات در صف پایدار ثبت می‌شود و ناشر پس‌زمینه آن را می‌فرستد (app/services/outbox_service.py).
 پس صدا زدن این توابع باید پیش از commit باشد. متن‌های رمز موقت و کد بازیابی «حساس» علامت می‌خورند.
 """
+import http.client
 import json
 import logging
 import os
 import smtplib
+import socket
 import ssl
+import urllib.error
 import urllib.parse
 import urllib.request
 from email.message import EmailMessage
@@ -66,23 +69,73 @@ def _skipped(channel: str, recipient: str, text: str) -> None:
 # ---------------------------------------------------------------------------
 # ارسال واقعی (داخل worker)
 # ---------------------------------------------------------------------------
-def deliver_sms(mobile: str, text: str, local_id: int | None = None) -> bool:
+KAVENEGAR_API = "https://api.kavenegar.com/v1"
+# وضعیت پیام نزد کاوه‌نگار (kavenegar.com/rest.html، جدول ۲). وجود رکورد یعنی پذیرش، نه رسیدن به گیرنده.
+PROVIDER_STATUS_LABELS = {
+    1: "در صف ارسال", 2: "زمان‌بندی‌شده", 4: "تحویل به مخابرات", 5: "تحویل به مخابرات", 6: "خطا در ارسال",
+    10: "رسیده به گیرنده", 11: "نرسیده به گیرنده", 13: "لغو یا مشکل در ارسال", 14: "مسدود از سوی گیرنده",
+}
+PROVIDER_NOT_RECORDED = 100
+STATUS_LOOKUP_WINDOW_HOURS = 12
+
+
+class AmbiguousSend(Exception):
+    """درخواست شاید به سرویس‌دهنده رسیده باشد ولی پاسخ نیامد؛ نتیجه نامعلوم است، نه ناموفق."""
+
+
+def _kavenegar(path: str, data: dict | None, timeout: int) -> dict:
+    url = f"{KAVENEGAR_API}/{_env('SMS_API_KEY')}/{path}"
+    req = urllib.request.Request(url, data=urllib.parse.urlencode(data).encode() if data is not None else None, method="POST" if data is not None else "GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode() or "{}")
+    except urllib.error.HTTPError as error:
+        # سرویس‌دهنده پاسخ داد و خطا گفت (مثلاً ۴۱۸ اعتبار ناکافی یا ۴۲۶)؛ کلید در متن خطا نمی‌آید
+        try:
+            body = json.loads(error.read().decode() or "{}")
+        except ValueError:
+            body = {}
+        return body or {"return": {"status": error.code}}
+    except urllib.error.URLError as error:
+        if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
+            raise ConnectionError("SMS provider unreachable") from None   # درخواست نرفته است
+        raise AmbiguousSend(type(error.reason).__name__) from None
+    except (TimeoutError, socket.timeout, http.client.HTTPException, ConnectionResetError) as error:
+        raise AmbiguousSend(type(error).__name__) from None
+
+
+def deliver_sms(mobile: str, text: str, local_id: int | None = None) -> dict | bool:
+    """رکورد سرویس‌دهنده (messageid، status، sender، receptor، message)، True اگر پذیرفت ولی رکوردی نداد، یا False اگر پیامک تنظیم نشده است."""
     if not sms_enabled():
         _skipped("SMS", mobile, text)
         return False
-    url = f"https://api.kavenegar.com/v1/{_env('SMS_API_KEY')}/sms/send.json"
     data = {"receptor": mobile, "message": text}
     if _env("SMS_SENDER"):
         data["sender"] = _env("SMS_SENDER")
     if local_id is not None:
-        data["localid"] = str(local_id)   # ارسال دوباره همان پیام پس از مرگ worker
-    req = urllib.request.Request(url, data=urllib.parse.urlencode(data).encode(), method="POST")
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        body = json.loads(resp.read().decode() or "{}")
+        data["localid"] = str(local_id)   # کاوه‌نگار localid تکراری را دوباره نمی‌فرستد و رکورد قبلی را برمی‌گرداند
+    body = _kavenegar("sms/send.json", data, timeout=20)
     status = (body.get("return") or {}).get("status")
     if status != 200:
-        raise RuntimeError(f"SMS provider error: {body.get('return')}")
-    return True
+        raise RuntimeError(f"SMS provider error: {status}")
+    entries = body.get("entries")
+    # پذیرفته شد؛ اگر رکوردی برنگشت فقط True، که «ارسال‌نشده» (False) با آن اشتباه نشود
+    return entries[0] if isinstance(entries, list) and entries and isinstance(entries[0], dict) and entries[0] else True
+
+
+def sms_status_by_localid(local_id: int) -> int | None:
+    """وضعیت پیام با localid، یا None اگر پاسخ روشن نیست (خطا، ۴۲۶، قطع شبکه). None هرگز یعنی «فرستاده نشده» نیست."""
+    try:
+        body = _kavenegar(f"sms/statuslocalmessageid.json?localid={int(local_id)}", None, timeout=15)
+    except (AmbiguousSend, ConnectionError):
+        return None
+    entries = body.get("entries")
+    if (body.get("return") or {}).get("status") != 200 or not isinstance(entries, list) or len(entries) != 1:
+        return None
+    try:
+        return int(entries[0].get("status"))
+    except (TypeError, ValueError):
+        return None
 
 
 def deliver_email(to: str, subject: str, text: str) -> bool:
