@@ -9,7 +9,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    JSON, Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
+    JSON, Boolean, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text,
 )
 from sqlalchemy.orm import relationship
 
@@ -161,6 +161,7 @@ class DriverReturn(TenantScoped, Base):
     created_at = Column(DateTime, nullable=False, default=_now)
     received_at = Column(DateTime, nullable=True)
     received_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    received_location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     note = Column(String(500), nullable=True)
 
     lines = relationship("DriverReturnLine", cascade="all, delete-orphan", order_by="DriverReturnLine.id")
@@ -418,3 +419,42 @@ class TenantExport(Base):
     requested_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=_now)
     finished_at = Column(DateTime, nullable=True)
+
+
+class PurchaseRequest(TenantScoped, Base):
+    """درخواست خرید. پرداخت و رسید خودکار ندارد (ت۲۲)."""
+    __tablename__ = "purchase_requests"
+    __table_args__ = (CheckConstraint("status IN ('pending', 'approved', 'rejected', 'canceled')", name="ck_purchase_requests_status"),)
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(16), nullable=False, unique=True)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False, index=True)
+    status = Column(String(12), nullable=False, default="pending", index=True)
+    note = Column(String(500), nullable=True)
+    requested_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now)
+
+
+class PurchaseRequestLine(TenantScoped, Base):
+    __tablename__ = "purchase_request_lines"
+    __table_args__ = (CheckConstraint("quantity > 0", name="ck_purchase_request_lines_quantity"),)
+
+    id = Column(Integer, primary_key=True)
+    request_id = Column(Integer, ForeignKey("purchase_requests.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    product_name = Column(String(200), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    estimated_unit_cost = Column(Float, nullable=True)
+
+
+class PurchaseRequestEvent(TenantScoped, Base):
+    """تاریخچه فقط‌افزودنی تصمیم‌ها؛ با تریگر تغییرناپذیر است."""
+    __tablename__ = "purchase_request_events"
+    __table_args__ = (CheckConstraint("action IN ('created', 'approved', 'rejected', 'canceled')", name="ck_purchase_request_events_action"),)
+
+    id = Column(Integer, primary_key=True)
+    request_id = Column(Integer, ForeignKey("purchase_requests.id", ondelete="RESTRICT"), nullable=False, index=True)
+    action = Column(String(12), nullable=False)
+    note = Column(String(500), nullable=True)
+    actor_id = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
+    at = Column(DateTime, nullable=False, default=_now)

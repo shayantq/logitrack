@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.wms import PENDING
 from app.models import ACTIVE_ORDER_STATUSES, Order, Shipment, StockReservation, User, Vehicle
+from app.models_operations import Location
 from app.models_productivity import ContactAttempt, DriverReturn, DriverReturnLine, OrderHandover
 from app.services import audit_service, capacity_service, control_settings, notification_service, order_service, stock_ledger
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
@@ -61,8 +62,9 @@ def open_return(db: Session, user: User | None, order: Order, quantities: dict[i
 
 def _return_out(db: Session, row: DriverReturn) -> dict:
     receiver = db.get(User, row.received_by_id) if row.received_by_id else None
+    location = db.get(Location, row.received_location_id) if row.received_location_id else None
     return {"id": row.id, "order_id": row.order_id, "status": row.status, "reason": row.reason, "created_at": row.created_at,
-            "received_at": row.received_at, "received_by": _name(receiver), "note": row.note,
+            "received_at": row.received_at, "received_by": _name(receiver), "note": row.note, "received_location_code": location.code if location else None,
             "lines": [{"product_id": line.product_id, "product_name": line.product_name, "expected_quantity": line.expected_quantity,
                        "received_quantity": line.received_quantity, "shortage_reason": line.shortage_reason} for line in row.lines]}
 
@@ -114,6 +116,11 @@ def receive_return(db: Session, user: User, order_id: int, return_id: int, data)
                 stock_ledger.record(db, inventory, entry.received_quantity, "order_return", document=document, user=user,
                                     reason=f"برگشت از راننده: سفارش {order.tracking_code}", reference_type="order", reference_id=order.id, lines=lines)
         row.status, row.received_at, row.received_by_id, row.note = "received", _now(), user.id, data.note
+        if data.location_id is not None:
+            location = db.get(Location, data.location_id)
+            if location is None or location.warehouse_id != order.warehouse_id:
+                raise ConflictError("محل دریافت در انبار این سفارش نیست.")
+            row.received_location_id = location.id
         if order.stock_state == "returning" and not db.query(DriverReturn.id).filter(
                 DriverReturn.order_id == order.id, DriverReturn.status == "open", DriverReturn.id != row.id).first():
             order.stock_state = "returned"

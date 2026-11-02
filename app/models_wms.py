@@ -259,6 +259,8 @@ LEDGER_TRIGGERS_SQL = (
     "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
     "CREATE TRIGGER trg_delivery_evidence_events_immutable BEFORE UPDATE OR DELETE ON delivery_evidence_events "
     "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
+    "CREATE TRIGGER trg_purchase_request_events_immutable BEFORE UPDATE OR DELETE ON purchase_request_events "
+    "FOR EACH ROW EXECUTE FUNCTION pasineh_immutable_row()",
 )
 
 

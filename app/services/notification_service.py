@@ -115,7 +115,7 @@ def _visible(query, user: User):
         warehouse = (or_(Notification.warehouse_id.is_(None), Notification.warehouse_id == user.warehouse_id)
                      if user.warehouse_id else Notification.warehouse_id.is_(None))
         return query.filter(or_(own, and_(shared, Notification.audience == "staff", warehouse)))
-    if user.role == "driver":
+    if user.role in ("driver", "warehouse_operator", "fleet_manager"):
         return query.filter(own)
     raise ForbiddenError("شما مجوز مشاهده این اعلان‌ها را ندارید.")
 

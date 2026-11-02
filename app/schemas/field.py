@@ -18,6 +18,7 @@ class ReturnCountIn(BaseModel):
 
 class ReceiveReturnIn(BaseModel):
     lines: list[ReturnCountIn] = Field(min_length=1, max_length=100)
+    location_id: Optional[int] = Field(None, gt=0, description="محل دریافت کالا؛ کالا تا پایان بازرسی موجود آزاد نمی‌شود")
     note: Optional[Note] = None
 
 
@@ -37,6 +38,7 @@ class DriverReturnOut(BaseModelWithDateFormatting):
     created_at: datetime
     received_at: Optional[datetime] = None
     received_by: Optional[str] = None
+    received_location_code: Optional[str] = None
     note: Optional[str] = None
     lines: list[ReturnLineOut]
 

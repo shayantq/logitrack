@@ -50,6 +50,8 @@ const WITH_FLEET: Role[] = [...STAFF, "fleet_manager"];
 export const NAV: NavItem[] = [
   // داشبورد و نمای کلی
   { to: "/app", label: "نمای کلی", icon: BarChart3, roles: STAFF, end: true, group: "overview" },
+  { to: "/app/comparison", label: "مقایسه انبارها و تیم‌ها", icon: BarChart3, roles: ADMIN, group: "overview" },
+  { to: "/app/capacity", label: "نمای ظرفیت", icon: Gauge, roles: WITH_FLEET, group: "overview" },
   { to: "/app/analytics", label: "شاخص‌های عملکرد", icon: Gauge, roles: STAFF, group: "overview", perm: "analytics.view" },
   { to: "/app/map", label: "نقشه ارسال‌ها", icon: MapIcon, roles: WITH_FLEET, group: "overview" },
   // عملیات انبار
@@ -85,6 +87,7 @@ export const NAV: NavItem[] = [
   { to: "/app/ledger", label: "دفتر گردش کالا", icon: BookOpen, roles: STAFF, group: "reports" },
   { to: "/app/stock-card", label: "کاردکس کالا", icon: ClipboardList, roles: STAFF, group: "reports" },
   { to: "/app/documents", label: "اسناد انبار", icon: FileStack, roles: STAFF, group: "reports" },
+  { to: "/app/purchase-requests", label: "درخواست خرید", icon: ShoppingCart, roles: STAFF, group: "logistics" },
   { to: "/app/reorder", module: "reorder", label: "نقطه سفارش هوشمند", icon: ShoppingCart, roles: STAFF, group: "reports" },
   { to: "/app/finance", label: "مالی حمل‌ونقل", icon: Wallet, roles: ADMIN, group: "reports" },
   { to: "/app/capital", module: "reorder", label: "برآورد سرمایه خرید", icon: PiggyBank, roles: ADMIN, group: "reports" },

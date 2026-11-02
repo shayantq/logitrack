@@ -11,6 +11,7 @@ import { useVehicles } from "@/hooks/data";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
 import { Badge, Button, Field, Input, Select } from "@/ui/primitives";
+import { LocationSelect } from "@/pages/warehouse/shared";
 
 type Order = Schemas["OrderDetailResponse"];
 const refreshKeys = ["orders", "stats", "movements", "action-center", "order-timeline"];
@@ -23,16 +24,17 @@ function useRefresh(orderId: number, keys: string[]) {
   };
 }
 
-function ReturnCard({ orderId, row }: { orderId: number; row: Schemas["DriverReturnOut"] }) {
+function ReturnCard({ orderId, warehouseId, row }: { orderId: number; warehouseId?: number | null; row: Schemas["DriverReturnOut"] }) {
   const toast = useToast();
   const refresh = useRefresh(orderId, ["driver-returns"]);
   const [counts, setCounts] = useState<Record<number, string>>({});
   const [reasons, setReasons] = useState<Record<number, string>>({});
+  const [location, setLocation] = useState("");
   const value = (id: number, expected: number) => counts[id] ?? String(expected);
   const receive = useMutation({
     mutationFn: () => unwrap(api.POST("/orders/{order_id}/driver-returns/{return_id}/receive", {
       params: { path: { order_id: orderId, return_id: row.id } },
-      body: { lines: row.lines.map(l => ({ product_id: l.product_id, received_quantity: Number(value(l.product_id, l.expected_quantity)), shortage_reason: reasons[l.product_id] || null })) },
+      body: { location_id: location ? Number(location) : null, lines: row.lines.map(l => ({ product_id: l.product_id, received_quantity: Number(value(l.product_id, l.expected_quantity)), shortage_reason: reasons[l.product_id] || null })) },
     })),
     onSuccess: () => { toast.success("برگشت در انبار ثبت شد و کالا منتظر بازرسی است."); refresh(); },
     onError: e => toast.error(errorMessage(e)),
@@ -45,6 +47,12 @@ function ReturnCard({ orderId, row }: { orderId: number; row: Schemas["DriverRet
         <span className="text-text-2">{row.reason}</span>
         <span className="text-xs text-muted">{faShortDateTime(row.received_at ?? row.created_at)}{row.received_by && ` — ${row.received_by}`}</span>
       </div>
+      {open && warehouseId && (
+        <Field label="محل دریافت" hint="کالا پس از شمارش در انتظار بازرسی می‌ماند و موجود آزاد نمی‌شود.">
+          <LocationSelect warehouseId={warehouseId} value={location} onChange={setLocation} testId="return-location" />
+        </Field>
+      )}
+      {!open && row.received_location_code && <div className="text-xs text-muted" data-testid="return-received-location">محل دریافت: <span className="font-mono ltr">{row.received_location_code}</span></div>}
       {row.lines.map(l => (
         <div key={l.product_id} className="grid items-end gap-2 sm:grid-cols-[1fr_7rem_1.4fr]">
           <div>{l.product_name} <span className="text-xs text-muted">({faNumber(l.expected_quantity)} عدد)</span></div>
@@ -71,7 +79,7 @@ export function DriverReturns({ order }: { order: Order }) {
   return (
     <section className="space-y-2" data-testid="driver-returns">
       <h4 className="text-sm font-bold">برگشت کالا از راننده</h4>
-      {data.map(row => <ReturnCard key={row.id} orderId={order.id} row={row} />)}
+      {data.map(row => <ReturnCard key={row.id} orderId={order.id} warehouseId={order.warehouse_id} row={row} />)}
     </section>
   );
 }

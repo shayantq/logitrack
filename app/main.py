@@ -25,7 +25,7 @@ from app.services.stock_ledger import LedgerViolationError
 from app.routers import (
     auth, inventory, orders, users, vehicles, reports, warehouses, notifications, platform,
     organization, organization_requests, drivers, dispatch, driver_portal, performance, tracking, routes, tickets, stocktakes, catalog, replenishment,
-    partners, wms, locations, inbound, fulfillment, control, demo, action_center, exceptions as exceptions_router, field_ops,
+    partners, wms, locations, inbound, fulfillment, control, demo, planning, action_center, exceptions as exceptions_router, field_ops,
 )
 
 # ------------------------------------------------------------------------------
@@ -225,6 +225,8 @@ app.include_router(control.labels)
 app.include_router(control.scan)
 app.include_router(control.readiness)
 app.include_router(control.workflow)
+app.include_router(planning.purchase)
+app.include_router(planning.planning)
 app.include_router(demo.router)
 
 

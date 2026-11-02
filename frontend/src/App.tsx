@@ -14,6 +14,9 @@ const TrackPage = lazy(() => import("./pages/public/TrackPage"));
 const AboutPage = lazy(() => import("./pages/public/AboutPage"));
 const MarketingPage = lazy(() => import("./pages/public/MarketingPage"));
 const MyTasksPage = lazy(() => import("./pages/warehouse/MyTasksPage"));
+const PurchaseRequestsPage = lazy(() => import("./pages/warehouse/PurchaseRequestsPage"));
+const ComparisonPage = lazy(() => import("./pages/control/PlanningPages").then(m => ({ default: m.ComparisonPage })));
+const CapacityPage = lazy(() => import("./pages/control/PlanningPages").then(m => ({ default: m.CapacityPage })));
 const SupportPage = lazy(() => import("./pages/public/SupportPage"));
 const OrgTicketsPage = lazy(() => import("./pages/tickets/TicketsPage").then(m => ({ default: m.OrgTicketsPage })));
 const DriverSupportPage = lazy(() => import("./pages/tickets/TicketsPage").then(m => ({ default: m.DriverSupportPage })));
@@ -187,6 +190,9 @@ export function App() {
             <Route path="putaway" element={guard(ORG_STAFF, <PutawayPage />)} />
             <Route path="my-tasks" element={guard([...ORG_STAFF, "warehouse_operator"], <MyTasksPage />)} />
             <Route path="picking" element={guard(ORG_STAFF, <PickingPage />)} />
+            <Route path="purchase-requests" element={guard(ORG_STAFF, <PurchaseRequestsPage />)} />
+            <Route path="comparison" element={guard(["org_admin"], <ComparisonPage />)} />
+            <Route path="capacity" element={guard([...ORG_STAFF, "fleet_manager"], <CapacityPage />)} />
             <Route path="shipping" element={guard(ORG_STAFF, <ShippingPage />)} />
             <Route path="transfers" element={guard(ORG_STAFF, <TransfersPage />)} />
             <Route path="backorders" element={guard(ORG_STAFF, <BackordersPage />)} />

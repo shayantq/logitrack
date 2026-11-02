@@ -20,7 +20,7 @@ _FLEET = (
     r"POST /dispatch/suggest", r"GET /dispatch/orders/\d+/suggestions", r"GET /dispatch/schedules", r"PUT /dispatch/schedules/\d+",
     r"POST /dispatch/schedules/\d+/time-off", r"DELETE /dispatch/schedules/\d+/time-off/\d+",
     r"GET /vehicles(/\d+)?", r"POST /vehicles", r"PUT /vehicles/\d+/(status|driver)", r"POST /vehicles/\d+/out-of-service",
-    r"GET /exceptions(/\d+)?", r"PATCH /exceptions/\d+", r"(GET|POST|PUT|PATCH|DELETE) /saved-views(/\d+)?",
+    r"GET /exceptions(/\d+)?", r"PATCH /exceptions/\d+", r"(GET|POST|PUT|PATCH|DELETE) /saved-views(/\d+)?", r"GET /planning/capacity",
 )
 _RULES = {"warehouse_operator": re.compile("|".join(_COMMON + _OPERATOR)), "fleet_manager": re.compile("|".join(_COMMON + _FLEET))}
 

@@ -45,7 +45,7 @@ EXPORT_VALID = timedelta(days=30)
 EXPORT_SECRET_COLUMNS = {"hashed_password", "totp_secret", "totp_last_step", "token_version", "access_token", "rating_token", "request_hash", "idempotency_key"}
 # جدول‌های سند و گزارش فعالیت با trigger غیرقابل‌تغییرند و در پاک‌سازی دست نمی‌خورند
 logger = logging.getLogger("pasineh")
-IMMUTABLE_TABLES = {"stock_movements", "stock_movement_lines", "domain_events", "stock_documents", "audit_logs", "delivery_evidence", "delivery_evidence_events"}
+IMMUTABLE_TABLES = {"stock_movements", "stock_movement_lines", "domain_events", "stock_documents", "audit_logs", "delivery_evidence", "delivery_evidence_events", "purchase_request_events"}
 PII_COLUMNS = {
     "recipient_name", "recipient_mobile", "requester_name", "requester_mobile", "destination_address", "destination_postal_code", "first_name", "last_name",
     "national_code", "birth_date", "mobile", "address", "postal_code", "note", "exception_note", "body", "photo_path", "attachment_path", "decision_note", "response_note",

@@ -46,6 +46,9 @@ PERMISSIONS = {p.key: p for p in (
     Permission("analytics.view", "داشبورد شاخص‌های عملکرد", "گزارش و تحلیل", STAFF, STAFF),
     Permission("valuation.view", "ارزش‌گذاری موجودی و کالای راکد", "گزارش و تحلیل", STAFF, ADMIN),
     Permission("valuation.manage", "تغییر روش ارزش‌گذاری", "گزارش و تحلیل", ADMIN, ADMIN, True),
+    # خرید
+    Permission("purchase.request", "ثبت درخواست خرید", "خرید", STAFF, STAFF),
+    Permission("purchase.approve", "تأیید یا رد درخواست خرید", "خرید", ADMIN, ADMIN, True),
     # سیستم
     Permission("audit.view", "مشاهده و جست‌وجوی گزارش فعالیت", "سیستم", STAFF, ADMIN),
     Permission("permissions.manage", "مدیریت مجوزهای نقش‌ها", "سیستم", ADMIN, ADMIN, True),

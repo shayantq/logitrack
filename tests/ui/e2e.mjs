@@ -2453,6 +2453,29 @@ await session("fleet", fleetName, "Fleet2026xx", async page => {
   check("fleet", "fleet pages open", page.url().endsWith("/app/exceptions"), page.url());
 });
 
+await session("purchase-manager", "qazvin_manager", "manager123", async page => {
+  await page.goto(`${BASE}/app/purchase-requests`);
+  await page.click("[data-testid=purchase-new]");
+  await choose(page, "[data-testid=purchase-product]", { index: 1 });
+  await page.fill("[data-testid=purchase-qty]", "5");
+  await page.click("[data-testid=purchase-save]");
+  await page.waitForSelector("[data-testid=purchase-row][data-status=pending]");
+  check("purchase-manager", "manager cannot approve", await page.locator("[data-testid=purchase-row] [data-testid=purchase-approve]").count() === 0);
+  await page.goto(`${BASE}/app/capacity`);
+  await page.waitForSelector("[data-testid=capacity-assumptions]");
+  check("purchase-manager", "capacity view states its assumptions", (await page.textContent("[data-testid=capacity-assumptions]")).includes("تغییر نمی‌دهد"));
+});
+await session("purchase-admin", "qazvin_admin", "admin123", async page => {
+  await page.goto(`${BASE}/app/purchase-requests`);
+  const row = page.locator("[data-testid=purchase-row][data-status=pending]").first();
+  await row.locator("[data-testid=purchase-approve]").click();
+  await page.waitForSelector("[data-testid=toast]");
+  check("purchase-admin", "admin approves", true);
+  await page.goto(`${BASE}/app/comparison`);
+  await page.waitForSelector("[data-testid=comparison-teams] tbody tr");
+  check("purchase-admin", "comparison shows warehouses and groups", await page.locator("[data-testid=comparison-teams] tbody tr").count() === 4 && await page.locator("[data-testid=comparison-warehouses] tbody tr").count() > 0);
+});
+
 await session("public", null, null, async page => {
   await page.goto(`${BASE}/dashboard`);
   await page.waitForURL(/\/app\/login$/);
