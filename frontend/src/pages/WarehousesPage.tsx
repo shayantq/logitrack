@@ -16,6 +16,7 @@ import { faNumber } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorState, Field, Input, PageHeader, Select, Skeleton, cn } from "@/ui/primitives";
 import { confirmDialog } from "@/ui/dialogs";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 type WarehouseRow = Schemas["WarehouseOut"];
 type WarehouseType = Schemas["WarehouseIn"]["type"];
@@ -145,7 +146,7 @@ function WarehouseForm({ warehouse, all, onClose }: { warehouse: WarehouseRow | 
           </Select>
         </Field>
         <Field label="کد انبار" hint="خالی = ساخت خودکار (WH-01، …)">
-          <Input className="ltr uppercase" maxLength={16} pattern="[A-Za-z0-9][A-Za-z0-9\-]*" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} data-testid="wh-code" />
+          <Input className="ltr uppercase" maxLength={16} pattern="[A-Za-z0-9][A-Za-z0-9\-]*" title={FORMAT_HINTS.warehouseCode} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} data-testid="wh-code" />
         </Field>
         <Field label="انبار مادر" hint="اختیاری — مثلاً سایتی که این انبار در آن است">
           <Select value={form.parent} onChange={e => setForm(f => ({ ...f, parent: e.target.value }))} data-testid="wh-parent">

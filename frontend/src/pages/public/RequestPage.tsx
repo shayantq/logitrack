@@ -12,6 +12,7 @@ import { Badge, Button, Field, Input, Select, Textarea, buttonClass, cn } from "
 import { CitySelect } from "@/components/CitySelect";
 import { PublicFooter, PublicHeader } from "./chrome";
 import { customFromQuery, customSummary, planById } from "./content/pricing";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 type Body = Schemas["OrganizationRequestCreate"];
 type FormState = Record<
@@ -139,8 +140,8 @@ export default function RequestPage() {
                       <Field label="نام تجاری *"><Input required minLength={2} maxLength={200} value={form.name} onChange={set("name")} placeholder="مثلاً فروشگاه نمونه" data-testid="req-name" /></Field>
                       <Field label="نام ثبتی شرکت *"><Input required minLength={2} maxLength={200} value={form.legal_name} onChange={set("legal_name")} data-testid="req-legal-name" /></Field>
                       <Choice label="حوزه فعالیت *" className="sm:col-span-2" options={BUSINESS_TYPES} value={form.business_type} onPick={v => pick("business_type", v)} testId="req-business" />
-                      <Field label="شناسه ملی *" hint="۱۱ رقم"><Input className="ltr" required inputMode="numeric" pattern="[0-9۰-۹]{11}" value={form.national_id} onChange={set("national_id")} data-testid="req-national-id" /></Field>
-                      <Field label="کد اقتصادی" hint="اختیاری — ۱۱ تا ۱۴ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{11,14}" value={form.economic_code} onChange={set("economic_code")} /></Field>
+                      <Field label="شناسه ملی *" hint="۱۱ رقم"><Input className="ltr" required inputMode="numeric" pattern="[0-9۰-۹]{11}" title={FORMAT_HINTS.nationalId} value={form.national_id} onChange={set("national_id")} data-testid="req-national-id" /></Field>
+                      <Field label="کد اقتصادی" hint="اختیاری — ۱۱ تا ۱۴ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{11,14}" title={FORMAT_HINTS.economicCode} value={form.economic_code} onChange={set("economic_code")} /></Field>
                       <Field label="استان *">
                         <Select required value={form.province} onChange={set("province")} data-testid="req-province">
                           <option value="">انتخاب کنید</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
@@ -148,7 +149,7 @@ export default function RequestPage() {
                       </Field>
                       <Field label="شهر *"><CitySelect required province={form.province} value={form.city} onChange={v => pick("city", v)} testId="req-city" /></Field>
                       <Field label="نشانی *" className="sm:col-span-2"><Input required minLength={10} maxLength={500} value={form.address} onChange={set("address")} data-testid="req-address" /></Field>
-                      <Field label="کد پستی" hint="اختیاری — ۱۰ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{10}" value={form.postal_code} onChange={set("postal_code")} /></Field>
+                      <Field label="کد پستی" hint="اختیاری — ۱۰ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{10}" title={FORMAT_HINTS.postalCode} value={form.postal_code} onChange={set("postal_code")} /></Field>
                       <Field label="وب‌سایت" hint="اختیاری"><Input className="ltr" value={form.website} onChange={set("website")} placeholder="example.ir" /></Field>
                     </div>
                   )}
@@ -182,7 +183,7 @@ export default function RequestPage() {
                   {step === 2 && (
                     <div className="grid gap-5 sm:grid-cols-2">
                       <Field label="نام و نام خانوادگی مسئول *" className="sm:col-span-2"><Input required minLength={2} maxLength={100} value={form.contact_name} onChange={set("contact_name")} data-testid="req-contact-name" /></Field>
-                      <Field label="شماره همراه *" hint="مثل ۰۹۱۲۱۲۳۴۵۶۷"><Input className="ltr" required inputMode="tel" pattern="[0۰][9۹][0-9۰-۹]{9}" value={form.contact_mobile} onChange={set("contact_mobile")} data-testid="req-mobile" /></Field>
+                      <Field label="شماره همراه *" hint="مثل ۰۹۱۲۱۲۳۴۵۶۷"><Input className="ltr" required inputMode="tel" pattern="[0۰][9۹][0-9۰-۹]{9}" title={FORMAT_HINTS.mobile} value={form.contact_mobile} onChange={set("contact_mobile")} data-testid="req-mobile" /></Field>
                       <Field label="ایمیل *"><Input className="ltr" type="email" required value={form.contact_email} onChange={set("contact_email")} data-testid="req-email" /></Field>
                       <Field label="تلفن ثابت" hint="اختیاری"><Input className="ltr" inputMode="tel" value={form.phone} onChange={set("phone")} /></Field>
                       <div className="sm:col-span-2">

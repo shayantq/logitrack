@@ -14,6 +14,7 @@ import { confirmDialog } from "@/ui/dialogs";
 import { Modal, Tooltip } from "@/ui/overlays";
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, cn } from "@/ui/primitives";
 import { LocationTypeBadge, StatusBadge, WarehousePicker, useInvalidateOperations, useLocations, useWarehouseChoice } from "./shared";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 type Loc = Schemas["LocationOut"];
 type LocIn = Schemas["LocationIn"];
@@ -165,7 +166,7 @@ function LocationForm({ warehouseId, all, editing, onClose }: {
       </>}>
       <form id="location-form-el" className="grid gap-4 sm:grid-cols-3" onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }}>
         <Field label="کد محل *" hint="مثلاً A-01-03-2 (حروف لاتین، عدد، خط تیره)">
-          <Input required className="ltr uppercase" maxLength={32} pattern="[0-9A-Za-z._\/\-]+" value={form.code} onChange={e => set("code", e.target.value)} data-testid="loc-code" />
+          <Input required className="ltr uppercase" maxLength={32} pattern="[0-9A-Za-z._\/\-]+" title={FORMAT_HINTS.locationCode} value={form.code} onChange={e => set("code", e.target.value)} data-testid="loc-code" />
         </Field>
         <Field label="سطح">
           <Select value={form.level} onChange={e => set("level", e.target.value as LocIn["level"])} data-testid="loc-level">

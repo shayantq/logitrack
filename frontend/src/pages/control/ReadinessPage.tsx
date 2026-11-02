@@ -118,7 +118,7 @@ function ImportCard() {
       form.append("dry_run", String(dryRun));
       const r = await authFetch(`/readiness/import/${kind}`, { method: "POST", body: form });
       const data = await r.json();
-      if (!r.ok) throw new Error(typeof data?.detail === "string" ? data.detail : "ورود ناموفق بود.");
+      if (!r.ok) throw new Error(errorMessage(data, "ورود ناموفق بود."));
       setReport(data as Report);
       if (!dryRun) {
         toast.success(kind === "opening" ? `موجودی اول دوره ثبت شد (${(data as Report).document_code}).` : `${faNumber((data as Report).create ?? 0)} محل ساخته شد.`);

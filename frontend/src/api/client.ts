@@ -89,7 +89,7 @@ export class ApiError extends Error {
   }
 }
 
-type ValidationItem = { loc?: (string | number)[]; msg?: string };
+type ValidationItem = { msg?: string };
 
 export function errorMessage(error: unknown, fallback = "خطایی رخ داد؛ دوباره تلاش کنید."): string {
   if (error instanceof ApiError) return error.message;
@@ -97,14 +97,9 @@ export function errorMessage(error: unknown, fallback = "خطایی رخ داد�
     const detail = (error as { detail: unknown }).detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) {
-      return (detail as ValidationItem[])
-        .map(d => {
-          const msg = (d.msg ?? "").replace(/^Value error, /, "");
-          const field = String(d.loc?.slice(-1)[0] ?? "");
-          // خطای کل فرم (مثل شهر خارج از استان) نام فیلد ندارد
-          return !field || field === "body" ? msg : `${field}: ${msg}`;
-        })
-        .join(" | ");
+      // سرور پیام هر خطا را فارسی و همراه نام فیلد می‌فرستد (app/core/validation_messages.py)؛ پیام تکراری یک بار می‌آید
+      const lines = (detail as ValidationItem[]).map(d => (d.msg ?? "").replace(/^Value error, /, "")).filter(Boolean);
+      return [...new Set(lines)].join(" | ") || fallback;
     }
   }
   if (error instanceof Error) return error.message;

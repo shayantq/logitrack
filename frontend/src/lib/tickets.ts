@@ -1,5 +1,5 @@
 /** تیکت پشتیبانی (مرحله ۱۱): برچسب‌ها و ارسال فرم چندبخشی (متن + تصویر) */
-import { ApiError, authFetch, type Schemas } from "@/api/client";
+import { ApiError, authFetch, errorMessage, type Schemas } from "@/api/client";
 import type { Tone } from "@/ui/primitives";
 
 export type Ticket = Schemas["TicketDetail"];
@@ -40,13 +40,7 @@ export function waitingLabel(t: Pick<TicketRow, "status" | "waiting_on" | "sourc
 export async function postForm<T>(url: string, form: FormData, auth = true): Promise<T> {
   const res = auth ? await authFetch(url, { method: "POST", body: form }) : await fetch(url, { method: "POST", body: form });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const detail = (data as { detail?: unknown }).detail;
-    const message = typeof detail === "string" ? detail
-      : Array.isArray(detail) ? detail.map(d => String((d as { msg?: string }).msg ?? "").replace(/^Value error, /, "")).join(" | ")
-        : "خطا در ارسال";
-    throw new ApiError(message, res.status);
-  }
+  if (!res.ok) throw new ApiError(errorMessage(data, "خطا در ارسال"), res.status);
   return data as T;
 }
 

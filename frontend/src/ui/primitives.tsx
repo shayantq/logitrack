@@ -1,5 +1,5 @@
 /** اجزای پایه رابط کاربری — همه بر پایه توکن‌های رنگی (روشن/تاریک خودکار) */
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
 
 export function cn(...parts: (string | false | null | undefined)[]) {
@@ -88,8 +88,15 @@ export function CardHeader({ title, subtitle, actions, icon, tone = "brand" }: {
 export { Select } from "./select";
 const FIELD_BASE = "w-full rounded-xl border border-border-strong bg-surface px-3.5 text-sm text-text placeholder:text-muted/70 transition focus:border-brand focus:ring-4 focus:ring-brand/15 focus:outline-none disabled:opacity-60";
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
-  return <input ref={ref} className={cn(FIELD_BASE, "h-10", className)} {...props} />;
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, onInvalid, onInput, ...props }, ref) {
+  const inner = useRef<HTMLInputElement>(null);
+  useImperativeHandle(ref, () => inner.current as HTMLInputElement);
+  // مقدار تازه (تایپ، اسکن یا پر شدن خودکار) پیام قالب قبلی را پاک می‌کند تا فرم گیر نکند
+  useEffect(() => { inner.current?.setCustomValidity(""); }, [props.value]);
+  // اگر قالب (pattern) نخواند، متن title (همان پیام فارسی سرور) به‌جای پیام انگلیسی مرورگر نشان داده می‌شود
+  return <input ref={inner} className={cn(FIELD_BASE, "h-10", className)} {...props}
+    onInvalid={e => { if (props.title && e.currentTarget.validity.patternMismatch) e.currentTarget.setCustomValidity(props.title); onInvalid?.(e); }}
+    onInput={e => { e.currentTarget.setCustomValidity(""); onInput?.(e); }} />;
 });
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...props }, ref) {
   return <textarea ref={ref} className={cn(FIELD_BASE, "py-2.5", className)} {...props} />;

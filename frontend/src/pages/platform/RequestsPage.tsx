@@ -9,6 +9,7 @@ import { faDate, faNumber } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
 import { Badge, Button, Card, DataList, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Table, TableSkeleton } from "@/ui/primitives";
 import { promptDialog } from "@/ui/dialogs";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 type Request = Schemas["OrganizationRequestResponse"];
 type Status = "pending" | "approved" | "rejected";
@@ -110,7 +111,7 @@ export default function RequestsPage() {
             {canReview && (
               <form id="approve-form" className="grid gap-4 rounded-xl border border-border p-4 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); approveMutation.mutate(); }}>
                 <div className="eyebrow sm:col-span-2">تأیید و ساخت سازمان</div>
-                <Field label="شناسه انگلیسی (slug) *"><Input className="ltr" required pattern="[A-Za-z0-9][A-Za-z0-9-]*" value={approve.slug} onChange={e => setApprove(a => ({ ...a, slug: e.target.value }))} /></Field>
+                <Field label="شناسه انگلیسی (slug) *"><Input className="ltr" required pattern="[A-Za-z0-9][A-Za-z0-9-]*" title={FORMAT_HINTS.slug} value={approve.slug} onChange={e => setApprove(a => ({ ...a, slug: e.target.value }))} /></Field>
                 <Field label="نام کاربری ادمین" hint="خالی = slug_admin"><Input className="ltr" value={approve.username} onChange={e => setApprove(a => ({ ...a, username: e.target.value }))} /></Field>
                 <Field label="ایمیل ادمین" hint="خالی = ایمیل مسئول"><Input type="email" className="ltr" value={approve.email} onChange={e => setApprove(a => ({ ...a, email: e.target.value }))} /></Field>
                 <Field label="رمز عبور ادمین" hint="خالی = رمز موقت تصادفی"><Input className="ltr" minLength={6} value={approve.password} onChange={e => setApprove(a => ({ ...a, password: e.target.value }))} /></Field>

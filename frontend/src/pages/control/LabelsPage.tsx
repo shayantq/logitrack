@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Printer, Search, Tags } from "lucide-react";
-import { api, authFetch, unwrap } from "@/api/client";
+import { api, authFetch, errorMessage, unwrap } from "@/api/client";
 import { useCan } from "@/auth/AuthContext";
 import { useToast } from "@/components/Toast";
 import { useProducts } from "@/hooks/data";
@@ -21,8 +21,7 @@ type Row = { id: number; code: string; title: string; sub?: string };
 async function printPdf(body: { label_type: Kind; ids: number[]; copies: number; reason?: string | null }) {
   const r = await authFetch("/labels/print", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!r.ok) {
-    const detail = (await r.json().catch(() => null)) as { detail?: string } | null;
-    throw Object.assign(new Error(detail?.detail ?? "چاپ برچسب ناموفق بود."), { status: r.status });
+    throw Object.assign(new Error(errorMessage(await r.json().catch(() => null), "چاپ برچسب ناموفق بود.")), { status: r.status });
   }
   const url = URL.createObjectURL(await r.blob());
   window.open(url, "_blank", "noopener");

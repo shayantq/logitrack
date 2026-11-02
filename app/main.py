@@ -19,6 +19,7 @@ from app.core.http_security import SecurityHeadersMiddleware, build_csp, install
 from app.core.observability import MetricsMiddleware, configure_logging, render_metrics
 from app.core.request_context import RequestContextMiddleware, request_id
 from app.core.security import enforce_production_settings, is_production
+from app.core.validation_messages import translate
 from app.core.tenancy import TenantIsolationError
 from app.services.stock_ledger import LedgerViolationError
 
@@ -291,7 +292,8 @@ async def http_error_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(status_code=422, content=_error_body(422, jsonable_encoder(exc.errors())))
+    # متن انگلیسی Pydantic به جمله فارسی با نام فیلد تبدیل می‌شود (app/core/validation_messages.py)
+    return JSONResponse(status_code=422, content=_error_body(422, jsonable_encoder(translate(exc.errors()))))
 
 
 @app.exception_handler(Exception)

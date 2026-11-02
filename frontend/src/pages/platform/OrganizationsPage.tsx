@@ -13,6 +13,7 @@ import { OperationsHealth } from "./OperationsHealth";
 import { OrganizationAdmin } from "./OrganizationAdmin";
 import { Badge, Button, Card, DataList, ErrorState, Field, Input, PageHeader, Spinner, StatCard, Table, TableSkeleton } from "@/ui/primitives";
 import { confirmDialog, promptDialog } from "@/ui/dialogs";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 function ProfileModal({ orgId, onClose }: { orgId: number | null; onClose: () => void }) {
   const { data: p } = useQuery({
@@ -144,7 +145,7 @@ export default function OrganizationsPage() {
         footer={<><Button variant="secondary" onClick={() => setCreateOpen(false)}>انصراف</Button><Button type="submit" form="org-form" loading={create.isPending}>ساخت سازمان</Button></>}>
         <form id="org-form" className="grid gap-4 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); create.mutate(); }}>
           <Field label="نام سازمان *"><Input required minLength={2} value={form.name} onChange={set("name")} /></Field>
-          <Field label="شناسه انگلیسی (slug) *" hint="حروف انگلیسی، عدد و خط تیره"><Input className="ltr" required pattern="[A-Za-z0-9][A-Za-z0-9-]*" value={form.slug} onChange={set("slug")} /></Field>
+          <Field label="شناسه انگلیسی (slug) *" hint="حروف انگلیسی، عدد و خط تیره"><Input className="ltr" required pattern="[A-Za-z0-9][A-Za-z0-9-]*" title={FORMAT_HINTS.slug} value={form.slug} onChange={set("slug")} /></Field>
           <div className="eyebrow sm:col-span-2">اولین ادمین سازمان</div>
           <Field label="نام و نام خانوادگی" className="sm:col-span-2"><Input value={form.full_name} onChange={set("full_name")} /></Field>
           <Field label="نام کاربری *"><Input className="ltr" required minLength={3} maxLength={20} value={form.username} onChange={set("username")} /></Field>

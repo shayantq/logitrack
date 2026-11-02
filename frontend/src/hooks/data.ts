@@ -1,7 +1,7 @@
 /** داده‌های پرتکرار — با کش مشترک TanStack Query (هر صفحه همان داده را دوباره نمی‌گیرد) */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, authFetch, unwrap } from "@/api/client";
+import { api, authFetch, errorMessage, unwrap } from "@/api/client";
 
 export const useProducts = () =>
   useQuery({ queryKey: ["products"], queryFn: () => unwrap(api.GET("/inventory/products")) });
@@ -53,8 +53,7 @@ export function useAsyncExport(onError: (message: string) => void, onDone: () =>
         ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
         : { method: "POST" });
       if (!startRes.ok) {
-        const detail = await startRes.json().catch(() => null) as { detail?: unknown } | null;
-        throw new Error(typeof detail?.detail === "string" ? detail.detail : "خطا در شروع تولید گزارش.");
+        throw new Error(errorMessage(await startRes.json().catch(() => null), "خطا در شروع تولید گزارش."));
       }
       const { task_id } = (await startRes.json()) as { task_id: string };
       for (let attempt = 0; attempt < 60; attempt++) {

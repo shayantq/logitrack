@@ -8,6 +8,7 @@ import { BRAND } from "@/brand";
 import { latinDigits } from "@/lib/format";
 import { Logo, ThemeToggle } from "@/ui/brand";
 import { Button, Field, Input, Spinner, buttonClass } from "@/ui/primitives";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 export default function JoinPage() {
   const { code = "" } = useParams();
@@ -74,7 +75,7 @@ export default function JoinPage() {
               <p className="mt-2 text-muted">حساب کاربری بسازید؛ بلافاصله وارد فرم مدارک می‌شوید.</p>
               <form className="mt-8 space-y-4" onSubmit={(e: FormEvent) => { e.preventDefault(); signup.mutate(); }} data-testid="join-form">
                 <Field label="نام و نام خانوادگی"><Input required minLength={3} value={form.full_name} onChange={set("full_name")} data-testid="join-name" /></Field>
-                <Field label="شماره همراه"><Input required className="ltr" inputMode="tel" pattern="[0۰][9۹][0-9۰-۹]{9}" placeholder="09xxxxxxxxx" value={form.mobile} onChange={set("mobile")} data-testid="join-mobile" /></Field>
+                <Field label="شماره همراه"><Input required className="ltr" inputMode="tel" pattern="[0۰][9۹][0-9۰-۹]{9}" title={FORMAT_HINTS.mobile} placeholder="09xxxxxxxxx" value={form.mobile} onChange={set("mobile")} data-testid="join-mobile" /></Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="نام کاربری" hint="حروف انگلیسی"><Input required minLength={3} maxLength={20} className="ltr" autoComplete="username" value={form.username} onChange={set("username")} data-testid="join-username" /></Field>
                   <Field label="رمز عبور" hint="حداقل ۶ کاراکتر"><Input required minLength={6} type="password" className="ltr" autoComplete="new-password" value={form.password} onChange={set("password")} data-testid="join-password" /></Field>

@@ -19,6 +19,7 @@ import { PositionsModal } from "./PositionsModal";
 import { useDeepLink } from "@/hooks/useDeepLink";
 import { CatalogImportModal, ProductCatalogModal, UNITS, downloadFile } from "./CatalogModals";
 import { confirmDialog } from "@/ui/dialogs";
+import { FORMAT_HINTS } from "@/lib/validation";
 
 type Product = Schemas["ProductResponse"];
 const STATUSES = Object.keys(STOCK_STATUS) as StockStatus[];
@@ -55,7 +56,7 @@ function ProductModal({ open, onClose }: { open: boolean; onClose: () => void })
     </>}>
       <form id="product-form" className="grid gap-4 sm:grid-cols-2" onSubmit={(e: FormEvent) => { e.preventDefault(); create.mutate(); }}>
         <Field label="نام کالا *" className="sm:col-span-2"><Input required value={form.name} onChange={set("name")} /></Field>
-        <Field label="کد کالا (SKU) *" hint="یکتا، بدون فاصله"><Input className="ltr" required pattern="\S+" value={form.sku} onChange={set("sku")} /></Field>
+        <Field label="کد کالا (SKU) *" hint="یکتا، بدون فاصله"><Input className="ltr" required pattern="\S+" title={FORMAT_HINTS.sku} value={form.sku} onChange={set("sku")} /></Field>
         <Field label="بارکد" hint="اختیاری — در کل سازمان یکتاست"><Input className="ltr" inputMode="numeric" value={form.barcode} onChange={set("barcode")} /></Field>
         <Field label="قیمت پایه (ریال)"><Input type="number" min={0} step="0.01" value={form.price} onChange={set("price")} /></Field>
         <Field label="درصد یارانه" hint="اختیاری — قیمت فروش = قیمت پایه × (۱ − درصد)"><Input type="number" min={0} max={99} step="0.1" value={form.subsidy} onChange={set("subsidy")} /></Field>
