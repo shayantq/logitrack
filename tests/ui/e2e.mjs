@@ -2428,6 +2428,31 @@ await session("marketing", null, null, async page => {
   check("marketing", "footer links to the new pages", true);
 }, { viewport: { width: 390, height: 844 } });
 
+const fleetName = `fleet_${runId}`.toLowerCase();
+await apiCall(adminToken, "POST", "/auth/", { username: fleetName, email: `${fleetName}@example.com`, password: "Fleet2026xx", full_name: "مدیر ناوگان آزمون", role: "fleet_manager" });
+await session("fleet", fleetName, "Fleet2026xx", async page => {
+  await page.waitForSelector("[data-testid=map-list]");
+  check("fleet", "lands on the dispatch board", page.url().endsWith("/app/map"), page.url());
+  const token = await page.evaluate(() => localStorage.getItem("access_token"));
+  const read = path => page.evaluate(async ([p, t]) => { const r = await fetch(p, { headers: { Authorization: `Bearer ${t}` } }); return { status: r.status, body: r.ok ? await r.json() : null }; }, [path, token]);
+  check("fleet", "backend rejects users and finance", (await read("/users/")).status === 403 && (await read("/reports/finance")).status === 403);
+  const orders = (await read("/orders/?limit=5")).body;
+  check("fleet", "orders carry no money", orders.length > 0 && orders.every(o => o.delivery_fee === null && o.total_price === null && o.driver_earning === null));
+  await page.click("[data-testid=app-nav] >> text=سفارش‌ها");
+  await page.waitForSelector("[data-testid=orders-table] tbody tr");
+  await page.locator("[data-testid=orders-table] tbody tr").first().click();
+  await page.waitForTimeout(800);
+  check("fleet", "order details open without timeline or settlement", await page.locator("[data-testid=order-settlement]").count() === 0);
+  await page.keyboard.press("Escape");
+  await page.click("[data-testid=app-nav] >> text=برنامه رانندگان");
+  await page.waitForTimeout(800);
+  await page.click("[data-testid=app-nav] >> text=ناوگان");
+  await page.waitForTimeout(800);
+  await page.goto(`${BASE}/app/exceptions`);
+  await page.waitForTimeout(800);
+  check("fleet", "fleet pages open", page.url().endsWith("/app/exceptions"), page.url());
+});
+
 await session("public", null, null, async page => {
   await page.goto(`${BASE}/dashboard`);
   await page.waitForURL(/\/app\/login$/);

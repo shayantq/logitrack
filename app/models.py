@@ -16,11 +16,12 @@ class RoleEnum(str, enum.Enum):
     ORG_ADMIN = "org_admin"
     WAREHOUSE_MANAGER = "warehouse_manager"
     WAREHOUSE_OPERATOR = "warehouse_operator"
+    FLEET_MANAGER = "fleet_manager"
     DRIVER = "driver"
 
 
 PLATFORM_ROLES = (RoleEnum.PLATFORM_ADMIN, RoleEnum.PLATFORM_SUPPORT)
-TENANT_ROLES = (RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER, RoleEnum.WAREHOUSE_OPERATOR, RoleEnum.DRIVER)
+TENANT_ROLES = (RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER, RoleEnum.WAREHOUSE_OPERATOR, RoleEnum.FLEET_MANAGER, RoleEnum.DRIVER)
 
 
 # مقادیر مجاز ستون‌های Enum (منبع واحد برای مدل، اسکیماها و سرویس‌ها)

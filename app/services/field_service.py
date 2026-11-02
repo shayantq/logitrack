@@ -208,7 +208,7 @@ def out_of_service(db: Session, user: User, vehicle_id: int, data) -> dict:
         vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).with_for_update().first()
         if vehicle is None:
             raise NotFoundError("خودرو یافت نشد.")
-        if user.role != "org_admin" and not (user.role == "driver" and vehicle.driver_id == user.id):
+        if user.role not in ("org_admin", "fleet_manager") and not (user.role == "driver" and vehicle.driver_id == user.id):
             raise ForbiddenError()
         vehicle.status = "maintenance"
         audit_service.log(db, user, "vehicle.out_of_service", f"خودرو {vehicle.license_plate} خارج از سرویس شد", target_type="vehicle",

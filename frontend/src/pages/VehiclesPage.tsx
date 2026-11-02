@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMe } from "@/auth/AuthContext";
 import { Plus, Trash2, Truck } from "lucide-react";
 import { api, errorMessage, unwrap, type Schemas } from "@/api/client";
 import { CityPicker } from "@/components/CitySelect";
@@ -19,9 +20,15 @@ export default function VehiclesPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { data: vehicles, isLoading, error, refetch } = useVehicles();
-  const { data: users = [] } = useUsers();
+  const me = useMe();
+  const isFleet = me.role === "fleet_manager";
+  const { data: users = [] } = useUsers(!isFleet);
+  // مدیر ناوگان به فهرست کاربران دسترسی ندارد و رانندگان را از برنامه کاری می‌خواند
+  const schedules = useQuery({ queryKey: ["vehicle-drivers"], enabled: isFleet, queryFn: () => unwrap(api.GET("/dispatch/schedules")) });
   // فقط رانندگان احراز هویت‌شده خودرو و سفارش می‌گیرند
-  const drivers = users.filter(u => u.role === "driver" && (u.driver_status ?? "approved") === "approved");
+  const drivers = isFleet
+    ? (schedules.data ?? []).map(r => ({ id: r.driver_id, full_name: r.driver_name, username: r.driver_name, driver_code: null as string | null, city: null as string | null }))
+    : users.filter(u => u.role === "driver" && (u.driver_status ?? "approved") === "approved");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) => setForm(f => ({ ...f, [k]: e.target.value }));

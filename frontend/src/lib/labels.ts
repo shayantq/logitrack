@@ -1,7 +1,7 @@
 /** برچسب‌ها و قوانین مشترک — هم‌خوان با بک‌اند (app/services/order_service.py و app/models.py) */
 import type { Tone } from "@/ui/primitives";
 
-export type Role = "platform_admin" | "platform_support" | "org_admin" | "warehouse_manager" | "warehouse_operator" | "driver";
+export type Role = "platform_admin" | "platform_support" | "org_admin" | "warehouse_manager" | "warehouse_operator" | "fleet_manager" | "driver";
 
 export const ROLE_LABELS: Record<Role, string> = {
   platform_admin: "ادمین پلتفرم",
@@ -9,6 +9,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   org_admin: "ادمین سازمان",
   warehouse_manager: "مدیر انبار",
   warehouse_operator: "اپراتور انبار",
+  fleet_manager: "مدیر ناوگان",
   driver: "راننده",
 };
 
@@ -43,11 +44,13 @@ export const ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
 };
 const DRIVER_ALLOWED: OrderStatus[] = ["picking_up", "picked_up", "in_transit", "delivered", "failed"];
 const MANAGER_ALLOWED: OrderStatus[] = ["picked_up", "canceled"];
+const FLEET_ALLOWED: OrderStatus[] = ["picking_up", "picked_up", "in_transit", "failed"];
 
 export function nextStatusesFor(role: Role, status: string): OrderStatus[] {
   const next = ORDER_TRANSITIONS[status as OrderStatus] ?? [];
   if (role === "driver") return next.filter(s => DRIVER_ALLOWED.includes(s));
   if (role === "warehouse_manager") return next.filter(s => MANAGER_ALLOWED.includes(s));
+  if (role === "fleet_manager") return next.filter(s => FLEET_ALLOWED.includes(s));
   if (role === "org_admin") return next;
   return [];
 }

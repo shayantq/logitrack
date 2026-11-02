@@ -35,6 +35,7 @@ export function homePathFor(user: { role: Role | string; driver_status?: string 
   if (PLATFORM_ROLES.includes(role)) return "/app/platform";
   if (role === "driver") return isApprovedDriver(user) ? "/app/driver" : "/app/onboarding";
   if (role === "warehouse_operator") return "/app/my-tasks";
+  if (role === "fleet_manager") return "/app/map";
   return "/app";
 }
 

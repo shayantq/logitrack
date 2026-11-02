@@ -47,7 +47,7 @@ def get_vehicle(db: Session, user: User, vehicle_id: int) -> Vehicle:
 
 
 def create_vehicle(db: Session, user: User, vehicle_request: VehicleRequest) -> Vehicle:
-    if user.role != 'org_admin':
+    if user.role not in ('org_admin', 'fleet_manager'):
         raise ForbiddenError()
 
     assigned_driver = db.query(User).filter(User.id == vehicle_request.driver_id, User.role == 'driver').first()
@@ -78,7 +78,7 @@ def update_vehicle_status(db: Session, user: User, vehicle_id: int, status_reque
     if target_vehicle is None:
         raise NotFoundError('خودروی مورد نظر یافت نشد.')
 
-    if user.role != 'org_admin' and not (user.role == 'driver' and target_vehicle.driver_id == user.id):
+    if user.role not in ('org_admin', 'fleet_manager') and not (user.role == 'driver' and target_vehicle.driver_id == user.id):
         raise ForbiddenError()
 
     if target_vehicle.status == status_request.vehicle_status:
@@ -93,7 +93,7 @@ def update_vehicle_status(db: Session, user: User, vehicle_id: int, status_reque
 
 
 def change_vehicle_driver(db: Session, user: User, vehicle_id: int, driver_request: VehicleDriverRequest) -> Vehicle:
-    if user.role != 'org_admin':
+    if user.role not in ('org_admin', 'fleet_manager'):
         raise ForbiddenError()
 
     target_vehicle = db.get(Vehicle, vehicle_id)

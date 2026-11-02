@@ -171,9 +171,9 @@ export function App() {
           <Route path="/app/mfa" element={<RequireLogin>{fade(<MfaPage />)}</RequireLogin>} />
           <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={guard(ORG_STAFF, <DashboardPage />)} />
-            <Route path="orders" element={guard(ORG_STAFF, <OrdersPage />)} />
-            <Route path="schedules" element={guard(ORG_STAFF, <SchedulesPage />)} />
-            <Route path="map" element={guard(ORG_STAFF, <MapPage />)} />
+            <Route path="orders" element={guard([...ORG_STAFF, "fleet_manager"], <OrdersPage />)} />
+            <Route path="schedules" element={guard([...ORG_STAFF, "fleet_manager"], <SchedulesPage />)} />
+            <Route path="map" element={guard([...ORG_STAFF, "fleet_manager"], <MapPage />)} />
             <Route path="warehouses" element={guard(ORG_STAFF, <WarehousesPage />)} />
             <Route path="stocktakes" element={guard(ORG_STAFF, <StocktakesPage />)} />
             <Route path="stocktakes/:id" element={guard(ORG_STAFF, <StocktakeDetailPage />)} />
@@ -190,7 +190,7 @@ export function App() {
             <Route path="shipping" element={guard(ORG_STAFF, <ShippingPage />)} />
             <Route path="transfers" element={guard(ORG_STAFF, <TransfersPage />)} />
             <Route path="backorders" element={guard(ORG_STAFF, <BackordersPage />)} />
-            <Route path="exceptions" element={guard(ORG_STAFF, <ExceptionsPage />)} />
+            <Route path="exceptions" element={guard([...ORG_STAFF, "fleet_manager"], <ExceptionsPage />)} />
             <Route path="replenishment" element={guard(ORG_STAFF, <ReplenishmentRulesPage />)} />
             <Route path="dispositions" element={guard(ORG_STAFF, <DispositionsPage />)} />
             <Route path="analytics" element={guard(ORG_STAFF, <AnalyticsPage />)} />
@@ -204,7 +204,7 @@ export function App() {
             <Route path="finance" element={guard(["org_admin"], <FinancePage />)} />
             <Route path="capital" element={guard(["org_admin"], <CapitalPlanPage />)} />
             <Route path="reorder" element={guard(ORG_STAFF, <ReorderPage />)} />
-            <Route path="vehicles" element={guard(["org_admin"], <VehiclesPage />)} />
+            <Route path="vehicles" element={guard(["org_admin", "fleet_manager"], <VehiclesPage />)} />
             <Route path="users" element={guard(["org_admin"], <UsersPage />)} />
             <Route path="users/:id" element={guard(["org_admin"], <UserDetailPage />)} />
             <Route path="activity" element={guard(ORG_STAFF, <ActivityPage />)} />

@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
-from fastapi.routing import APIRoute
 
 from app.core import role_access
 from app.core.security import create_access_token
@@ -72,11 +71,9 @@ def test_every_route_outside_the_allow_list_is_forbidden(env):
     """اگر مسیر تازه‌ای اضافه شود، این آزمون بدون تغییر فهرست هم آن را می‌سنجد."""
     headers = _auth(env.op1)
     checked = 0
-    for route in app.routes:
-        if not isinstance(route, APIRoute) or not route.path.startswith("/"):
-            continue
-        for method in route.methods - {"HEAD", "OPTIONS"}:
-            path = _concrete(route.path)
+    for template, operations in app.openapi()["paths"].items():
+        for method in (m.upper() for m in operations):
+            path = _concrete(template)
             if role_access.allows("warehouse_operator", method, path):
                 assert ALLOWED.match(path), f"{method} {path} نباید مجاز باشد"
                 continue

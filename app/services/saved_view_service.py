@@ -12,7 +12,7 @@ from app.models_productivity import SavedView
 from app.services.exceptions import ConflictError, ForbiddenError, NotFoundError
 
 MAX_PER_PAGE = 30
-STAFF = ("org_admin", "warehouse_manager")
+STAFF = ("org_admin", "warehouse_manager", "fleet_manager")
 
 
 def _role(user: User) -> str:

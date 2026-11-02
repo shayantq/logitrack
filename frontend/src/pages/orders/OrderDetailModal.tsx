@@ -56,7 +56,7 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
     onSuccess: o => { toast.success(`وضعیت به «${orderStatusLabel(o.status)}» تغییر کرد.`); refresh(o); },
     onError: e => toast.error(errorMessage(e)),
   });
-  const canAssign = order?.status === "pending" && (me.role === "org_admin" || me.role === "warehouse_manager");
+  const canAssign = order?.status === "pending" && (me.role === "org_admin" || me.role === "warehouse_manager" || me.role === "fleet_manager");
   const suggestions = useQuery({
     queryKey: ["order-suggestions", orderId, order?.status],
     queryFn: () => unwrap(api.GET("/dispatch/orders/{order_id}/suggestions", { params: { path: { order_id: orderId! } } })),
@@ -125,7 +125,7 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
                   <tr key={i.id}>
                     <td><div className="font-medium">{i.product_name}</div><div className="font-mono text-xs text-muted">{i.product_sku}</div></td>
                     <td className="tnum">{faNumber(i.quantity)}</td><td className="tnum">{faNumber(i.unit_price)}</td>
-                    <td className="tnum font-medium">{faNumber(i.unit_price * i.quantity)}</td>
+                    <td className="tnum font-medium">{faNumber((i.unit_price ?? 0) * i.quantity)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -136,7 +136,7 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
 
           <section data-testid="order-route">
             <h4 className="mb-3 flex items-center gap-2 text-sm font-bold"><MapPinned className="size-4 text-brand" />مسیر روی نقشه</h4>
-            <OrderRouteCard orderId={order.id} canReport={isAdmin} mapClassName="h-56 sm:h-72" />
+            <OrderRouteCard orderId={order.id} canReport={isAdmin || me.role === "fleet_manager"} mapClassName="h-56 sm:h-72" />
           </section>
 
           {(isAdmin || me.role === "warehouse_manager") && <OrderSettlement order={order} />}
@@ -183,7 +183,7 @@ export function OrderDetailModal({ orderId, onClose }: { orderId: number | null;
           <ContactLog order={order} />
           <HandoverPanel order={order} />
 
-          <OrderTimeline orderId={order.id} version={`${order.status}-${order.history.length}-${order.priority}-${order.failure_resolution}`} />
+          {me.role !== "fleet_manager" && <OrderTimeline orderId={order.id} version={`${order.status}-${order.history.length}-${order.priority}-${order.failure_resolution}`} />}
         </div>
       )}
     </Modal>

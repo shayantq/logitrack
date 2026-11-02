@@ -184,7 +184,7 @@ def get_order_route(db: Session, user: User, order_id: int) -> dict:
 
 
 def _reportable_order(db: Session, user: User, order_id: int) -> Order:
-    if user.role not in ("driver", "org_admin"):
+    if user.role not in ("driver", "org_admin", "fleet_manager"):
         raise ForbiddenError("فقط راننده سفارش یا ادمین سازمان می‌تواند موقعیت را گزارش کند.")
     order = order_service.get_order(db, user, order_id)
     if order.status != "in_transit":

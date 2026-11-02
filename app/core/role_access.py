@@ -13,7 +13,16 @@ _OPERATOR = (
     r"GET /putaway/tasks(/\d+)?", r"GET /putaway/tasks/\d+/suggestions", r"POST /putaway/tasks/\d+/(execute|problem|claim|release)",
     r"GET /inbound/receipts(/\d+)?", r"POST /inbound/receipts/\d+/receive",
 )
-_RULES = {"warehouse_operator": re.compile("|".join(_COMMON + _OPERATOR))}
+_FLEET = (
+    r"GET /orders(/\d+)?", r"PUT /orders/\d+/(assign|status)", r"POST /orders/\d+/resolve-failure", r"GET /orders/\d+/attempts",
+    r"GET /orders/\d+/attempts/\d+/photo", r"GET /orders/\d+/attempts/\d+/evidence(/\d+/file)?", r"(GET|POST) /orders/\d+/contacts", r"GET /orders/\d+/handovers",
+    r"GET /orders/\d+/route", r"POST /orders/\d+/checkpoints", r"DELETE /orders/\d+/checkpoints/last", r"GET /map/orders", r"GET /geo/.+",
+    r"POST /dispatch/suggest", r"GET /dispatch/orders/\d+/suggestions", r"GET /dispatch/schedules", r"PUT /dispatch/schedules/\d+",
+    r"POST /dispatch/schedules/\d+/time-off", r"DELETE /dispatch/schedules/\d+/time-off/\d+",
+    r"GET /vehicles(/\d+)?", r"POST /vehicles", r"PUT /vehicles/\d+/(status|driver)", r"POST /vehicles/\d+/out-of-service",
+    r"GET /exceptions(/\d+)?", r"PATCH /exceptions/\d+", r"(GET|POST|PUT|PATCH|DELETE) /saved-views(/\d+)?",
+)
+_RULES = {"warehouse_operator": re.compile("|".join(_COMMON + _OPERATOR)), "fleet_manager": re.compile("|".join(_COMMON + _FLEET))}
 
 
 def is_restricted(role: str) -> bool:

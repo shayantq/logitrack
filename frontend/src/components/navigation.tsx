@@ -45,12 +45,13 @@ export const GROUPS: { id: GroupId; label: string; tone: Tone }[] = [
 const STAFF: Role[] = ["org_admin", "warehouse_manager"];
 const ADMIN: Role[] = ["org_admin"];
 const PLATFORM: Role[] = ["platform_admin", "platform_support"];
+const WITH_FLEET: Role[] = [...STAFF, "fleet_manager"];
 
 export const NAV: NavItem[] = [
   // داشبورد و نمای کلی
   { to: "/app", label: "نمای کلی", icon: BarChart3, roles: STAFF, end: true, group: "overview" },
   { to: "/app/analytics", label: "شاخص‌های عملکرد", icon: Gauge, roles: STAFF, group: "overview", perm: "analytics.view" },
-  { to: "/app/map", label: "نقشه ارسال‌ها", icon: MapIcon, roles: STAFF, group: "overview" },
+  { to: "/app/map", label: "نقشه ارسال‌ها", icon: MapIcon, roles: WITH_FLEET, group: "overview" },
   // عملیات انبار
   { to: "/app/receipts", label: "رسید و دریافت", icon: PackageOpen, roles: STAFF, group: "operations" },
   { to: "/app/quality", label: "بازرسی کیفی", icon: FlaskConical, roles: STAFF, group: "operations" },
@@ -68,11 +69,12 @@ export const NAV: NavItem[] = [
   { to: "/app/locations", label: "محل‌های انبار", icon: MapPinned, roles: STAFF, group: "master" },
   { to: "/app/inventory", label: "انبار و کالاها", icon: Warehouse, roles: STAFF, group: "master" },
   { to: "/app/partners", label: "طرف‌های تجاری", icon: Handshake, roles: STAFF, group: "master" },
-  { to: "/app/vehicles", label: "ناوگان", icon: Truck, roles: ADMIN, group: "master" },
+  { to: "/app/vehicles", label: "ناوگان", icon: Truck, roles: ["org_admin", "fleet_manager"], group: "master" },
   // لجستیک و ارسال
-  { to: "/app/orders", label: "سفارش‌ها", icon: Package, roles: STAFF, group: "logistics" },
+  { to: "/app/orders", label: "سفارش‌ها", icon: Package, roles: WITH_FLEET, group: "logistics" },
   { to: "/app/backorders", label: "سفارش‌های معوق", icon: Hourglass, roles: STAFF, group: "logistics" },
-  { to: "/app/schedules", label: "برنامه رانندگان", icon: CalendarClock, roles: STAFF, group: "logistics" },
+  { to: "/app/schedules", label: "برنامه رانندگان", icon: CalendarClock, roles: WITH_FLEET, group: "logistics" },
+  { to: "/app/exceptions", label: "مرکز استثنا", icon: Truck, roles: ["fleet_manager"], group: "logistics" },
   { to: "/app/drivers/top", label: "برترین رانندگان", icon: Trophy, roles: STAFF, group: "logistics" },
   { to: "/app/drivers", label: "احراز هویت رانندگان", icon: ShieldCheck, roles: ADMIN, group: "logistics", badge: "pending-drivers", end: true },
   { to: "/app/driver-requests", label: "درخواست‌های رانندگان", icon: Mail, roles: ADMIN, group: "logistics", badge: "pending-requests" },

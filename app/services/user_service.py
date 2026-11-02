@@ -29,7 +29,7 @@ ACTIVE_DRIVER_STATUSES = ("assigned", "picking_up", "picked_up", "in_transit")
 # جدول‌هایی که «پرونده» کاربرند و سابقه کاری حساب نمی‌شوند (با حذف کاربر پاک می‌شوند یا بی‌اهمیت‌اند)
 _NOT_HISTORY = {"audit_logs", "driver_documents", "driver_shifts", "driver_time_off", "driver_profiles", "driver_requests",
                 "driver_invites", "vehicles", "commission_plans", "organization_requests"}
-ROLE_FA = {"org_admin": "ادمین سازمان", "warehouse_manager": "مدیر انبار", "warehouse_operator": "اپراتور انبار", "driver": "راننده"}
+ROLE_FA = {"org_admin": "ادمین سازمان", "warehouse_manager": "مدیر انبار", "warehouse_operator": "اپراتور انبار", "fleet_manager": "مدیر ناوگان", "driver": "راننده"}
 _TEMP_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
 GENERIC_LOGIN_ERROR = 'نام کاربری یا رمز عبور اشتباه است. لطفاً اطلاعات ورود را بررسی و دوباره تلاش کنید.'
 

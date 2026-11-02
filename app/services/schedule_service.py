@@ -10,12 +10,12 @@ from app.services.exceptions import ForbiddenError, NotFoundError
 
 
 def _require_staff(user: User) -> None:
-    if user.role not in ("org_admin", "warehouse_manager"):
+    if user.role not in ("org_admin", "warehouse_manager", "fleet_manager"):
         raise ForbiddenError()
 
 
 def _require_admin(user: User) -> None:
-    if user.role != "org_admin":
+    if user.role not in ("org_admin", "fleet_manager"):
         raise ForbiddenError("فقط ادمین سازمان برنامه رانندگان را تغییر می‌دهد.")
 
 

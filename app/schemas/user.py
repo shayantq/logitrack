@@ -8,7 +8,7 @@ from app.schemas.geo_fields import KnownCity
 # رمز عبور trim نمی‌شود (فاصله بخشی از رمز است). سقف ۷۲ کاراکتر محدودیت خود bcrypt است.
 Password = Annotated[str, StringConstraints(min_length=6, max_length=72)]
 # نقش‌هایی که ادمین سازمان می‌تواند بسازد (نقش‌های پلتفرم فقط توسط اسکریپت create_admin.py)
-TenantRole = Literal["org_admin", "warehouse_manager", "warehouse_operator", "driver"]
+TenantRole = Literal["org_admin", "warehouse_manager", "warehouse_operator", "fleet_manager", "driver"]
 
 
 class CreateUserRequest(BaseModel):

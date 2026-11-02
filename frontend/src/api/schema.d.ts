@@ -6053,7 +6053,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "org_admin" | "warehouse_manager" | "warehouse_operator" | "driver";
+            role: "org_admin" | "warehouse_manager" | "warehouse_operator" | "fleet_manager" | "driver";
             /** Password */
             password: string;
             /** City */
@@ -8611,7 +8611,7 @@ export interface components {
              * Total Price
              * @default 0
              */
-            total_price: number;
+            total_price: number | null;
             /** Driver Id */
             driver_id?: number | null;
             /** Delivery Fee */
@@ -8665,7 +8665,7 @@ export interface components {
             /** Quantity */
             quantity: number;
             /** Unit Price */
-            unit_price: number;
+            unit_price?: number | null;
             /** Unit Weight Kg */
             unit_weight_kg: number;
         };
@@ -8804,7 +8804,7 @@ export interface components {
              * Total Price
              * @default 0
              */
-            total_price: number;
+            total_price: number | null;
             /** Driver Id */
             driver_id?: number | null;
             /** Delivery Fee */
@@ -13197,7 +13197,7 @@ export interface components {
             /** Mobile */
             mobile?: string | null;
             /** Role */
-            role?: ("org_admin" | "warehouse_manager" | "warehouse_operator" | "driver") | null;
+            role?: ("org_admin" | "warehouse_manager" | "warehouse_operator" | "fleet_manager" | "driver") | null;
             /** City */
             city?: string | null;
             /** Warehouse Id */

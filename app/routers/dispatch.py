@@ -16,7 +16,7 @@ from app.services.exceptions import DomainError
 
 router = APIRouter(prefix="/dispatch", tags=["🗓️ زمان‌بندی و تخصیص هوشمند"])
 
-staff = require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER])
+staff = require_role([RoleEnum.ORG_ADMIN, RoleEnum.WAREHOUSE_MANAGER, RoleEnum.FLEET_MANAGER])
 org_admin = require_role([RoleEnum.ORG_ADMIN])
 driver_only = require_role([RoleEnum.DRIVER])
 

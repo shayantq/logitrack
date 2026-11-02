@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal, Optional
 
+from app.core import request_context
 from pydantic import (
     AfterValidator, BaseModel, BeforeValidator, ConfigDict, EmailStr, Field, StringConstraints, model_validator,
 )
@@ -148,6 +149,15 @@ class CustomerResponse(BaseModel):
     email: Optional[str] = None
 
 
+# مدیر ناوگان داده مالی سفارش را نمی‌بیند (ت۲۰). این‌جا برش داده می‌شود تا هر مسیری که سفارش برمی‌گرداند پوشش داشته باشد.
+ORDER_MONEY_FIELDS = ("total_price", "delivery_fee", "commission_level", "commission_percent", "commission_amount", "driver_earning")
+
+
+def _money_hidden() -> bool:
+    state = request_context.current.get()
+    return bool(state) and state.get("role") == "fleet_manager"
+
+
 class OrderItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -156,8 +166,14 @@ class OrderItemResponse(BaseModel):
     product_name: str
     product_sku: Optional[str] = None
     quantity: int
-    unit_price: float
+    unit_price: Optional[float] = None
     unit_weight_kg: float
+
+    @model_validator(mode="after")
+    def _hide_money(self):
+        if _money_hidden():
+            self.unit_price = None
+        return self
 
 
 class OrderStatusHistoryResponse(BaseModelWithDateFormatting):
@@ -203,7 +219,7 @@ class OrderResponse(BaseModelWithDateFormatting):
     items: list[OrderItemResponse] = []
     total_quantity: int = 0
     total_weight_kg: float = 0
-    total_price: float = 0
+    total_price: Optional[float] = 0
     # مرحله ۸: کرایه و تسویه منجمدشده در لحظه تحویل
     driver_id: Optional[int] = None
     delivery_fee: Optional[float] = None
@@ -217,6 +233,13 @@ class OrderResponse(BaseModelWithDateFormatting):
     failure_resolution: Optional[str] = None
     assignment_state: Optional[str] = None
     assignment_deadline: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def _hide_money(self):
+        if _money_hidden():
+            for name in ORDER_MONEY_FIELDS:
+                setattr(self, name, None)
+        return self
 
 
 class AttemptLineOut(BaseModel):

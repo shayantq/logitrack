@@ -15,7 +15,7 @@ import { Badge, Button, Checkbox, Field, Input, Select, type Tone } from "@/ui/p
 
 export type UserRow = Schemas["UserResponse"];
 const WAREHOUSE_ROLES = ["warehouse_manager", "warehouse_operator"];
-export const ROLE_TONE: Record<string, Tone> = { org_admin: "violet", warehouse_operator: "info", warehouse_manager: "info", driver: "brand" };
+export const ROLE_TONE: Record<string, Tone> = { org_admin: "violet", fleet_manager: "orange", warehouse_operator: "info", warehouse_manager: "info", driver: "brand" };
 
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 export const randomPassword = () => Array.from(crypto.getRandomValues(new Uint32Array(10)), n => ALPHABET[n % ALPHABET.length]).join("");
@@ -92,7 +92,7 @@ export function UserFormModal({ open, onClose, user }: { open: boolean; onClose:
     mutationFn: () => editing
       ? unwrap(api.PUT("/users/{user_id}", { params: { path: { user_id: user!.id } }, body: {
         full_name: form.full_name, email: form.email, mobile,
-        ...(user!.role !== "driver" && user!.id !== me.id ? { role: form.role as "org_admin" | "warehouse_manager" | "warehouse_operator" } : {}),
+        ...(user!.role !== "driver" && user!.id !== me.id ? { role: form.role as "org_admin" | "warehouse_manager" | "warehouse_operator" | "fleet_manager" } : {}),
         ...(WAREHOUSE_ROLES.includes(form.role) && form.warehouse_id ? { warehouse_id: Number(form.warehouse_id) } : {}),
         ...(form.role === "driver" ? { city: form.city || null } : {}),
       } }))
@@ -115,7 +115,7 @@ export function UserFormModal({ open, onClose, user }: { open: boolean; onClose:
           hint={roleLocked ? (user!.role === "driver" ? "حساب راننده به نقش دیگری تبدیل نمی‌شود." : "نقش خودتان را نمی‌توانید عوض کنید.") : undefined}>
           <Select value={form.role} onChange={set("role")} disabled={roleLocked} data-testid="user-role">
             {(!editing || user!.role === "driver") && <option value="driver">راننده</option>}
-            <option value="warehouse_operator">اپراتور انبار</option><option value="warehouse_manager">مدیر انبار</option><option value="org_admin">ادمین سازمان</option>
+            <option value="fleet_manager">مدیر ناوگان</option><option value="warehouse_operator">اپراتور انبار</option><option value="warehouse_manager">مدیر انبار</option><option value="org_admin">ادمین سازمان</option>
           </Select>
         </Field>
         <Field label="نام و نام خانوادگی" className="sm:col-span-2"><Input value={form.full_name} onChange={set("full_name")} data-testid="user-fullname" /></Field>

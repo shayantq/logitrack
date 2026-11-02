@@ -74,7 +74,7 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="این بخش برای نقش شما باز نیست.")
     state = request_context.current.get()
     if state is not None:
-        state.update(organization_id=user.organization_id, user_id=user.id)
+        state.update(organization_id=user.organization_id, user_id=user.id, role=getattr(user.role, "value", user.role))
 
     from app.services.user_service import mfa_required
     if mfa_required(user) and user.totp_enabled_at is None and not request.url.path.rstrip("/").startswith(MFA_SETUP_PATHS):

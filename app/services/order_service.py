@@ -48,6 +48,7 @@ ALLOWED_TRANSITIONS = {
 }
 DRIVER_ALLOWED_STATUSES = {'picking_up', 'picked_up', 'in_transit', 'delivered', 'failed'}
 MANAGER_ALLOWED_STATUSES = {'picked_up', 'canceled'}
+FLEET_ALLOWED_STATUSES = {"picking_up", "picked_up", "in_transit", "failed"}
 # وضعیت‌هایی که «انجام کار» هستند و پیش از روز تحویل سفارش مجاز نیستند
 WORK_STATUSES = {'picking_up', 'picked_up', 'in_transit', 'delivered', 'failed'}
 # کالا تحویل نشده → به انبار برمی‌گردد (رزرو آزاد می‌شود یا کالای خارج‌شده با سند برگشت).
@@ -497,7 +498,7 @@ def count_orders(db: Session, user: User, **filters) -> int:
 # تخصیص خودرو و تغییر وضعیت
 # ---------------------------------------------------------------------------
 def assign_vehicle(db: Session, user: User, order_id: int, request: OrderAssignRequest) -> Order:
-    if user.role not in ['org_admin', 'warehouse_manager']:
+    if user.role not in ['org_admin', 'warehouse_manager', 'fleet_manager']:
         raise ForbiddenError()
     try:
         order = db.query(Order).filter(Order.id == order_id).with_for_update().first()
@@ -716,6 +717,9 @@ def update_order_status(db: Session, user: User, order_id: int, status_request: 
             raise ConflictError('اول این مأموریت را قبول یا رد کنید.')
         if new_status not in DRIVER_ALLOWED_STATUSES:
             raise ConflictError('راننده فقط می‌تواند وضعیت را به «در راه انبار»، «بارگیری شد»، «در مسیر»، «تحویل‌شده» یا «ناموفق» تغییر دهد.')
+    elif user.role == 'fleet_manager':
+        if new_status not in FLEET_ALLOWED_STATUSES:
+            raise ConflictError('مدیر ناوگان فقط می‌تواند حرکت سفارش را به‌روز کند یا آن را ناموفق ثبت کند؛ تحویل با راننده و مدرک او ثبت می‌شود.')
     elif user.role == 'warehouse_manager':
         if target_order.warehouse_id != user.warehouse_id:
             raise ForbiddenError('این سفارش از انبار شما ارسال نمی‌شود.')
@@ -808,8 +812,10 @@ def try_assign(db: Session, order: Order) -> Vehicle | None:
 
 
 def _open_failure(db: Session, user: User, order_id: int, resolution: str) -> Order:
-    if user.role not in ('org_admin', 'warehouse_manager'):
+    if user.role not in ('org_admin', 'warehouse_manager', 'fleet_manager'):
         raise ForbiddenError()
+    if user.role == 'fleet_manager' and resolution != 'redeliver':
+        raise ForbiddenError('مدیر ناوگان فقط می‌تواند تحویل دوباره را برنامه‌ریزی کند.')
     order = db.query(Order).options(selectinload(Order.items)).filter(Order.id == order_id).with_for_update().first()
     if order is None:
         raise NotFoundError('سفارش مورد نظر یافت نشد.')

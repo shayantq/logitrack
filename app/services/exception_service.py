@@ -387,12 +387,14 @@ def _link(item: OperationException) -> str | None:
 
 
 def _ensure_staff(user: User) -> None:
-    if user.role not in STAFF:
+    if user.role not in (*STAFF, "fleet_manager"):
         raise ForbiddenError("فقط کارکنان سازمان به مرکز استثنا دسترسی دارند.")
 
 
 def _scoped(query, user: User):
     """مدیر انبار فقط استثناهای انبار خودش را می‌بیند؛ موردهای بدون انبار (پشتیبانی) برای ادمین است."""
+    if user.role == "fleet_manager":
+        return query.filter(OperationException.team == "fleet")
     return query.filter(OperationException.warehouse_id == user.warehouse_id) if user.role == "warehouse_manager" else query
 
 
