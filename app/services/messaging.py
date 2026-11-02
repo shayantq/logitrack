@@ -12,6 +12,7 @@
 پیام در همان تراکنش عملیات در صف پایدار ثبت می‌شود و ناشر پس‌زمینه آن را می‌فرستد (app/services/outbox_service.py).
 پس صدا زدن این توابع باید پیش از commit باشد. متن‌های رمز موقت و کد بازیابی «حساس» علامت می‌خورند.
 """
+import hashlib
 import http.client
 import json
 import logging
@@ -249,9 +250,16 @@ def order_delivered(db, order, organization_name: str) -> None:
               organization_id=order.organization_id, dedupe_key=f"order:{order.id}:delivered")
 
 
-def password_reset_code(db, user, code: str, channel: str) -> None:
+def password_reset_code(db, user, code: str, channel: str, reset_id: int | None = None) -> None:
+    """reset_id همان ردیف password_resets است تا اگر نتیجه پیامک نامعلوم شد فقط همین کد باطل شود."""
     text = f"{BRAND_FA}: کد بازیابی رمز عبور شما: {code}\nاین کد ۱۰ دقیقه معتبر است. اگر شما درخواست نداده‌اید، این پیام را نادیده بگیرید."
     if channel == "sms":
-        queue_sms(db, user.mobile, text, sensitive=True, expires_in=RESET_CODE_TTL)
+        queue_sms(db, user.mobile, text, sensitive=True, expires_in=RESET_CODE_TTL, password_reset_id=reset_id)
     else:
-        queue_email(db, user.email, f"کد بازیابی رمز عبور {BRAND_FA}", text, sensitive=True, expires_in=RESET_CODE_TTL)
+        queue_email(db, user.email, f"کد بازیابی رمز عبور {BRAND_FA}", text, sensitive=True, expires_in=RESET_CODE_TTL, password_reset_id=reset_id)
+
+
+def provider_account() -> str | None:
+    """SHA-256 کلید کاوه‌نگار برای سنجیدن «همان حساب»؛ کلید از آن برنمی‌گردد و این مقدار هم لاگ یا نمایش داده نمی‌شود."""
+    key = _env("SMS_API_KEY")
+    return hashlib.sha256(key.encode()).hexdigest() if key else None

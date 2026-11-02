@@ -494,12 +494,13 @@ def request_password_reset(db: Session, identifier: str) -> None:
     db.query(PasswordReset).filter(PasswordReset.user_id == user.id, PasswordReset.used_at.is_(None)) \
         .update({PasswordReset.used_at: now}, synchronize_session=False)
     code = f"{secrets.randbelow(10 ** 6):06d}"
-    db.add(PasswordReset(user_id=user.id, code_hash=_reset_hash(user.id, code), channel=channel,
-                         created_at=now, expires_at=now + RESET_TTL))
+    reset = PasswordReset(user_id=user.id, code_hash=_reset_hash(user.id, code), channel=channel, created_at=now, expires_at=now + RESET_TTL)
+    db.add(reset)
+    db.flush()
     audit_service.log(db, None, "auth.reset_requested",
                       f"درخواست کد بازیابی رمز ({'پیامک' if channel == 'sms' else 'ایمیل'})", target=user,
                       organization_id=user.organization_id)
-    messaging.password_reset_code(db, user, code, channel)
+    messaging.password_reset_code(db, user, code, channel, reset_id=reset.id)
     db.commit()
 
 

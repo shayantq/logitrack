@@ -67,13 +67,14 @@ def new_provider_ref() -> int:
 
 
 def enqueue(db: Session, channel: str, recipient: str, body: str, *, subject: str | None = None, organization_id: int | None = None,
-            sensitive: bool = False, expires_in: timedelta | None = None, dedupe_key: str | None = None) -> OutboundMessage | None:
+            sensitive: bool = False, expires_in: timedelta | None = None, dedupe_key: str | None = None,
+            password_reset_id: int | None = None) -> OutboundMessage | None:
     """در تراکنش جاری ثبت می‌کند (بدون commit). رویدادی که قبلاً ثبت شده دوباره ثبت نمی‌شود."""
     now = _now()
     # provider_ref تکراری پیش از ثبت سنجیده می‌شود؛ برخورد هم‌زمان بسیار نادر را قید یکتای دیتابیس می‌گیرد
     message = OutboundMessage(organization_id=organization_id, channel=channel, recipient=recipient, subject=subject, body=body,
                               sensitive=sensitive, dedupe_key=dedupe_key, status="pending", created_at=now, next_attempt_at=now,
-                              expires_at=now + expires_in if expires_in else None, provider_ref=_fresh_ref(db))
+                              expires_at=now + expires_in if expires_in else None, provider_ref=_fresh_ref(db), password_reset_id=password_reset_id)
     if dedupe_key is None:
         db.add(message)
         return message
@@ -140,13 +141,25 @@ def _deliver(message: OutboundMessage):
     return messaging.deliver_email(message.recipient, message.subject or "", message.body)
 
 
-def _unconfirmed(message: OutboundMessage, note: str) -> None:
-    """نتیجه نامعلوم: نه تکرار خودکار و نه ناموفق. متن حساس همین حالا و بدون نسخه دیگر پاک می‌شود."""
+def _unconfirmed(db: Session, message: OutboundMessage, note: str) -> None:
+    """
+    نتیجه نامعلوم: نه تکرار خودکار و نه ناموفق. متن حساس همین حالا و بدون نسخه دیگر پاک می‌شود و کد بازیابی‌ای که
+    همین پیام حمل می‌کرد باطل می‌شود؛ کاربر از روند عادی کد تازه می‌گیرد. کدهای دیگر دست نمی‌خورند.
+    """
+    from app.models import PasswordReset
     from app.services.messaging import mask
     message.status, message.lease_until, message.last_error = MESSAGE_UNCONFIRMED, None, note[:300]
     if message.sensitive:
         message.body = None
         message.recipient = mask(message.recipient)
+    if message.password_reset_id is not None:
+        reset = db.query(PasswordReset).filter(PasswordReset.id == message.password_reset_id, PasswordReset.used_at.is_(None)).first()
+        if reset is not None:
+            from app.models import User
+            reset.used_at = _now()
+            owner = db.query(User).filter(User.id == reset.user_id).execution_options(skip_tenant_filter=True).first()
+            audit_service.log(db, None, "auth.reset_invalidated", "کد بازیابی باطل شد؛ نتیجه پیامک آن نامعلوم ماند", target=owner,
+                              organization_id=owner.organization_id if owner else None)
 
 
 def _previous_outcome(message: OutboundMessage, now: datetime) -> str:
@@ -157,6 +170,9 @@ def _previous_outcome(message: OutboundMessage, now: datetime) -> str:
     from app.services import messaging
     window = timedelta(hours=messaging.STATUS_LOOKUP_WINDOW_HOURS)
     if message.first_attempt_at is None or message.first_attempt_at < now - window:
+        return "unknown"
+    # پاسخ وضعیت فقط از همان حسابی معتبر است که پیام با آن رفت؛ پیام قدیمی بدون اثر انگشت هم اعتماد نمی‌گیرد
+    if message.provider_account is None or message.provider_account != messaging.provider_account():
         return "unknown"
     status = messaging.sms_status_by_localid(message.provider_ref)
     if status is None:
@@ -193,7 +209,11 @@ def publish_due(db: Session, now: datetime | None = None) -> dict:
         else:
             message.status, message.lease_until = "sending", now + _lease()
             message.attempts += 1
-            message.first_attempt_at = message.first_attempt_at or now
+            if message.first_attempt_at is None:
+                message.first_attempt_at = now
+                if message.channel == "sms":
+                    from app.services.messaging import provider_account
+                    message.provider_account = provider_account()
             claimed.append(message.id)
     db.commit()
 
@@ -207,7 +227,7 @@ def publish_due(db: Session, now: datetime | None = None) -> dict:
                 db.commit()
                 continue
             if outcome == "unknown":
-                _unconfirmed(message, f"{AMBIGUOUS}: نتیجه ارسال قبلی روشن نیست")
+                _unconfirmed(db, message, f"{AMBIGUOUS}: نتیجه ارسال قبلی روشن نیست")
                 result["unconfirmed"] += 1
                 db.commit()
                 continue

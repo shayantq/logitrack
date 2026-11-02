@@ -206,6 +206,7 @@ def test_dead_worker_lease_is_picked_up_again(env, sms_on, monkeypatch):
     row = db.query(OutboundMessage).one()
     now = _now()
     row.status, row.attempts, row.lease_until, row.first_attempt_at = "sending", 1, now + timedelta(minutes=1), now   # worker وسط ارسال مرد
+    row.provider_account = messaging.provider_account()
     db.commit()
     assert outbox_service.publish_due(db, now)["sent"] == 0    # lease هنوز معتبر است
     assert outbox_service.publish_due(db, now + timedelta(minutes=2))["sent"] == 1

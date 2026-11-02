@@ -329,6 +329,10 @@ class OutboundMessage(Base):
     provider_message_id = Column(BigInteger, nullable=True)
     provider_status = Column(Integer, nullable=True)
     first_attempt_at = Column(DateTime, nullable=True)
+    # SHA-256 کلید کاوه‌نگار هنگام اولین تلاش؛ پاسخ وضعیت فقط با همین حساب معتبر است. هرگز در لاگ یا پاسخ API نمی‌آید.
+    provider_account = Column(String(64), nullable=True)
+    # کد بازیابی‌ای که این پیام حمل می‌کند؛ اگر نتیجه نامعلوم شود همین کد باطل می‌شود
+    password_reset_id = Column(Integer, ForeignKey("password_resets.id", ondelete="SET NULL", name="fk_outbound_messages_password_reset"), nullable=True)
 
 
 class TaskFailure(Base):

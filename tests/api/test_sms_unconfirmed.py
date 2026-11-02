@@ -300,3 +300,64 @@ def test_transport_errors_are_classified(monkeypatch):
     with pytest.raises(RuntimeError) as error:
         messaging.deliver_sms("09121112233", BODY, local_id=5)
     assert "SECRETKEY" not in str(error.value)
+
+
+def test_first_attempt_records_the_account_fingerprint_but_never_shows_it(env, caplog):
+    import hashlib
+    caplog.set_level(logging.DEBUG)
+    message = _queue(env)
+    outbox_service.publish_due(env.db)
+    fingerprint = hashlib.sha256(b"SECRETKEY").hexdigest()
+    assert _row(env, message.id).provider_account == fingerprint
+    shown = env.client.get("/platform/operations", headers=_auth(env.root)).text
+    assert fingerprint not in shown and fingerprint not in caplog.text and "SECRETKEY" not in caplog.text
+
+
+def test_rotated_api_key_never_authorises_a_resend(env, monkeypatch):
+    message = _queue(env)
+    _crash_mid_send(env, message, before_accept=True)       # کاوه‌نگار رکوردی ندارد؛ با کلید تازه پاسخ ۱۰۰ می‌آمد
+    monkeypatch.setenv("SMS_API_KEY", "ROTATEDKEY")
+    outbox_service.publish_due(env.db, _after_lease())
+    row = _row(env, message.id)
+    assert row.status == "unconfirmed" and env.provider.lookups == 0 and env.provider.sends == 0
+
+
+def test_legacy_message_without_fingerprint_is_not_trusted(env):
+    message = _queue(env)
+    row = _crash_mid_send(env, message, before_accept=True)
+    row.provider_account = None
+    env.db.commit()
+    outbox_service.publish_due(env.db, _after_lease())
+    assert _row(env, message.id).status == "unconfirmed" and env.provider.lookups == 0 and env.provider.sends == 0
+
+
+def test_unconfirmed_recovery_sms_invalidates_only_its_own_code(env, caplog):
+    from app.models import PasswordReset
+    from app.services import user_service
+    caplog.set_level(logging.DEBUG)
+    set_tenant(env.db, env.org_admin.organization_id)
+    other = User(username="other", email="o@x.io", role=RoleEnum.ORG_ADMIN, hashed_password="x", mobile="09124445566")
+    env.db.add(other)
+    env.org_admin.mobile = "09121112233"
+    env.db.commit()
+    set_tenant(env.db, None)
+    user_service.request_password_reset(env.db, "other")
+    outbox_service.publish_due(env.db)                      # کد کاربر دیگر پیش از خرابی فرستاده و پذیرفته شده است
+    user_service.request_password_reset(env.db, "adm")
+    mine = env.db.query(PasswordReset).filter(PasswordReset.user_id == env.org_admin.id).one()
+    theirs = env.db.query(PasswordReset).filter(PasswordReset.user_id == other.id).one()
+    message = env.db.query(OutboundMessage).filter(OutboundMessage.password_reset_id == mine.id).one()
+    assert message.sensitive and env.db.query(OutboundMessage).filter(OutboundMessage.password_reset_id == theirs.id).count() == 1
+    env.provider.after_accept = SystemExit("worker killed")
+    with pytest.raises(SystemExit):
+        outbox_service.publish_due(env.db)
+    env.db.rollback()
+    env.provider.after_accept = None
+    env.provider.lookup_override = None                     # پاسخ وضعیت روشن نیست (مثلاً ۴۲۶)
+    outbox_service.publish_due(env.db, _after_lease())
+    env.db.expire_all()
+    assert env.db.get(OutboundMessage, message.id).status == "unconfirmed" and env.db.get(OutboundMessage, message.id).body is None
+    assert env.db.get(PasswordReset, mine.id).used_at is not None
+    assert env.db.get(PasswordReset, theirs.id).used_at is None
+    assert env.db.query(AuditLog).filter(AuditLog.action == "auth.reset_invalidated").count() == 1
+    assert "کد بازیابی رمز عبور شما" not in caplog.text
