@@ -14,7 +14,7 @@ import { DOCUMENT_STATUS, DOCUMENT_TYPES, STOCK_STATUS, type StockStatus } from 
 import { faDateTime, faNumber } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 
 type Doc = Schemas["StockDocumentOut"];
 
@@ -77,6 +77,7 @@ export default function DocumentsPage() {
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : !docs?.length ? (
           <EmptyState icon={<FileStack className="size-5" />} title="سندی با این فیلترها نیست" />
         ) : (
+          <>
           <Table testId="documents-table">
             <thead><tr><th>کد سند</th><th>نوع</th><th>وضعیت</th><th>زمان</th><th>انبار</th><th>ورود</th><th>خروج</th><th>طرف / مرجع</th><th>کاربر</th></tr></thead>
             <tbody>
@@ -99,6 +100,8 @@ export default function DocumentsPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={docs.length} limit={50} />
+          </>
         )}
       </Card>
       <DocumentModal id={openId} onClose={() => setFilter("doc", "")} onOpen={id => setFilter("doc", String(id))} />

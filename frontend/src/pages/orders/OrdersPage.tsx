@@ -9,11 +9,14 @@ import { BulkActionModal, type BulkRequest } from "@/components/BulkActionModal"
 import { useAsyncExport } from "@/hooks/data";
 import { type OrderStatus } from "@/lib/labels";
 import { faNumber, faShortDateTime } from "@/lib/format";
-import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Table, TableSkeleton, cn } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Table, TableSkeleton, cn, SortHeader, TruncationNotice, type SortState } from "@/ui/primitives";
+import { UpdatedAt } from "@/components/UpdatedAt";
 import { OrderFormModal } from "./OrderFormModal";
 import { OrderSearch, useOrderFilters } from "./OrderSearch";
 import { OrderDetailModal } from "./OrderDetailModal";
 import { useDeepLink } from "@/hooks/useDeepLink";
+
+type OrderSort = "tracking_code" | "destination_city" | "delivery_window_start" | "status";
 
 export default function OrdersPage() {
   const me = useMe();
@@ -31,11 +34,12 @@ export default function OrdersPage() {
   const flash = useDeepLink("order", { onHit: setDetailId });
   const exporter = useAsyncExport(toast.error, () => toast.success("گزارش آماده و دانلود شد."));
 
-  const { data: orders, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["orders", filters],
+  const [sort, setSort] = useState<SortState<OrderSort>>(null);
+  const { data: orders, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
+    queryKey: ["orders", filters, sort],
     queryFn: () => unwrap(api.GET("/orders/", { params: { query: {
       ...filters, order_status: filters.order_status as OrderStatus | undefined,
-      priority: filters.priority === "true" ? true : undefined, view: filters.view as "late" | "today" | "needs_update" | undefined, limit: 300,
+      priority: filters.priority === "true" ? true : undefined, view: filters.view as "late" | "today" | "needs_update" | undefined, limit: 300, sort: sort?.key, direction: sort?.dir,
     } } })),
     placeholderData: keepPreviousData,
     refetchInterval: 15_000,
@@ -59,6 +63,7 @@ export default function OrdersPage() {
           <Button icon={<Plus className="size-4" />} onClick={() => setFormOpen(true)} data-testid="new-order">ثبت سفارش</Button>
         </>} />
 
+      <div className="mb-2 flex justify-end"><UpdatedAt at={dataUpdatedAt} /></div>
       <Card>
         <OrderSearch key={JSON.stringify(filters)} filters={filters} onChange={setFilters} />
         {ids.length > 0 && (
@@ -82,8 +87,9 @@ export default function OrdersPage() {
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : orders!.length === 0 ? (
           <EmptyState icon={<PackageSearch className="size-5" />} title="سفارشی یافت نشد" text="فیلترها را تغییر دهید یا سفارش جدید ثبت کنید." />
         ) : (
+          <>
           <Table testId="orders-table">
-            <thead><tr><th><span className="inline-flex items-center gap-3"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="انتخاب همه" data-testid="orders-select-all" className="size-4 accent-[var(--brand)]" />کد پیگیری</span></th><th>مشتری</th><th>اقلام</th><th>مقصد</th><th>زمان تحویل</th><th>وضعیت</th></tr></thead>
+            <thead><tr><th><span className="inline-flex items-center gap-3"><input type="checkbox" checked={allChecked} onChange={toggleAll} aria-label="انتخاب همه" data-testid="orders-select-all" className="size-4 accent-[var(--brand)]" /><button type="button" onClick={() => setSort(sort?.key === "tracking_code" ? (sort.dir === "asc" ? { key: "tracking_code", dir: "desc" } : null) : { key: "tracking_code", dir: "asc" })} data-testid="sort-tracking_code">کد پیگیری</button></span></th><th>مشتری</th><th>اقلام</th><SortHeader label="مقصد" column="destination_city" sort={sort} onSort={setSort} /><SortHeader label="زمان تحویل" column="delivery_window_start" sort={sort} onSort={setSort} /><SortHeader label="وضعیت" column="status" sort={sort} onSort={setSort} /></tr></thead>
             <tbody>
               {orders!.map(o => (
                 <tr key={o.id} className={cn("clickable", flash === o.id && "focus-flash", selected.has(o.id) && "bg-brand-soft/30")} data-focus={`order-${o.id}`} onClick={() => setDetailId(o.id)}>
@@ -103,6 +109,8 @@ export default function OrdersPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={orders?.length ?? 0} limit={300} />
+          </>
         )}
         <div className="flex flex-wrap justify-between gap-2 border-t border-border px-5 py-3 text-xs text-muted">
           <span>برای جزئیات، تاریخچه و تغییر وضعیت روی هر سفارش کلیک کنید.</span>

@@ -15507,6 +15507,9 @@ export interface operations {
                 delivery_to?: string | null;
                 /** @description فقط فوری‌ها */
                 priority?: boolean | null;
+                /** @description ستون مرتب‌سازی */
+                sort?: ("tracking_code" | "delivery_window_start" | "status" | "destination_city") | null;
+                direction?: "asc" | "desc";
                 /** @description نمای نام‌دار (مثل دیرکرد) */
                 view?: ("late" | "today" | "needs_update" | "awaiting_resolution" | "at_risk" | "driver_returns" | "customer_requests") | null;
             };
@@ -19411,6 +19414,7 @@ export interface operations {
                 urgent?: boolean;
                 owner_id?: number | null;
                 kind?: string | null;
+                sort?: "severity" | "opened_at" | "due_at";
             };
             header?: never;
             path?: never;

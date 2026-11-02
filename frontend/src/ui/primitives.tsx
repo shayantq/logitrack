@@ -146,7 +146,40 @@ export function EmptyState({ icon, title, text, action }: { icon?: ReactNode; ti
   );
 }
 
+/** فهرستی که به سقف سرور رسیده است: کاربر باید بداند ردیف‌های بیشتری هست. */
+export function TruncationNotice({ count, limit }: { count: number; limit: number }) {
+  if (count < limit) return null;
+  return (
+    <p className="border-t border-border bg-warning-soft/40 px-4 py-2.5 text-xs text-text-2" data-testid="list-truncated">
+      فقط {limit.toLocaleString("fa-IR")} ردیف نمایش داده شده و این فهرست کامل نیست. برای دیدن بقیه، فیلتر را دقیق‌تر کنید.
+    </p>
+  );
+}
+
+export type SortState<K extends string> = { key: K; dir: "asc" | "desc" } | null;
+
+/** ستون قابل مرتب‌سازی. کلیک سوم مرتب‌سازی پیش‌فرض را برمی‌گرداند. */
+export function SortHeader<K extends string>({ label, column, sort, onSort }: { label: ReactNode; column: K; sort: SortState<K>; onSort: (next: SortState<K>) => void }) {
+  const active = sort?.key === column;
+  const next = (): SortState<K> => !active ? { key: column, dir: "asc" } : sort?.dir === "asc" ? { key: column, dir: "desc" } : null;
+  return (
+    <th aria-sort={active ? (sort?.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button type="button" onClick={() => onSort(next())} className="inline-flex items-center gap-1 font-inherit hover:text-brand" data-testid={`sort-${column}`}>
+        {label}<span aria-hidden className="text-[10px]">{active ? (sort?.dir === "asc" ? "▲" : "▼") : "↕"}</span>
+      </button>
+    </th>
+  );
+}
+
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const denied = (error as { status?: number } | null)?.status === 403;
+  if (denied) {
+    return (
+      <div className="animate-fade m-5 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-2" data-testid="permission-denied">
+        {error instanceof Error && error.message ? error.message : "به این بخش دسترسی ندارید."}
+      </div>
+    );
+  }
   return (
     <div className="animate-fade m-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
       <span>{error instanceof Error ? error.message : "خطا در دریافت اطلاعات."}</span>

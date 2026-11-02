@@ -12,7 +12,7 @@ import { FULFILLMENT, SHIPMENT_STATUS } from "@/lib/labels";
 import { faDateTime, faNumber } from "@/lib/format";
 import { confirmDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 import { WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type QueueOrder = Schemas["PackingQueueOut"];
@@ -149,6 +149,7 @@ export default function ShippingPage() {
       <Card>
         <CardHeader title="محموله‌ها" icon={<Truck className="size-4" />} subtitle="ظرفیت وزنی و حجمی خودرو هنگام ساخت و تحویل دوباره کنترل می‌شود." />
         {!shipments.data?.length ? <EmptyState title="هنوز محموله‌ای نیست" /> : (
+          <>
           <Table testId="shipments-table">
             <thead><tr><th>کد</th><th>وضعیت</th><th>خودرو / راننده</th><th>سفارش‌ها</th><th>بار</th><th>زمان</th><th className="w-1" /></tr></thead>
             <tbody>
@@ -173,6 +174,8 @@ export default function ShippingPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={shipments.data.length} limit={100} />
+          </>
         )}
       </Card>
       {packing && <PackModal order={packing} onClose={() => setPacking(null)} onDone={id => { refresh(); setSlipFor(id); }} />}

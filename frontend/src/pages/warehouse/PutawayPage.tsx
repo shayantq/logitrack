@@ -13,7 +13,7 @@ import { PUTAWAY_PROBLEMS, PUTAWAY_STATUS, STOCK_STATUS, type StockStatus } from
 import { faDate, faNumber } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
 import { Menu, MenuItem, Modal, Tooltip } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 import { LocationSelect, STATUS_KEYS, StatusBadge, WarehousePicker, scanKeyDown, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type Task = Schemas["PutawayTaskOut"];
@@ -72,6 +72,7 @@ export default function PutawayPage() {
           <EmptyState icon={<MapPin className="size-5" />} title={status === "active" ? "وظیفه جانمایی بازی نیست" : "موردی نیست"}
             text={status === "active" ? "پس از دریافت رسید یا بازرسی، برای کالای محل تخلیه خودکار وظیفه ساخته می‌شود." : undefined} />
         ) : (
+          <>
           <Table testId="putaway-table">
             <thead><tr><th>وظیفه</th><th>کالا</th><th>وضعیت کیفی</th><th>مقدار</th><th>از</th><th>به (پیشنهاد)</th><th>خطا</th><th className="w-1" /></tr></thead>
             <tbody>
@@ -103,6 +104,8 @@ export default function PutawayPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={tasks.length} limit={200} />
+          </>
         )}
       </Card>
       <ExecuteModal task={executing} onClose={() => setExecuting(null)} />

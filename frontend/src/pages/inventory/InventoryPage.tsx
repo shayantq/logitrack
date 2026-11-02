@@ -11,7 +11,8 @@ import { useAsyncExport, usePartners, useProducts, useWarehouses } from "@/hooks
 import { STOCK_STATUS, WAREHOUSE_TYPES, type StockStatus } from "@/lib/labels";
 import { faNumber } from "@/lib/format";
 import { Modal, Tooltip } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, Textarea, cn } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, Textarea, cn, SortHeader, type SortState } from "@/ui/primitives";
+import { UpdatedAt } from "@/components/UpdatedAt";
 import { DateField } from "@/ui/datetime";
 import { LocationSelect } from "../warehouse/shared";
 import { PositionsModal } from "./PositionsModal";
@@ -290,7 +291,7 @@ export default function InventoryPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const invalidate = useInvalidateStock();
-  const { data: products, isLoading, error, refetch } = useProducts();
+  const { data: products, isLoading, error, refetch, dataUpdatedAt } = useProducts();
   const [productModal, setProductModal] = useState(false);
   const [movementFor, setMovementFor] = useState<Product | null | undefined>(undefined);
   // جستجو در آدرس صفحه (قابل اشتراک و ذخیره در «نماهای من»)
@@ -309,8 +310,13 @@ export default function InventoryPage() {
     onError: e => toast.error(errorMessage(e)),
   });
   const term = search.trim();
-  const visible = (products ?? []).filter(p => !term || p.name.includes(term) || p.sku.toLowerCase().includes(term.toLowerCase())
+  const [sort, setSort] = useState<SortState<"name" | "sku" | "stock">>(null);
+  const filtered = (products ?? []).filter(p => !term || p.name.includes(term) || p.sku.toLowerCase().includes(term.toLowerCase())
     || (p.category ?? "").includes(term) || (p.barcode ?? "") === term);
+  const visible = !sort ? filtered : [...filtered].sort((x, y) => {
+    const order = sort.key === "stock" ? x.stock - y.stock : x[sort.key].localeCompare(y[sort.key], "fa");
+    return sort.dir === "asc" ? order : -order;
+  });
 
   return (
     <>
@@ -334,12 +340,13 @@ export default function InventoryPage() {
           </div>
           <SavedViews page="inventory" filters={{ q: search }} onApply={f => setSearch(f.q ?? "")} />
         </div>
+        <div className="flex justify-end px-4 pt-2"><UpdatedAt at={dataUpdatedAt} /></div>
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : visible.length === 0 ? (
           <EmptyState icon={<PackageSearch className="size-5" />} title={term ? "کالایی با این مشخصات نیست" : "هنوز کالایی ثبت نشده"}
             action={!term && <Button size="sm" onClick={() => setProductModal(true)}>تعریف اولین کالا</Button>} />
         ) : (
           <Table testId="products-table">
-            <thead><tr><th>کالا</th><th>SKU</th><th>گروه / مبدأ</th><th>موجودی</th><th>وزن</th><th>قیمت فروش (ریال)</th><th className="w-1" /></tr></thead>
+            <thead><tr><SortHeader label="کالا" column="name" sort={sort} onSort={setSort} /><SortHeader label="SKU" column="sku" sort={sort} onSort={setSort} /><th>گروه / مبدأ</th><SortHeader label="موجودی" column="stock" sort={sort} onSort={setSort} /><th>وزن</th><th>قیمت فروش (ریال)</th><th className="w-1" /></tr></thead>
             <tbody>
               {visible.map(p => (
                 <tr key={p.id} data-testid="product-row" data-sku={p.sku} data-focus={`product-${p.id}`} className={cn(flash === p.id && "focus-flash", !p.is_active && "opacity-60")}>

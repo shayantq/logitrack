@@ -11,7 +11,7 @@ import { usePartners } from "@/hooks/data";
 import { DISPOSITION_ACTIONS, STOCK_STATUS, type StockStatus } from "@/lib/labels";
 import { faDateTime, faNumber } from "@/lib/format";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 import { StatusBadge, WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type Balance = Schemas["StockBalanceOut"];
@@ -62,6 +62,7 @@ export default function DispositionsPage() {
       <Card>
         <CardHeader title="سوابق تعیین تکلیف" icon={<Recycle className="size-4" />} />
         {!history.data?.length ? <EmptyState title="هنوز تصمیمی ثبت نشده" /> : (
+          <>
           <Table testId="dispositions-table">
             <thead><tr><th>کد / سند</th><th>تصمیم</th><th>کالا</th><th>از وضعیت</th><th>مقدار</th><th>دلیل</th><th>کاربر</th><th>زمان</th></tr></thead>
             <tbody>{history.data.map(d => (
@@ -74,6 +75,8 @@ export default function DispositionsPage() {
               </tr>
             ))}</tbody>
           </Table>
+          <TruncationNotice count={history.data.length} limit={200} />
+          </>
         )}
       </Card>
       {target && <DisposeModal balance={target} onClose={() => setTarget(null)} />}

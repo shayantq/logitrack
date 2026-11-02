@@ -139,3 +139,10 @@ def test_fleet_manages_vehicles_and_schedules(env):
 def test_other_organization_is_isolated(env):
     assert env.client.get(f"/orders/{env.order['id']}", headers=_auth(env.outsider)).status_code == 404
     assert env.client.get(f"/vehicles/{env.vehicle.id}", headers=_auth(env.outsider)).status_code == 404
+
+
+def test_orders_sort_is_validated(env):
+    assert env.client.get("/orders/?sort=delivery_window_start&direction=asc", headers=_auth(env.admin)).status_code == 200
+    assert env.client.get("/orders/?sort=driver_earning", headers=_auth(env.admin)).status_code == 422
+    assert env.client.get("/exceptions/?sort=due_at", headers=_auth(env.admin)).status_code == 200
+    assert env.client.get("/exceptions/?sort=nope", headers=_auth(env.admin)).status_code == 422

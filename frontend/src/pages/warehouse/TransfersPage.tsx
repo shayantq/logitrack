@@ -16,7 +16,7 @@ import { TRANSFER_STATUS } from "@/lib/labels";
 import { faDateTime, faNumber } from "@/lib/format";
 import { confirmDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, Select, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 import { LocationSelect, useInvalidateOperations } from "./shared";
 
 type Transfer = Schemas["TransferOut"];
@@ -51,6 +51,7 @@ export default function TransfersPage() {
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : !transfers?.length ? (
           <EmptyState icon={<ArrowLeftRight className="size-5" />} title={status ? "انتقالی با این وضعیت نیست" : "هنوز سفارش انتقالی نیست"} />
         ) : (
+          <>
           <Table testId="transfers-table">
             <thead><tr><th>کد</th><th>وضعیت</th><th>از</th><th>به</th><th>اقلام</th><th>در راه</th><th>زمان</th></tr></thead>
             <tbody>
@@ -67,6 +68,8 @@ export default function TransfersPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={transfers.length} limit={200} />
+          </>
         )}
       </Card>
       {creating && <NewTransferModal onClose={() => setCreating(false)} onCreated={setOpenId} />}

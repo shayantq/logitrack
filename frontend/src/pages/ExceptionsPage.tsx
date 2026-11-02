@@ -13,7 +13,8 @@ import { useUsers } from "@/hooks/data";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Skeleton, Textarea } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Skeleton, Textarea, TruncationNotice } from "@/ui/primitives";
+import { UpdatedAt } from "@/components/UpdatedAt";
 
 type Item = Schemas["ExceptionOut"];
 type Update = Schemas["ExceptionUpdate"];
@@ -43,10 +44,11 @@ export default function ExceptionsPage() {
     if (key === "severity") next.delete("urgent");
     setParams(next, { replace: true });
   };
-  const { data, error, refetch, isLoading } = useQuery({
-    queryKey: ["exceptions", status, team, severity, urgent],
+  const sort = (params.get("sort") ?? "severity") as "severity" | "opened_at" | "due_at";
+  const { data, error, refetch, isLoading, dataUpdatedAt } = useQuery({
+    queryKey: ["exceptions", status, team, severity, urgent, sort],
     queryFn: () => unwrap(api.GET("/exceptions/", { params: { query: {
-      status, urgent, team: (team || null) as Item["team"] | null, severity: (severity || null) as Item["severity"] | null,
+      status, urgent, sort, team: (team || null) as Item["team"] | null, severity: (severity || null) as Item["severity"] | null,
     } } })),
   });
   const refresh = () => { queryClient.invalidateQueries({ queryKey: ["exceptions"] }); queryClient.invalidateQueries({ queryKey: ["action-center"] }); };
@@ -61,7 +63,13 @@ export default function ExceptionsPage() {
       <PageHeader eyebrow="عملیات" title="مرکز استثنا" subtitle="کارهایی که از روند عادی خارج شده‌اند؛ هر ۱۵ دقیقه خودکار بررسی می‌شوند."
         actions={<Button variant="secondary" icon={<RefreshCw className="size-4" />} loading={scan.isPending} onClick={() => scan.mutate()} data-testid="exceptions-scan">بررسی دوباره</Button>} />
       <AdjustmentApprovals />
+      <div className="mb-2 flex justify-end"><UpdatedAt at={dataUpdatedAt} /></div>
       <div className="mb-4 flex flex-wrap gap-2">
+        <Select value={sort} onChange={e => setFilter("sort", e.target.value)} className="w-44" aria-label="مرتب‌سازی" data-testid="exception-sort">
+          <option value="severity">مرتب‌سازی: شدت</option>
+          <option value="opened_at">مرتب‌سازی: تازه‌ترین</option>
+          <option value="due_at">مرتب‌سازی: نزدیک‌ترین مهلت</option>
+        </Select>
         <Select value={status} onChange={e => setFilter("status", e.target.value)} className="w-40" aria-label="وضعیت" data-testid="exceptions-status">
           {STATUS_OPTIONS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
@@ -77,6 +85,7 @@ export default function ExceptionsPage() {
       ) : (
         <div className="space-y-3">
           {data.map(item => <ExceptionCard key={item.id} item={item} onOpen={() => setOpen(item.id)} onChanged={refresh} />)}
+          <TruncationNotice count={data.length} limit={500} />
         </div>
       )}
       <ExceptionModal id={open} onClose={() => setOpen(null)} onChanged={refresh} />

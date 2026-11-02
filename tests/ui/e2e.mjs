@@ -2476,6 +2476,26 @@ await session("purchase-admin", "qazvin_admin", "admin123", async page => {
   check("purchase-admin", "comparison shows warehouses and groups", await page.locator("[data-testid=comparison-teams] tbody tr").count() === 4 && await page.locator("[data-testid=comparison-warehouses] tbody tr").count() > 0);
 });
 
+await session("list-states", "qazvin_admin", "admin123", async page => {
+  await page.goto(`${BASE}/app/orders`);
+  await page.waitForSelector("[data-testid=orders-table] tbody tr");
+  await page.click("[data-testid=sort-delivery_window_start]");
+  await page.waitForSelector("[aria-sort=ascending]");
+  check("list-states", "orders sort from the server", true);
+  await page.waitForSelector("[data-testid=updated-at]");
+  check("list-states", "orders show when data was received", true);
+  await page.goto(`${BASE}/app/inventory`);
+  await page.waitForSelector("[data-testid=products-table] tbody tr");
+  await page.click("[data-testid=sort-name]");
+  await page.waitForSelector("[aria-sort=ascending]");
+  const names = (await apiCall(adminToken, "GET", "/inventory/products")).map(p => p.name).sort((x, y) => x.localeCompare(y, "fa"));
+  const firstRow = await page.locator("[data-testid=products-table] tbody tr").first().textContent();
+  check("list-states", "products sort", firstRow.includes(names[0]), `${names[0]} / ${firstRow.slice(0, 60)}`);
+  await page.goto(`${BASE}/app/exceptions`);
+  await page.waitForSelector("[data-testid=exception-sort]");
+  check("list-states", "exceptions have sorting", true);
+});
+
 await session("public", null, null, async page => {
   await page.goto(`${BASE}/dashboard`);
   await page.waitForURL(/\/app\/login$/);

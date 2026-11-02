@@ -8,7 +8,7 @@ import { useMe } from "@/auth/AuthContext";
 import { CityPicker } from "@/components/CitySelect";
 import { useToast } from "@/components/Toast";
 import { useWarehouses } from "@/hooks/data";
-import { normalizeDigits } from "@/lib/format";
+import { faDate, normalizeDigits } from "@/lib/format";
 import { confirmDialog } from "@/ui/dialogs";
 import { Menu, MenuItem, MenuSeparator, Modal } from "@/ui/overlays";
 import { Badge, Button, Checkbox, Field, Input, Select, type Tone } from "@/ui/primitives";
@@ -46,7 +46,7 @@ export function timeAgo(value?: string | null): string {
   if (diff < 3600) return `${fa(diff / 60)} دقیقه پیش`;
   if (diff < 86400) return `${fa(diff / 3600)} ساعت پیش`;
   if (diff < 86400 * 30) return `${fa(diff / 86400)} روز پیش`;
-  return new Date(iso).toLocaleDateString("fa-IR");
+  return faDate(iso);
 }
 
 /** مرورگر و سیستم‌عامل از روی User-Agent — فقط برای نمایش */

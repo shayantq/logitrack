@@ -27,9 +27,10 @@ def _call(fn, *args, **kwargs):
 def list_exceptions(db: db_dependency, user: user_dependency,
                     status: Literal["active", "all", "open", "acknowledged", "in_progress", "waiting", "waiting_external", "resolved", "merged"] = Query("active"),
                     team: Optional[ExceptionTeam] = None, severity: Optional[ExceptionSeverity] = None, urgent: bool = False,
-                    owner_id: Optional[int] = Query(None, gt=0), kind: Optional[str] = Query(None, max_length=32)):
+                    owner_id: Optional[int] = Query(None, gt=0), kind: Optional[str] = Query(None, max_length=32),
+                    sort: Literal["severity", "opened_at", "due_at"] = "severity"):
     return _call(exception_service.list_exceptions, db, user, status=status, team=team, severity=severity, urgent=urgent,
-                 owner_id=owner_id, kind=kind)
+                 owner_id=owner_id, kind=kind, sort=sort)
 
 
 @router.get("/mine", response_model=list[DriverExceptionOut], summary="🚚 مشکل‌های باز سفارش‌های من (راننده)")

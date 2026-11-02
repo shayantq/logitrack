@@ -12,7 +12,7 @@ import { useVehicles } from "@/hooks/data";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { confirmDialog, promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Field, Input, Select, Textarea } from "@/ui/primitives";
+import { Badge, Button, Field, Input, Select, Textarea, ErrorState } from "@/ui/primitives";
 
 type Order = Schemas["OrderDetailResponse"];
 type Body = Schemas["ResolveFailureRequest"];
@@ -31,7 +31,7 @@ const tomorrowAt = (hour: number) => { const d = new Date(); d.setDate(d.getDate
 export function DeliveryAttempts({ order }: { order: Order }) {
   const [photo, setPhoto] = useState<string | null>(null);
   const toast = useToast();
-  const { data = [] } = useQuery({
+  const { data = [], error, refetch } = useQuery({
     queryKey: ["order-attempts", order.id, order.delivery_attempt_count, order.failure_resolution],
     queryFn: () => unwrap(api.GET("/orders/{order_id}/attempts", { params: { path: { order_id: order.id } } })),
     enabled: (order.delivery_attempt_count ?? 0) > 0,
@@ -41,6 +41,7 @@ export function DeliveryAttempts({ order }: { order: Order }) {
     if (res.ok) setPhoto(URL.createObjectURL(await res.blob()));
     else toast.error("عکس در دسترس نیست.");
   };
+  if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (!data.length) return null;
   return (
     <section data-testid="delivery-attempts">

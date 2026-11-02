@@ -8,12 +8,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ListChecks, Plus, ScanLine, X } from "lucide-react";
 import { api, errorMessage, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useToast } from "@/components/Toast";
+import { UpdatedAt } from "@/components/UpdatedAt";
 import { PICK_LIST_STATUS, PICK_STRATEGIES } from "@/lib/labels";
 import { faDate, faNumber } from "@/lib/format";
 import { DateField } from "@/ui/datetime";
 import { promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, cn } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, cn, TruncationNotice } from "@/ui/primitives";
 import { LocationSelect, WarehousePicker, scanKeyDown, useInvalidateOperations, useLocations, useWarehouseChoice } from "./shared";
 
 type Line = Schemas["PickLineOut"];
@@ -27,7 +28,7 @@ export default function PickingPage() {
   const [status, setStatus] = useState<"active" | "picked" | "canceled">("active");
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
-  const { data: lists, isLoading, error, refetch } = useQuery({
+  const { data: lists, isLoading, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["pick-lists", warehouseId, status],
     queryFn: () => unwrap(api.GET("/picking/lists", { params: { query: { warehouse_id: warehouseId, status } } })),
     enabled: !!warehouseId,
@@ -47,6 +48,7 @@ export default function PickingPage() {
       <Card>
         <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <div className="w-64"><WarehousePicker choice={choice} /></div>
+          <UpdatedAt at={dataUpdatedAt} className="ms-auto" />
           <SegmentedControl value={status} onChange={setStatus} options={[
             { value: "active", label: "باز" }, { value: "picked", label: "برداشت‌شده" }, { value: "canceled", label: "لغوشده" }]} />
         </div>
@@ -54,6 +56,7 @@ export default function PickingPage() {
           <EmptyState icon={<ListChecks className="size-5" />} title="فهرست برداشتی نیست"
             text="از سفارش‌های رزروشده یک فهرست برداشت بسازید." />
         ) : (
+          <>
           <Table testId="pick-lists-table">
             <thead><tr><th>کد</th><th>روش</th><th>وضعیت</th><th>سفارش‌ها</th><th>پیشرفت</th><th>آماده‌سازی</th><th className="w-1" /></tr></thead>
             <tbody>
@@ -74,6 +77,8 @@ export default function PickingPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={lists.length} limit={100} />
+          </>
         )}
       </Card>
       {creating && warehouseId && <NewPickListModal warehouseId={warehouseId} onClose={() => setCreating(false)} onCreated={setOpenId} />}

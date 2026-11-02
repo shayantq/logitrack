@@ -66,7 +66,7 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
 
   return (
     <div className="border-b border-border" data-testid="order-search">
-      <form className="grid gap-3 p-4 md:grid-cols-[1fr_180px_170px_auto_auto_auto]" onSubmit={(e: FormEvent) => { e.preventDefault(); apply(); }}>
+      <form className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[1fr_180px_170px_auto_auto_auto]" onSubmit={(e: FormEvent) => { e.preventDefault(); apply(); }}>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" />
           <Input className="pr-10" placeholder="جستجو در کد، مشتری، کالا، راننده، پلاک، شهر…" value={draft.q ?? ""} onChange={e => set("q", e.target.value)} data-testid="search-q" />

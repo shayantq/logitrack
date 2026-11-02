@@ -67,10 +67,13 @@ def get_all_orders(
         delivery_from: Optional[date] = Query(None, description='روز تحویل از (وقت ایران، شامل)'),
         delivery_to: Optional[date] = Query(None, description='روز تحویل تا (وقت ایران، شامل)'),
         priority: Optional[bool] = Query(None, description='فقط فوری‌ها'),
+        sort: Optional[Literal[tuple(order_service.ORDER_SORTS)]] = Query(None, description='ستون مرتب‌سازی'),
+        direction: Literal["asc", "desc"] = Query("desc"),
         view: Optional[Literal[tuple(order_service.ORDER_VIEWS)]] = Query(None, description='نمای نام‌دار (مثل دیرکرد)'),
     ):
     return order_service.list_orders(
         db, user, order_status, province, city, q, vehicle_id, date_from, date_to, skip, limit,
+        sort=sort, direction=direction,
         tracking_code=tracking_code, product=product, driver_id=driver_id, driver=driver, plate=plate,
         delivery_from=delivery_from, delivery_to=delivery_to, priority=priority, view=view,
     )

@@ -24,7 +24,7 @@ interface Stats {
 }
 
 function greeting() {
-  const h = new Date().getHours();
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tehran", hour: "numeric", hourCycle: "h23" }).format(new Date()));
   return h < 12 ? "صبح بخیر" : h < 17 ? "روز بخیر" : "عصر بخیر";
 }
 

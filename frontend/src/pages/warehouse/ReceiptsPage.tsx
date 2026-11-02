@@ -16,7 +16,7 @@ import { faDate, faDateTime, faNumber } from "@/lib/format";
 import { DateField } from "@/ui/datetime";
 import { promptDialog } from "@/ui/dialogs";
 import { Modal } from "@/ui/overlays";
-import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, Textarea } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Field, Input, PageHeader, SegmentedControl, Select, Table, TableSkeleton, Textarea, TruncationNotice } from "@/ui/primitives";
 import { InspectModal, LocationSelect, WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type Receipt = Schemas["ReceiptOut"];
@@ -79,6 +79,7 @@ export default function ReceiptsPage() {
           <EmptyState icon={<PackageOpen className="size-5" />} title="رسیدی با این فیلترها نیست"
             action={<Button size="sm" onClick={() => setCreating(true)}>ثبت اولین رسید</Button>} />
         ) : (
+          <>
           <Table testId="receipts-table">
             <thead><tr><th>کد رسید</th><th>نوع</th><th>وضعیت</th><th>انبار</th><th>طرف / بارنامه</th><th>مورد انتظار</th><th>دریافت‌شده</th><th>زمان</th></tr></thead>
             <tbody>
@@ -97,6 +98,8 @@ export default function ReceiptsPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={receipts.length} limit={50} />
+          </>
         )}
       </Card>
       {creating && <NewReceiptModal onClose={() => setCreating(false)} onCreated={id => { setCreating(false); setFilter("receipt", String(id)); }} />}

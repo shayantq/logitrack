@@ -1,5 +1,8 @@
 /** قالب‌بندی تاریخ، عدد و ارقام برای نمایش فارسی */
 
+/** زمان نمایش همیشه ساعت ایران و تقویم شمسی است؛ دیتابیس و API همان UTC می‌مانند. */
+const IRAN = "Asia/Tehran";
+
 /** تاریخ‌های سرور به UTC هستند؛ اگر منطقه زمانی نداشته باشند، Z اضافه می‌شود. */
 function toDate(value?: string | null): Date | null {
   if (!value) return null;
@@ -10,17 +13,17 @@ function toDate(value?: string | null): Date | null {
 
 export function faDate(value?: string | null): string {
   const d = toDate(value);
-  return d ? d.toLocaleDateString("fa-IR") : "—";
+  return d ? d.toLocaleDateString("fa-IR", { timeZone: IRAN }) : "—";
 }
 
 export function faDateTime(value?: string | null): string {
   const d = toDate(value);
-  return d ? d.toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" }) : "—";
+  return d ? d.toLocaleString("fa-IR", { timeZone: IRAN, dateStyle: "short", timeStyle: "short" }) : "—";
 }
 
 export function faShortDateTime(value?: string | null): string {
   const d = toDate(value);
-  return d ? d.toLocaleString("fa-IR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  return d ? d.toLocaleString("fa-IR", { timeZone: IRAN, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 }
 
 export function faNumber(value?: number | null): string {

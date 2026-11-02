@@ -1,4 +1,5 @@
 /** مودال، منوی کشویی و راهنمای کوچک — بر پایه Radix (دسترس‌پذیر، کیبورد، فوکوس) */
+import { cloneElement, isValidElement } from "react";
 import type { ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
@@ -72,7 +73,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
   return (
     <RadixTooltip.Provider delayDuration={250}>
       <RadixTooltip.Root>
-        <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
+        <RadixTooltip.Trigger asChild>{typeof content === "string" && isValidElement<{ "aria-label"?: string }>(children) && !children.props["aria-label"] ? cloneElement(children, { "aria-label": content }) : children}</RadixTooltip.Trigger>
         <RadixTooltip.Portal>
           <RadixTooltip.Content sideOffset={6} className="z-50 rounded-lg bg-text px-2.5 py-1.5 text-xs text-bg shadow-float">
             {content}

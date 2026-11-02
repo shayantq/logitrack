@@ -10,7 +10,7 @@ import { useToast } from "@/components/Toast";
 import { BACKORDER_STATUS } from "@/lib/labels";
 import { faDateTime, faNumber, localToIso, tomorrowIsoDate } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
-import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, SegmentedControl, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, SegmentedControl, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 import { useInvalidateOperations } from "./shared";
 
 export default function BackordersPage() {
@@ -53,6 +53,7 @@ export default function BackordersPage() {
         {isLoading ? <TableSkeleton /> : error ? <ErrorState error={error} onRetry={refetch} /> : !rows?.length ? (
           <EmptyState icon={<Hourglass className="size-5" />} title="سفارش معوقی نیست" />
         ) : (
+          <>
           <Table testId="backorders-table">
             <thead><tr><th>اولویت</th><th>سفارش</th><th>کالا</th><th>مقدار</th><th>وضعیت</th><th>سررسید</th><th className="w-1" /></tr></thead>
             <tbody>
@@ -77,6 +78,8 @@ export default function BackordersPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={rows.length} limit={500} />
+          </>
         )}
       </Card>
     </>

@@ -10,7 +10,7 @@ import { useToast } from "@/components/Toast";
 import { useVehicles } from "@/hooks/data";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { promptDialog } from "@/ui/dialogs";
-import { Badge, Button, Field, Input, Select } from "@/ui/primitives";
+import { Badge, Button, Field, Input, Select, ErrorState } from "@/ui/primitives";
 import { LocationSelect } from "@/pages/warehouse/shared";
 
 type Order = Schemas["OrderDetailResponse"];
@@ -71,10 +71,11 @@ function ReturnCard({ orderId, warehouseId, row }: { orderId: number; warehouseI
 }
 
 export function DriverReturns({ order }: { order: Order }) {
-  const { data = [] } = useQuery({
+  const { data = [], error, refetch } = useQuery({
     queryKey: ["driver-returns", order.id, order.stock_state, order.delivery_attempt_count],
     queryFn: () => unwrap(api.GET("/orders/{order_id}/driver-returns", { params: { path: { order_id: order.id } } })),
   });
+  if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (!data.length) return null;
   return (
     <section className="space-y-2" data-testid="driver-returns">
@@ -87,7 +88,7 @@ export function DriverReturns({ order }: { order: Order }) {
 export function CustomerRequests({ order }: { order: Order }) {
   const toast = useToast();
   const refresh = useRefresh(order.id, ["customer-requests"]);
-  const { data = [] } = useQuery({
+  const { data = [], error, refetch } = useQuery({
     queryKey: ["customer-requests", order.id, order.status],
     queryFn: () => unwrap(api.GET("/orders/{order_id}/customer-requests", { params: { path: { order_id: order.id } } })),
   });
@@ -101,6 +102,7 @@ export function CustomerRequests({ order }: { order: Order }) {
     const note = await promptDialog({ title: approve ? "تأیید درخواست" : "رد درخواست", label: "پاسخ به مشتری", required: !approve, multiline: true, confirmLabel: approve ? "تأیید" : "رد" });
     if (note !== null) decide.mutate({ id, approve, note: note || null });
   };
+  if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (!data.length) return null;
   return (
     <section className="space-y-2" data-testid="customer-requests">
@@ -131,10 +133,11 @@ export function CustomerRequests({ order }: { order: Order }) {
 }
 
 export function ContactLog({ order }: { order: Order }) {
-  const { data = [] } = useQuery({
+  const { data = [], error, refetch } = useQuery({
     queryKey: ["order-contacts", order.id, order.status],
     queryFn: () => unwrap(api.GET("/orders/{order_id}/contacts", { params: { path: { order_id: order.id } } })),
   });
+  if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (!data.length) return null;
   return (
     <section data-testid="contact-log">
@@ -153,7 +156,7 @@ export function HandoverPanel({ order }: { order: Order }) {
   const [vehicle, setVehicle] = useState("");
   const moving = order.status === "picked_up" || order.status === "in_transit";
   const { data: vehicles = [] } = useVehicles(moving);
-  const { data = [] } = useQuery({
+  const { data = [], error, refetch } = useQuery({
     queryKey: ["order-handovers", order.id, order.vehicle_id],
     queryFn: () => unwrap(api.GET("/orders/{order_id}/handovers", { params: { path: { order_id: order.id } } })),
   });
@@ -164,6 +167,7 @@ export function HandoverPanel({ order }: { order: Order }) {
   });
   const waiting = data.some(h => h.status === "requested");
   const canStart = me.role === "org_admin" && moving && !waiting;
+  if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (!canStart && !data.length) return null;
   return (
     <section className="space-y-2" data-testid="handover-panel">

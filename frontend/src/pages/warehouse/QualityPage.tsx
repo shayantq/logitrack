@@ -8,7 +8,7 @@ import { ClipboardCheck, ShieldCheck } from "lucide-react";
 import { api, unwrap, type Schemas } from "@/api/client";
 import { STOCK_STATUS, type StockStatus } from "@/lib/labels";
 import { faDate, faDateTime, faNumber } from "@/lib/format";
-import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, SegmentedControl, Table, TableSkeleton } from "@/ui/primitives";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorState, PageHeader, SegmentedControl, Table, TableSkeleton, TruncationNotice } from "@/ui/primitives";
 import { InspectModal, StatusBadge, WarehousePicker, useWarehouseChoice } from "./shared";
 
 type Balance = Schemas["StockBalanceOut"];
@@ -66,6 +66,7 @@ export default function QualityPage() {
       <Card>
         <CardHeader title="سوابق بازرسی" subtitle="هر بازرسی یک سند «بازرسی کیفی» (QI) با بازرس، زمان و نتیجه‌ها دارد." icon={<ClipboardCheck className="size-4" />} />
         {!inspections.length ? <EmptyState title="هنوز بازرسی ثبت نشده" /> : (
+          <>
           <Table testId="inspections-table">
             <thead><tr><th>کد</th><th>کالا</th><th>از وضعیت</th><th>نتیجه</th><th>محل / بچ</th><th>بازرس</th><th>زمان</th></tr></thead>
             <tbody>
@@ -84,6 +85,8 @@ export default function QualityPage() {
               ))}
             </tbody>
           </Table>
+          <TruncationNotice count={inspections.length} limit={100} />
+          </>
         )}
       </Card>
       <InspectModal onClose={() => setTarget(null)} target={target && {

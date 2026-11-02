@@ -476,17 +476,27 @@ def _orders_query(db: Session, user: User, order_status: str | None = None, prov
     return query
 
 
+ORDER_SORTS = {"tracking_code": Order.tracking_code, "delivery_window_start": Order.delivery_window_start, "status": Order.status, "destination_city": Order.destination_city}
+
+
+def _order_sort(sort: str | None, direction: str) -> tuple:
+    column = ORDER_SORTS.get(sort)
+    if column is None:
+        return (Order.id.desc(),)
+    return (column.asc() if direction == "asc" else column.desc(), Order.id.desc())
+
+
 def list_orders(db: Session, user: User, order_status: str | None = None, province: str | None = None,
                 city: str | None = None, q: str | None = None, vehicle_id: int | None = None,
                 date_from: datetime | None = None, date_to: datetime | None = None,
-                skip: int = 0, limit: int = 100, **filters) -> list[Order]:
+                skip: int = 0, limit: int = 100, sort: str | None = None, direction: str = "desc", **filters) -> list[Order]:
     """
     جستجوی پیشرفته (مرحله ۹). همه فیلترها با AND ترکیب می‌شوند؛ q یک جستجوی سراسری است که
     کد سفارش، مشتری/تحویل‌گیرنده، کالا، راننده و پلاک را با OR می‌گردد.
     delivery_from/delivery_to: روز تحویل به وقت ایران (هر دو شامل). view: یکی از ORDER_VIEWS.
     """
     query = _orders_query(db, user, order_status, province, city, q, vehicle_id, date_from, date_to, **filters)
-    return query.options(selectinload(Order.items), joinedload(Order.customer))         .order_by(Order.id.desc()).offset(skip).limit(limit).all()
+    return query.options(selectinload(Order.items), joinedload(Order.customer))         .order_by(*_order_sort(sort, direction)).offset(skip).limit(limit).all()
 
 
 def count_orders(db: Session, user: User, **filters) -> int:

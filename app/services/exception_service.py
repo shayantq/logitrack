@@ -420,7 +420,7 @@ def _people(db: Session, ids) -> dict[int, str]:
 
 
 def list_exceptions(db: Session, user: User, *, status: str = "active", team: str | None = None, severity: str | None = None,
-                    urgent: bool = False, owner_id: int | None = None, kind: str | None = None) -> list[dict]:
+                    urgent: bool = False, owner_id: int | None = None, kind: str | None = None, sort: str = "severity") -> list[dict]:
     _ensure_staff(user)
     query = _scoped(db.query(OperationException), user)
     if status == "active":
@@ -441,7 +441,10 @@ def list_exceptions(db: Session, user: User, *, status: str = "active", team: st
     names = _people(db, [i.owner_id for i in items])
     suggest = assignee_service.exception_suggester(db)
     rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    items.sort(key=lambda i: (i.status not in ACTIVE_EXCEPTION_STATUSES, rank.get(i.severity, 9)))
+    if sort == "due_at":
+        items.sort(key=lambda i: (i.due_at is None, i.due_at or i.opened_at))
+    elif sort != "opened_at":
+        items.sort(key=lambda i: (i.status not in ACTIVE_EXCEPTION_STATUSES, rank.get(i.severity, 9)))
     return [_serialize(db, i, names, suggest) for i in items]
 
 
