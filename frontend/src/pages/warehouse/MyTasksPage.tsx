@@ -1,6 +1,7 @@
 /**
  * صف کار انبار برای گوشی: کار بعدی، محل، کالا و تعداد، و اجرای قدم‌به‌قدم با اسکن.
  * هر قدم یک ورودی بزرگ دارد و Enter بارکدخوان به قدم بعد می‌رود. درستی اسکن‌ها را همان سرویس برداشت و جانمایی می‌سنجد.
+ * بچ، انقضا و سریال کالای ردیابی‌شده را همان check_tracking سرویس دریافت می‌سنجد؛ این صفحه فقط آن‌ها را می‌گیرد.
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -11,8 +12,9 @@ import { api, errorMessage, newIdempotencyKey, unwrap, type Schemas } from "@/ap
 import { useToast } from "@/components/Toast";
 import { UpdatedAt } from "@/components/UpdatedAt";
 import { faNumber } from "@/lib/format";
+import { DateField } from "@/ui/datetime";
 import { promptDialog } from "@/ui/dialogs";
-import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Skeleton } from "@/ui/primitives";
+import { Badge, Button, Card, EmptyState, ErrorState, Input, PageHeader, Select, Skeleton, Textarea } from "@/ui/primitives";
 import { WarehousePicker, useInvalidateOperations, useWarehouseChoice } from "./shared";
 
 type Task =
@@ -28,15 +30,23 @@ const productOf = (t: Task) => t.kind === "receive"
   : { name: t.task.product_name, code: t.task.product_barcode ?? t.task.product_sku, lot: t.task.lot_number };
 const sourceOf = (t: Task) => t.kind === "receive" ? t.receipt.receiving_location_code ?? "محل تخلیه" : t.kind === "pick" ? t.line.location_code ?? t.warehouseCode : t.task.source_location_code ?? t.task.warehouse_code ?? "";
 
-type StepKey = "source" | "product" | "lot" | "destination" | "quantity" | "reason";
+type StepKey = "source" | "product" | "lot" | "expiry" | "destination" | "quantity" | "serials" | "reason";
 interface Step { key: StepKey; title: string; expect: string }
+
+const serialsOf = (text: string) => text.split(/[\s,،]+/).map(s => s.trim()).filter(Boolean);
+const trackingOf = (line: Schemas["ReceiptLineOut"]) => [line.lot_tracked && "بچ‌دار", line.expiry_tracked && "تاریخ انقضا", line.serial_tracked && "سریالی"].filter(Boolean) as string[];
 
 function stepsOf(t: Task, manual: boolean): Step[] {
   const product = productOf(t);
   if (t.kind === "receive") {
+    const line = t.line;
     return [
       manual ? { key: "reason" as const, title: "دلیل ورود دستی را انتخاب کنید", expect: "" } : { key: "product" as const, title: "کالا را اسکن کنید", expect: product.code },
+      // بچی که روی سطر رسید ثبت شده همان به کار می‌رود
+      ...(line.lot_tracked && !line.lot_number ? [{ key: "lot" as const, title: "شماره بچ روی بسته را اسکن کنید", expect: "" }] : []),
+      ...(line.expiry_tracked ? [{ key: "expiry" as const, title: "تاریخ انقضای روی بسته را انتخاب کنید", expect: "" }] : []),
       { key: "quantity" as const, title: "تعداد شمارش‌شده", expect: `مانده ${faNumber(remaining(t))}` },
+      ...(line.serial_tracked ? [{ key: "serials" as const, title: "سریال هر واحد را اسکن کنید", expect: "" }] : []),
     ];
   }
   return [
@@ -65,9 +75,8 @@ export default function MyTasksPage() {
     queryFn: () => unwrap(api.GET("/inbound/receipts", { params: { query: { warehouse_id: warehouseId, with_lines: true } } })),
   });
   const tasks = useMemo<Task[]>(() => [
-    // کالای بچ‌دار یا سریالی ورودی بیشتری دارد و در صفحه رسید ثبت می‌شود
     ...(receipts.data ?? []).filter(r => r.status === "open" || r.status === "receiving").flatMap(receipt => receipt.lines
-      .filter(line => line.outstanding > 0 && !line.lot_tracked && !line.expiry_tracked && !line.serial_tracked)
+      .filter(line => line.outstanding > 0)
       .map(line => ({ kind: "receive" as const, id: `receive-${line.id}`, receipt, line }))),
     ...[...(picks.data ?? [])].reverse().flatMap(list => list.lines.filter(l => l.status === "open").map(line => (
       { kind: "pick" as const, id: `pick-${line.id}`, line, listCode: list.code, warehouseCode: list.warehouse_code ?? "" }))),
@@ -134,6 +143,9 @@ function TaskCard({ task, primary, holder, busy, onStart }: { task: Task; primar
       <div className="mt-3 flex items-center gap-2 text-lg font-black"><MapPin className="size-5 shrink-0 text-brand" /><span className="font-mono ltr">{sourceOf(task) || "—"}</span></div>
       <div className="mt-2 flex items-center gap-2"><Package className="size-5 shrink-0 text-muted" /><span className="font-semibold">{product.name}</span></div>
       <div className="mt-1 text-sm text-muted">تعداد: <span className="font-bold text-text tnum">{faNumber(remaining(task))}</span></div>
+      {task.kind === "receive" && trackingOf(task.line).length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1" data-testid="task-tracking">{trackingOf(task.line).map(t => <Badge key={t} tone="warning">{t}</Badge>)}</div>
+      )}
       <Button className="mt-4 h-12 w-full" variant={primary ? "primary" : "secondary"} icon={<ScanLine className="size-5" />} loading={busy} disabled={!!holder} onClick={onStart} data-testid="task-start">{holder ? `در دست ${holder}` : "شروع"}</Button>
     </Card>
   );
@@ -145,7 +157,7 @@ function TaskRun({ task, onDone, onBack }: { task: Task; onDone: () => void; onB
   const [manual, setManual] = useState(false);
   const steps = useMemo(() => stepsOf(task, manual), [task, manual]);
   const [index, setIndex] = useState(0);
-  const [values, setValues] = useState<Record<StepKey, string>>({ source: "", product: "", lot: "", destination: "", reason: "", quantity: String(remaining(task)) });
+  const [values, setValues] = useState<Record<StepKey, string>>({ source: "", product: "", lot: "", expiry: "", destination: "", reason: "", serials: "", quantity: String(remaining(task)) });
   const [reasonNote, setReasonNote] = useState("");
   const [key, setKey] = useState(newIdempotencyKey);
   const input = useRef<HTMLInputElement>(null);
@@ -158,7 +170,8 @@ function TaskRun({ task, onDone, onBack }: { task: Task; onDone: () => void; onB
     mutationFn: async () => { await (task.kind === "receive"
       ? unwrap(api.POST("/inbound/receipts/{receipt_id}/receive", {
         params: { path: { receipt_id: task.receipt.id }, header: { "Idempotency-Key": key } },
-        body: { lines: [{ line_id: task.line.id, quantity: Number(values.quantity), serial_numbers: [], condition: "good", entry_mode: manual ? "manual" : "scan",
+        body: { lines: [{ line_id: task.line.id, quantity: Number(values.quantity), condition: "good", entry_mode: manual ? "manual" : "scan",
+          lot_number: values.lot.trim() || null, expiry_date: values.expiry || null, serial_numbers: serialsOf(values.serials),
           product_scan: manual ? null : values.product, manual_reason: manual ? values.reason as "no_barcode" : null, manual_note: manual && values.reason === "other" ? reasonNote : null }] } }))
       : task.kind === "pick"
       ? unwrap(api.POST("/picking/lines/{line_id}/pick", {
@@ -180,6 +193,10 @@ function TaskRun({ task, onDone, onBack }: { task: Task; onDone: () => void; onB
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!values[step.key].trim()) return;
+    if (step.key === "serials" && serialsOf(values.serials).length !== Number(values.quantity)) {
+      toast.error(`برای ${faNumber(Number(values.quantity))} واحد دقیقاً همین تعداد سریال لازم است.`);
+      return;
+    }
     if (last) run.mutate();
     else setIndex(i => i + 1);
   };
@@ -207,6 +224,16 @@ function TaskRun({ task, onDone, onBack }: { task: Task; onDone: () => void; onB
               <option value="other">سایر</option>
             </Select>
             {values.reason === "other" && <Input required minLength={3} maxLength={300} placeholder="توضیح" value={reasonNote} onChange={e => setReasonNote(e.target.value)} data-testid="task-reason-note" />}
+          </div>
+        ) : step.key === "expiry" ? (
+          <DateField required className="mt-4" value={values.expiry} onChange={v => setValues(s => ({ ...s, expiry: v }))} testId="task-expiry" aria-label="تاریخ انقضا" />
+        ) : step.key === "serials" ? (
+          <div className="mt-4 space-y-2">
+            {/* Enter بارکدخوان در این کادر خط تازه می‌سازد، پس هر اسکن یک سریال است */}
+            <Textarea autoFocus required rows={5} className="ltr font-mono" value={values.serials} onChange={e => setValues(s => ({ ...s, serials: e.target.value }))} data-testid="task-serials" />
+            <p className={`text-sm tnum ${serialsOf(values.serials).length === Number(values.quantity) ? "text-muted" : "text-warning"}`} data-testid="task-serial-count">
+              {faNumber(serialsOf(values.serials).length)} از {faNumber(Number(values.quantity))} سریال؛ هر سریال در یک خط
+            </p>
           </div>
         ) : (
           <Input id="task-input" ref={input} className="mt-4 h-14 text-lg ltr font-mono" autoComplete="off" required

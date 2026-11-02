@@ -2120,6 +2120,10 @@ const operatorOrder = await apiCall(adminToken, "POST", "/orders/", {
 const operatorList = await apiCall(opsToken, "POST", "/picking/lists", { warehouse_id: opsWarehouse, strategy: "single", order_ids: [operatorOrder.id],
   staging_location_id: (await apiCall(opsToken, "GET", `/warehouses/${opsWarehouse}/locations`)).find(l => l.code === stgCode).id });
 const operatorReceipt = await apiCall(opsToken, "POST", "/inbound/receipts", { receipt_type: "return", warehouse_id: opsWarehouse, lines: [{ product_id: (await apiCall(adminToken, "POST", "/inventory/products", { name: "کالای دریافت اپراتور", sku: `RCV-${runId}`, price: 1000, weight_kg: 1 })).product.id, expected_quantity: 1 }] });
+// کالای بچ‌دار و سریالی هم در صف اپراتور است و همان قاعده‌های سرور دریافت را دارد
+const trackedSku = `TRK-${runId}`;
+const trackedProduct = (await apiCall(adminToken, "POST", "/inventory/products", { name: "کالای سریالی اپراتور", sku: trackedSku, price: 1000, weight_kg: 1, lot_tracked: true, serial_tracked: true })).product;
+const trackedReceipt = await apiCall(opsToken, "POST", "/inbound/receipts", { receipt_type: "return", warehouse_id: opsWarehouse, lines: [{ product_id: trackedProduct.id, expected_quantity: 2 }] });
 await apiCall(adminToken, "POST", "/auth/", { username: operatorName, email: `${operatorName}@example.com`, password: "Operator2026", full_name: "اپراتور آزمون", role: "warehouse_operator", warehouse_id: opsWarehouse });
 await session("operator", operatorName, "Operator2026", async page => {
   await page.waitForSelector("[data-testid=my-tasks-page]");
@@ -2151,6 +2155,28 @@ await session("operator", operatorName, "Operator2026", async page => {
   await page.waitForSelector("[data-testid=task-run]", { state: "detached", timeout: 10000 });
   const entries = (await apiCall(opsToken, "GET", `/inbound/receipts/${operatorReceipt.id}`)).entries;
   check("operator", "manual receiving records the reason", entries.length === 1 && entries[0].reason_code === "label_damaged" && entries[0].created_by_name === "اپراتور آزمون", JSON.stringify(entries));
+
+  const trackedCard = page.locator("[data-kind=receive]", { hasText: trackedReceipt.code }).first();
+  const badges = await trackedCard.locator("[data-testid=task-tracking]").textContent();
+  check("operator", "tracked goods stay in the queue with their tracking", badges.includes("بچ‌دار") && badges.includes("سریالی"), badges);
+  await trackedCard.locator("[data-testid=task-start]").click();
+  await page.waitForSelector("[data-testid=task-run]");
+  await page.fill("[data-testid=task-input]", trackedSku);
+  await page.click("[data-testid=task-submit]");
+  await page.fill("[data-testid=task-input]", `LOT-${runId}`);
+  await page.click("[data-testid=task-submit]");
+  await page.fill("[data-testid=task-input]", "2");
+  await page.click("[data-testid=task-submit]");
+  await page.fill("[data-testid=task-serials]", `SN-${runId}-1`);
+  await page.click("[data-testid=task-submit]");
+  const serialToast = await page.waitForSelector("[data-testid=toast]:has-text('سریال لازم است')", { timeout: 10000 }).then(() => true, () => false);
+  const shortSerials = serialToast && await page.locator("[data-testid=task-run]").count() === 1;
+  check("operator", "too few serials are stopped before sending", shortSerials);
+  await page.fill("[data-testid=task-serials]", `SN-${runId}-1\nSN-${runId}-2`);
+  await page.click("[data-testid=task-submit]");
+  await page.waitForSelector("[data-testid=task-run]", { state: "detached", timeout: 10000 });
+  const tracked = await apiCall(opsToken, "GET", `/inbound/receipts/${trackedReceipt.id}`);
+  check("operator", "tracked goods are received with lot and serials", tracked.lines[0].outstanding === 0 && tracked.entries.length === 1, JSON.stringify(tracked.lines[0]));
 }, { viewport: { width: 390, height: 844 } });
 
 // ---------------- مرحله B و C: تحویل ناموفق، مدرک، ظرفیت، استثنا ----------------
