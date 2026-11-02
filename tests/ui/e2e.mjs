@@ -2251,7 +2251,11 @@ await session("reliability-admin", "qazvin_admin", "admin123", async page => {
 
   await page.goto(`${BASE}/app/exceptions`);
   await page.waitForSelector("[data-testid=exceptions-scan]");
+  // پیش از اسکن فهرست قدیمی (گاهی خالی) نشان داده می‌شود؛ تا پاسخ اسکن و کارت‌های تازه صبر می‌شود
+  const scanned = page.waitForResponse(r => r.url().includes("/exceptions/scan") && r.request().method() === "POST");
   await page.click("[data-testid=exceptions-scan]");
+  await scanned;
+  await page.locator("[data-testid=exception-card]").first().waitFor({ timeout: 8000 }).catch(() => {});
   await page.locator("[data-testid=exception-card]").or(page.getByText("استثنایی نیست")).first().waitFor();
   check("reliability", "exception center opens and scans", true);
   const firstCard = page.locator("[data-testid=exception-card]").first();
