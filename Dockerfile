@@ -21,6 +21,11 @@ COPY requirements.txt .
 # pip بعد از نصب حذف می‌شود: در اجرا لازم نیست و کتابخانه‌های قدیمیِ داخلش (msgpack، urllib3، setuptools) در اسکن امنیتی image آسیب‌پذیر شناخته می‌شوند
 RUN pip install -r requirements.txt && pip uninstall -y pip
 
+# DSA-6613-1: نسخه پایه ممکن است هنوز zlib آسیب‌پذیر داشته باشد؛ اصلاح رسمی Debian را اعمال کن.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
 # اجرای برنامه با کاربر غیر root
 # پوشه media (لوگوها و فایل‌های آپلودی) از قبل با مالکیت app ساخته می‌شود تا volume داکر همین مالکیت را بگیرد
 RUN useradd --create-home --uid 1000 app && mkdir -p /code/media && chown app:app /code/media
