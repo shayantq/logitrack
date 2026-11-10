@@ -141,10 +141,12 @@ try {
   // ۴۵۱ ردیف شبیه‌سازی می‌شوند تا مرزهای ۲۰۰ و ۳۰۰ واقعاً بررسی شوند.
   const sample = (await (await fetch(`${BASE}/orders/?limit=1`, { headers: { Authorization: `Bearer ${token}` } })).json())[0];
   let failRefresh = 0, delayNext = false, unlock;
+  let requestBlocked;
+  const blockedRequest = new Promise(resolve => { requestBlocked = resolve; });
   const calls = [];
   await page.route("**/orders/page?*", async route => {
     const url = new URL(route.request().url()); calls.push(url.searchParams);
-    if (delayNext) { delayNext = false; await new Promise(resolve => { unlock = resolve; }); }
+    if (delayNext) { delayNext = false; await new Promise(resolve => { unlock = resolve; requestBlocked(); }); }
     if (failRefresh) return route.fulfill({ status: failRefresh, json: { detail: failRefresh === 403 ? "مجوز آزمایشی لغو شد" : "قطع آزمایشی سفارش‌ها" } });
     const skip = Number(url.searchParams.get("skip") || 0), limit = Number(url.searchParams.get("limit") || 50);
     const items = Array.from({ length: Math.max(0, Math.min(limit, 451 - skip)) }, (_, i) => ({ ...sample, id: 10000 + skip + i, tracking_code: `LT-UX${String(skip + i).padStart(6, "0")}` }));
@@ -161,7 +163,7 @@ try {
   await page.waitForURL(/page=2/);
   await page.waitForFunction(() => document.querySelector("[data-testid=orders-select-all]")?.disabled);
   assert.equal(await page.locator("[data-testid=orders-bulk-bar]").count(), 0);
-  unlock(); await waitTable(page);
+  await blockedRequest; unlock(); await waitTable(page);
   assert((await page.locator("[data-testid=orders-table]").textContent()).includes("LT-UX000200"));
   await page.getByRole("button", { name: "صفحه بعد", exact: true }).click(); await waitTable(page);
   assert.equal(await page.locator("[data-testid=order-select]").count(), 51);
