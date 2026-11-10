@@ -14,7 +14,7 @@ _OPERATOR = (
     r"GET /inbound/receipts(/\d+)?", r"POST /inbound/receipts/\d+/receive",
 )
 _FLEET = (
-    r"GET /orders(/\d+)?", r"PUT /orders/\d+/(assign|status)", r"POST /orders/\d+/resolve-failure", r"GET /orders/\d+/attempts",
+    r"GET /orders(/page|/\d+)?", r"PUT /orders/\d+/(assign|status)", r"POST /orders/\d+/resolve-failure", r"GET /orders/\d+/attempts",
     r"GET /orders/\d+/attempts/\d+/photo", r"GET /orders/\d+/attempts/\d+/evidence(/\d+/file)?", r"(GET|POST) /orders/\d+/contacts", r"GET /orders/\d+/handovers",
     r"GET /orders/\d+/route", r"POST /orders/\d+/checkpoints", r"DELETE /orders/\d+/checkpoints/last", r"GET /map/orders", r"GET /geo/.+",
     r"POST /dispatch/suggest", r"GET /dispatch/orders/\d+/suggestions", r"GET /dispatch/schedules", r"PUT /dispatch/schedules/\d+",

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowLeft, ArrowUp, CheckCircle2, Circle, Coins, Gauge, Rocket, TimerOff } from "lucide-react";
 import { api, unwrap, type Schemas } from "@/api/client";
 import { UpdatedAt } from "@/components/UpdatedAt";
+import { QueryFeedback } from "@/components/QueryFeedback";
 import { faNumber } from "@/lib/format";
 import { faMoneyShort } from "@/pages/reports/period";
 import { Badge, Card, CardHeader, EmptyState, ErrorState, Skeleton, cn } from "@/ui/primitives";
@@ -54,25 +55,16 @@ function Trend({ kpi }: { kpi: Schemas["HomeKpi"] }) {
 
 export function BusinessHome() {
   const q = useQuery({ queryKey: ["home-business"], queryFn: () => unwrap(api.GET("/home/business")), refetchInterval: 60_000 });
-  if (q.error) return <ErrorState error={q.error} onRetry={q.refetch} />;
+  if (q.error && (!q.data || (q.error as { status?: number }).status === 403)) return <ErrorState error={q.error} onRetry={q.refetch} />;
   if (!q.data) return <Skeleton className="mb-6 h-64 rounded-2xl" />;
-  const { kpis, delays, exceptions, stock, money, setup, generated_at: at } = q.data;
-  const urgent = exceptions.critical + exceptions.high;
-  const problems = delays.late + delays.at_risk;
+  const { kpis, delays, money, setup, generated_at: at } = q.data;
   return (
-    <div data-testid="business-home">
+    <div data-testid="business-home" aria-busy={q.isFetching}>
+      <QueryFeedback error={q.error} retry={q.refetch} updatedAt={q.dataUpdatedAt} />
       <SetupChecklist steps={setup} />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-bold">سلامت کسب‌وکار</h2>
+        <h2 className="text-base font-bold">عملکرد و مالی — ۳۰ روز اخیر</h2>
         <UpdatedAt at={`${at}Z`} label="محاسبه" />
-      </div>
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="business-summary">
-        <SummaryLink to="/app/orders?view=late" testId="biz-late" label="سفارش دیرکرده یا در خطر" value={problems} tone={problems ? "danger" : "success"}
-          text={`${faNumber(delays.late)} دیرکرده، ${faNumber(delays.at_risk)} در خطر`} />
-        <SummaryLink to={stock.link} testId="biz-stock" label="کالای رو به اتمام" value={stock.low + stock.out} tone={stock.out ? "danger" : stock.low ? "warning" : "success"}
-          text={`${faNumber(stock.out)} تمام‌شده، ${faNumber(stock.low)} زیر نقطه سفارش`} />
-        <SummaryLink to={exceptions.link} testId="biz-exceptions" label="استثنای مهم باز" value={urgent} tone={exceptions.critical ? "danger" : urgent ? "warning" : "success"}
-          text={`${faNumber(exceptions.critical)} بحرانی، ${faNumber(exceptions.high)} زیاد`} />
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
@@ -135,18 +127,4 @@ export function BusinessHome() {
 
 function Money({ label, value }: { label: string; value: number }) {
   return <div><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 text-lg font-black tnum" title={`${faNumber(value)} ریال`}>{faMoneyShort(value)}</dd></div>;
-}
-
-function SummaryLink({ to, label, value, text, tone, testId }: {
-  to: string; label: string; value: number; text: string; tone: "danger" | "warning" | "success"; testId: string;
-}) {
-  return (
-    <Link to={to} data-testid={testId} className="card flex items-center gap-4 p-5 transition hover:border-brand">
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">{label}</div>
-        <div className="mt-1 text-xs text-muted">{text}</div>
-      </div>
-      <Badge tone={tone} className="text-base">{faNumber(value)}</Badge>
-    </Link>
-  );
 }

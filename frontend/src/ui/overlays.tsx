@@ -1,5 +1,5 @@
 /** مودال، منوی کشویی و راهنمای کوچک — بر پایه Radix (دسترس‌پذیر، کیبورد، فوکوس) */
-import { cloneElement, isValidElement } from "react";
+import { cloneElement, isValidElement, useRef } from "react";
 import type { ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
@@ -13,11 +13,14 @@ export function Modal({ open, onClose, title, description, children, footer, siz
   open: boolean; onClose: () => void; title: ReactNode; description?: ReactNode; children: ReactNode;
   footer?: ReactNode; size?: keyof typeof MODAL_SIZES; testId?: string;
 }) {
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root open={open} onOpenChange={o => !o && onClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-[rise_.2s_ease-out]" />
         <Dialog.Content data-testid={testId} dir="rtl"
+          onOpenAutoFocus={() => { returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+          onCloseAutoFocus={event => { if (returnFocus.current?.isConnected) { event.preventDefault(); returnFocus.current.focus({ preventScroll: true }); } }}
           className={cn("fixed inset-x-3 top-[4dvh] z-50 mx-auto flex max-h-[92dvh] flex-col rounded-2xl border border-border bg-surface shadow-float",
             "data-[state=open]:animate-[rise_.25s_cubic-bezier(.2,.7,.2,1)]", MODAL_SIZES[size])}>
           <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">

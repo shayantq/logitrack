@@ -1,7 +1,8 @@
 /** اجزای پایه رابط کاربری — همه بر پایه توکن‌های رنگی (روشن/تاریک خودکار) */
-import { forwardRef, useEffect, useImperativeHandle, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useCallback, useContext, useEffect, useId, useImperativeHandle, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
 import { faNumber } from "@/lib/format";
+import { describedBy, FieldContext, FormFeedbackContext, useField } from "./fieldContext";
 
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
@@ -29,10 +30,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
   variant?: ButtonVariant; size?: keyof typeof BUTTON_SIZES; loading?: boolean; icon?: ReactNode;
 }>(function Button({ variant = "primary", size = "md", loading, icon, className, children, disabled, ...props }, ref) {
   return (
-    <button ref={ref} disabled={disabled || loading}
+    <button ref={ref} disabled={disabled || loading} aria-busy={loading || undefined}
       className={buttonClass(variant, size, cn("disabled:pointer-events-none disabled:opacity-50", className))}
       {...props}>
-      {loading ? <Loader2 className="size-4 animate-spin" /> : icon}
+      {loading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : icon}
       {children}
     </button>
   );
@@ -118,30 +119,48 @@ function explainInvalid(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
 }
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, onInvalid, onInput, ...props }, ref) {
+  const field = useField(props.id);
   const inner = useRef<HTMLInputElement>(null);
   useImperativeHandle(ref, () => inner.current as HTMLInputElement);
   // مقدار تازه (تایپ، اسکن یا پر شدن خودکار) پیام قبلی را پاک می‌کند تا فرم گیر نکند
   useEffect(() => { inner.current?.setCustomValidity(""); }, [props.value]);
   return <input ref={inner} className={cn(FIELD_BASE, "h-10", className)} {...props}
+    id={props.id ?? field?.id} aria-labelledby={props["aria-labelledby"] ?? (props["aria-label"] ? undefined : field?.labelId)}
+    aria-describedby={describedBy(props["aria-describedby"], field?.describedBy)} aria-invalid={props["aria-invalid"] ?? (field?.invalid || undefined)}
     onInvalid={e => { explainInvalid(e.currentTarget, props.title); onInvalid?.(e); }}
     onInput={e => { e.currentTarget.setCustomValidity(""); onInput?.(e); }} />;
 });
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, onInvalid, onInput, ...props }, ref) {
+  const field = useField(props.id);
   const inner = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
   useEffect(() => { inner.current?.setCustomValidity(""); }, [props.value]);
   return <textarea ref={inner} className={cn(FIELD_BASE, "py-2.5", className)} {...props}
+    id={props.id ?? field?.id} aria-labelledby={props["aria-labelledby"] ?? (props["aria-label"] ? undefined : field?.labelId)}
+    aria-describedby={describedBy(props["aria-describedby"], field?.describedBy)} aria-invalid={props["aria-invalid"] ?? (field?.invalid || undefined)}
     onInvalid={e => { explainInvalid(e.currentTarget); onInvalid?.(e); }}
     onInput={e => { e.currentTarget.setCustomValidity(""); onInput?.(e); }} />;
 });
 
-export function Field({ label, hint, error, children, className }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; children: ReactNode; className?: string }) {
+export function Field({ label, hint, error: explicitError, name, children, className }: { label: ReactNode; hint?: ReactNode; error?: ReactNode; name?: string; children: ReactNode; className?: string }) {
+  const feedback = useContext(FormFeedbackContext);
+  const error = explicitError ?? (name ? feedback?.errors[name] : undefined);
+  const clearError = () => { if (name) feedback?.clear(name); };
+  const id = useId();
+  const controls = useRef(new Set<string>());
+  const [controlId, setControlId] = useState<string>();
+  const register = useCallback((nextId: string) => {
+    controls.current.add(nextId);
+    setControlId(controls.current.values().next().value);
+    return () => { controls.current.delete(nextId); setControlId(controls.current.values().next().value); };
+  }, []);
   return (
-    <label className={cn("block", className)}>
-      <span className="mb-1.5 block text-sm font-medium text-text-2">{label}</span>
-      {children}
-      {error ? <span className="mt-1 block text-xs text-danger">{error}</span> : hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
-    </label>
+    <div className={cn("block", className)} data-field-root data-error-field={name} onInput={clearError} onChange={clearError}>
+      <label htmlFor={controlId} id={`${id}-label`} className="mb-1.5 block text-sm font-medium text-text-2">{label}</label>
+      <FieldContext.Provider value={{ id, labelId: `${id}-label`, describedBy: describedBy(hint ? `${id}-hint` : undefined, error ? `${id}-error` : undefined), invalid: !!error, clearError, register }}>{children}</FieldContext.Provider>
+      {hint && <span id={`${id}-hint`} className="mt-1 block text-xs text-muted">{hint}</span>}
+      {error && <span id={`${id}-error`} className="mt-1 block text-xs text-danger">{error}</span>}
+    </div>
   );
 }
 
@@ -156,12 +175,12 @@ export function Checkbox({ label, ...props }: InputHTMLAttributes<HTMLInputEleme
 
 // ---------------------------------------------------------------- Feedback
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn("size-5 animate-spin text-brand", className)} />;
+  return <span role="status"><Loader2 aria-hidden className={cn("size-5 animate-spin text-brand", className)} /><span className="sr-only">در حال بارگذاری…</span></span>;
 }
 
 export function Skeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-lg bg-surface-2", className)}>
+    <div aria-hidden="true" className={cn("relative overflow-hidden rounded-lg bg-surface-2", className)}>
       <div className="absolute inset-0 translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-l from-transparent via-border/60 to-transparent" />
     </div>
   );
@@ -169,7 +188,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="space-y-3 p-5" data-testid="loading">
+    <div className="space-y-3 p-5" data-testid="loading" role="status" aria-label="در حال دریافت فهرست">
       {Array.from({ length: rows }, (_, i) => <Skeleton key={i} className="h-10" />)}
     </div>
   );
@@ -291,9 +310,9 @@ export function SegmentedControl<T extends string>({ value, options, onChange }:
   value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-xl border border-border bg-surface-2 p-1">
+    <div className="inline-flex rounded-xl border border-border bg-surface-2 p-1" role="group">
       {options.map(o => (
-        <button key={o.value} type="button" onClick={() => onChange(o.value)}
+        <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
           className={cn("rounded-lg px-3 py-1.5 text-xs font-medium transition",
             value === o.value ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text")}>
           {o.label}

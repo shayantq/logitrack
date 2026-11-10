@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock3, Plus, Sparkles, Trash2 } from "lucide-react";
-import { api, errorMessage, isServerError, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
+import { api, isServerError, newIdempotencyKey, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { CitySelect } from "@/components/CitySelect";
 import { SuggestionList } from "@/components/dispatch/SuggestionList";
@@ -12,6 +12,9 @@ import { faNumber, localToIso, normalizeDigits, tomorrowIsoDate } from "@/lib/fo
 import { Modal } from "@/ui/overlays";
 import { Button, Checkbox, Field, Input, Select, cn } from "@/ui/primitives";
 import { DateField, TimeField } from "@/ui/datetime";
+import { confirmDialog } from "@/ui/dialogs";
+import { FormFeedbackContext } from "@/ui/fieldContext";
+import { useFormErrors } from "@/hooks/useFormErrors";
 
 type Item = { product_id: number | ""; quantity: number };
 
@@ -21,6 +24,10 @@ const EMPTY = {
   date: tomorrowIsoDate(), from: "09:00", to: "13:00",
   size: "m" as Schemas["OrderRequest"]["size"], priority: false, backorder: false, warehouse: "", vehicle: "auto", notes: "", fee: "",
 };
+
+// عبور با Back در مسیریاب SPA نباید پیش‌نویس را از بین ببرد. فقط حافظه همین تب؛ بدون localStorage/sessionStorage.
+let draft: { owner: number; form: typeof EMPTY; items: Item[]; baseline: string; requestKey: string } | null = null;
+export const hasOrderDraft = (owner: number) => draft?.owner === owner;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -43,11 +50,39 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
   const [form, setForm] = useState(EMPTY);
   const [requestKey, setRequestKey] = useState(newIdempotencyKey);
   const [items, setItems] = useState<Item[]>([{ product_id: "", quantity: 1 }]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const formErrors = useFormErrors(formRef);
+  const baseline = useRef("");
+  const confirming = useRef(false);
+  const [recovered, setRecovered] = useState(false);
+  const dirty = JSON.stringify({ form, items }) !== baseline.current;
   const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) => setForm(f => ({ ...f, [key]: value }));
 
   useEffect(() => {
-    if (open) { setForm({ ...EMPTY, date: tomorrowIsoDate() }); setItems([{ product_id: "", quantity: 1 }]); setRequestKey(newIdempotencyKey()); }
+    if (open) {
+      if (draft?.owner === me.id) {
+        baseline.current = draft.baseline;
+        setForm(draft.form); setItems(draft.items); setRequestKey(draft.requestKey);
+        setRecovered(true); formErrors.reset(); return;
+      }
+      const fresh = { ...EMPTY, date: tomorrowIsoDate() };
+      const freshItems: Item[] = [{ product_id: "", quantity: 1 }];
+      baseline.current = JSON.stringify({ form: fresh, items: freshItems });
+      setForm(fresh); setItems(freshItems); setRequestKey(newIdempotencyKey()); setRecovered(false); formErrors.reset();
+    }
   }, [open]);
+  useEffect(() => { if (draft && draft.owner !== me.id) draft = null; }, [me.id]);
+  useEffect(() => {
+    if (!open) return;
+    if (dirty) draft = { owner: me.id, form, items, baseline: baseline.current, requestKey };
+    else if (draft?.owner === me.id) draft = null;
+  }, [open, dirty, form, items, me.id, requestKey]);
+  useEffect(() => {
+    if (!open || !dirty) return;
+    const leave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", leave);
+    return () => window.removeEventListener("beforeunload", leave);
+  }, [open, dirty]);
 
   const totals = useMemo(() => items.reduce((acc, item) => {
     const p = products.find(x => x.id === item.product_id);
@@ -89,15 +124,25 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
   const create = useMutation({
     mutationFn: (body: Schemas["OrderRequest"]) => unwrap(api.POST("/orders/", { body, params: { header: { "Idempotency-Key": requestKey } } })),
     onSuccess: order => {
+      draft = null;
       toast.success(`سفارش ${order.tracking_code} ثبت شد.`);
       for (const key of ["orders", "products", "vehicles", "stats"]) queryClient.invalidateQueries({ queryKey: [key] });
       onClose();
     },
-    onError: e => { toast.error(errorMessage(e)); if (isServerError(e)) setRequestKey(newIdempotencyKey()); },
+    onError: e => { formErrors.serverError(e); if (isServerError(e)) setRequestKey(newIdempotencyKey()); },
   });
+  async function requestClose() {
+    if (create.isPending || confirming.current) return;
+    if (!dirty) { draft = null; onClose(); return; }
+    confirming.current = true;
+    const discard = await confirmDialog({ title: "تغییرات ذخیره‌نشده کنار گذاشته شود؟", text: "اطلاعات این سفارش هنوز ثبت نشده است.", confirmLabel: "دور انداختن تغییرات", cancelLabel: "ادامه ویرایش", danger: true });
+    confirming.current = false;
+    if (discard) { draft = null; onClose(); }
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (create.isPending || !formErrors.validate()) return;
     const validItems = items.filter((i): i is { product_id: number; quantity: number } => i.product_id !== "" && i.quantity > 0);
     if (!validItems.length) { toast.error("حداقل یک کالا با تعداد معتبر انتخاب کنید."); return; }
     create.mutate({
@@ -118,23 +163,27 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="ثبت سفارش جدید" description="کالاها، مشتری، مقصد و زمان تحویل را وارد کنید." size="lg"
+    <Modal open={open} onClose={requestClose} title="ثبت سفارش جدید" description="کالاها، مشتری، مقصد و زمان تحویل را وارد کنید." size="lg"
       footer={<>
-        <Button variant="secondary" onClick={onClose}>انصراف</Button>
+        <Button variant="secondary" disabled={create.isPending} onClick={requestClose}>انصراف</Button>
         <Button type="submit" form="order-form" loading={create.isPending}>ثبت سفارش</Button>
       </>}>
-      <form id="order-form" onSubmit={onSubmit}>
+      <FormFeedbackContext.Provider value={{ errors: formErrors.errors, clear: formErrors.clear }}>
+      <form ref={formRef} id="order-form" noValidate onSubmit={onSubmit} aria-busy={create.isPending} data-dirty={dirty}>
+        {formErrors.feedback}
+        {recovered && <p role="status" className="mb-4 text-sm text-text-2" data-testid="order-draft-restored">پیش‌نویس ثبت‌نشده قبلی در همین تب بازیابی شد.</p>}
+        <fieldset disabled={create.isPending}>
         <Section title="اقلام سفارش">
           <div className="space-y-2">
             {items.map((item, index) => (
               <div className="grid grid-cols-[1fr_96px_40px] gap-2" key={index}>
-                <Select required value={item.product_id} data-testid="order-item-product" aria-label="کالا"
+                <Field label="کالا *" name={`items.${index}.product_id`}><Select required value={item.product_id} data-testid="order-item-product" aria-label="کالا"
                   onChange={e => setItems(list => list.map((x, i) => i === index ? { ...x, product_id: e.target.value ? Number(e.target.value) : "" } : x))}>
                   <option value="">انتخاب کالا...</option>
                   {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.sku}) — موجودی آزاد: {faNumber(p.free_stock)}</option>)}
-                </Select>
-                <Input type="number" min={1} required value={item.quantity} aria-label="تعداد" data-testid="order-item-qty"
-                  onChange={e => setItems(list => list.map((x, i) => i === index ? { ...x, quantity: Number(e.target.value) } : x))} />
+                </Select></Field>
+                <Field label="تعداد *" name={`items.${index}.quantity`}><Input type="number" min={1} required value={item.quantity} aria-label="تعداد" data-testid="order-item-qty"
+                  onChange={e => setItems(list => list.map((x, i) => i === index ? { ...x, quantity: Number(e.target.value) } : x))} /></Field>
                 <Button type="button" variant="ghost" size="icon" aria-label="حذف ردیف" disabled={items.length === 1}
                   onClick={() => setItems(list => list.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
                 <WarehouseStockLine product={products.find(p => p.id === item.product_id)} quantity={item.quantity} warehouses={warehouses} ownOnly={me.role === "warehouse_manager"}
@@ -150,38 +199,38 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
 
         <Section title="مشتری و تحویل‌گیرنده">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="نام مشتری *"><Input required minLength={2} value={form.customerName} onChange={e => set("customerName", e.target.value)} data-testid="customer-name" /></Field>
-            <Field label="موبایل مشتری *"><Input className="ltr" required placeholder="09121234567" value={form.customerMobile} onChange={e => set("customerMobile", e.target.value)} data-testid="customer-mobile" /></Field>
-            <Field label="نام تحویل‌گیرنده" hint="خالی = خود مشتری"><Input value={form.recipientName} onChange={e => set("recipientName", e.target.value)} /></Field>
-            <Field label="موبایل تحویل‌گیرنده"><Input className="ltr" value={form.recipientMobile} onChange={e => set("recipientMobile", e.target.value)} /></Field>
+            <Field name="customer.name" label="نام مشتری *"><Input required minLength={2} value={form.customerName} onChange={e => set("customerName", e.target.value)} data-testid="customer-name" /></Field>
+            <Field name="customer.mobile" label="موبایل مشتری *"><Input className="ltr" required placeholder="09121234567" value={form.customerMobile} onChange={e => set("customerMobile", e.target.value)} data-testid="customer-mobile" /></Field>
+            <Field name="recipient_name" label="نام تحویل‌گیرنده" hint="خالی = خود مشتری"><Input value={form.recipientName} onChange={e => set("recipientName", e.target.value)} /></Field>
+            <Field name="recipient_mobile" label="موبایل تحویل‌گیرنده"><Input className="ltr" value={form.recipientMobile} onChange={e => set("recipientMobile", e.target.value)} /></Field>
           </div>
         </Section>
 
         <Section title="مقصد">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="استان *">
+            <Field name="destination_province" label="استان *">
               <Select required value={form.province} onChange={e => set("province", e.target.value)} data-testid="order-province">
                 <option value="">انتخاب کنید...</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
               </Select>
             </Field>
-            <Field label="شهر *"><CitySelect required province={form.province} value={form.city} onChange={v => set("city", v)} testId="order-city" /></Field>
-            <Field label="کد پستی"><Input className="ltr" value={form.postal} onChange={e => set("postal", e.target.value)} /></Field>
-            <Field label="نشانی کامل *" className="sm:col-span-3"><Input required minLength={5} value={form.address} onChange={e => set("address", e.target.value)} data-testid="order-address" /></Field>
+            <Field name="destination_city" label="شهر *"><CitySelect required province={form.province} value={form.city} onChange={v => set("city", v)} testId="order-city" /></Field>
+            <Field name="destination_postal_code" label="کد پستی"><Input className="ltr" value={form.postal} onChange={e => set("postal", e.target.value)} /></Field>
+            <Field name="destination_address" label="نشانی کامل *" className="sm:col-span-3"><Input required minLength={5} value={form.address} onChange={e => set("address", e.target.value)} data-testid="order-address" /></Field>
           </div>
         </Section>
 
         <Section title="زمان و نحوه ارسال">
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="تاریخ تحویل *"><DateField required value={form.date} onChange={v => set("date", v)} testId="order-date" /></Field>
-            <Field label="از ساعت *"><TimeField required value={form.from} onChange={v => set("from", v)} testId="order-from" /></Field>
-            <Field label="تا ساعت *"><TimeField required value={form.to} onChange={v => set("to", v)} testId="order-to" /></Field>
-            <Field label="سایز بسته">
+            <Field name="delivery_window_start" label="تاریخ تحویل *"><DateField required value={form.date} onChange={v => set("date", v)} testId="order-date" /></Field>
+            <Field name="delivery_window_start_time" label="از ساعت *"><TimeField required value={form.from} onChange={v => set("from", v)} testId="order-from" /></Field>
+            <Field name="delivery_window_end" label="تا ساعت *"><TimeField required value={form.to} onChange={v => set("to", v)} testId="order-to" /></Field>
+            <Field name="size" label="سایز بسته">
               <Select value={form.size} onChange={e => set("size", e.target.value as typeof form.size)}>
                 {Object.entries(PACKAGE_SIZES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </Select>
             </Field>
             {me.role === "org_admin" && (
-              <Field label="انبار مبدأ">
+              <Field name="warehouse_id" label="انبار مبدأ">
                 <Select value={form.warehouse} onChange={e => set("warehouse", e.target.value)}>
                   <option value="">خودکار{chosen.length && fulfilling.length ? ` (${warehouses.find(w => w.id === fulfilling[0])?.name ?? ""})` : ""}</option>
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}{chosen.length ? (fulfilling.includes(w.id) ? " — موجودی کافی" : " — موجودی ناکافی") : ""}</option>)}
@@ -189,28 +238,28 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
                 {chosen.length > 0 && fulfilling.length === 0 && <p className={`mt-1 text-xs ${form.backorder ? "text-warning" : "text-danger"}`}>{form.backorder ? "موجودی کامل نیست؛ آنچه هست ارسال و باقی‌مانده «سفارش معوق» ثبت می‌شود." : "هیچ انباری به‌تنهایی موجودی کافی برای همه اقلام ندارد."}</p>}
               </Field>
             )}
-            <Field label="کرایه حمل (ریال)" hint={plan ? `خالی = ${faNumber(defaultFee)} ریال طبق قانون سازمان` : undefined}>
+            <Field name="delivery_fee" label="کرایه حمل (ریال)" hint={plan ? `خالی = ${faNumber(defaultFee)} ریال طبق قانون سازمان` : undefined}>
               <Input inputMode="numeric" className="ltr" placeholder={plan ? faNumber(defaultFee) : ""} value={form.fee} onChange={e => set("fee", e.target.value)} data-testid="order-fee" />
             </Field>
             <div className="sm:col-span-3 flex flex-wrap gap-x-6 gap-y-2"><Checkbox label="فوری / اورژانسی" checked={form.priority} onChange={e => set("priority", e.target.checked)} />
               <Checkbox label="پذیرش تأمین جزئی: کمبود موجودی «سفارش معوق» شود" checked={form.backorder} onChange={e => set("backorder", e.target.checked)} data-testid="order-backorder" /></div>
-            <Field label="توضیحات" className="sm:col-span-3"><Input maxLength={1000} value={form.notes} onChange={e => set("notes", e.target.value)} /></Field>
+            <Field name="notes" label="توضیحات" className="sm:col-span-3"><Input maxLength={1000} value={form.notes} onChange={e => set("notes", e.target.value)} /></Field>
           </div>
         </Section>
 
         <Section title="تخصیص راننده">
-          <div className="mb-3 grid grid-cols-2 gap-2" role="radiogroup" data-testid="assign-mode">
+          <div className="mb-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="نحوه تخصیص راننده" data-testid="assign-mode">
             {[["auto", Sparkles, "بهترین پیشنهاد، خودکار", "هنگام ثبت، مناسب‌ترین راننده انتخاب می‌شود"],
               ["later", Clock3, "بعداً تخصیص می‌دهم", "سفارش «در انتظار تخصیص» می‌ماند"]].map(([value, Icon, title, hint]) => {
               const I = Icon as typeof Sparkles;
               const active = form.vehicle === value;
               return (
-                <button key={value as string} type="button" role="radio" aria-checked={active} data-testid={`assign-mode-${value}`}
-                  onClick={() => set("vehicle", value as string)}
-                  className={cn("flex items-start gap-2 rounded-xl border p-3 text-start transition", active ? "border-brand bg-brand-soft" : "border-border hover:border-border-strong")}>
+                <label key={value as string} data-testid={`assign-mode-${value}`}
+                  className={cn("flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-start transition focus-within:ring-2 focus-within:ring-brand", active ? "border-brand bg-brand-soft" : "border-border hover:border-border-strong")}>
+                  <input type="radio" name="order-assignment-mode" className="sr-only" value={value as string} checked={active} onChange={() => set("vehicle", value as string)} />
                   <I className={cn("mt-0.5 size-4 shrink-0", active ? "text-brand" : "text-muted")} />
                   <span><span className="block text-sm font-semibold">{title as string}</span><span className="text-xs text-muted">{hint as string}</span></span>
-                </button>
+                </label>
               );
             })}
           </div>
@@ -224,7 +273,9 @@ export function OrderFormModal({ open, onClose }: { open: boolean; onClose: () =
             <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">برای دیدن رانندگان پیشنهادی، کالا، شهر مقصد و زمان تحویل را وارد کنید.</p>
           )}
         </Section>
+        </fieldset>
       </form>
+      </FormFeedbackContext.Provider>
     </Modal>
   );
 }

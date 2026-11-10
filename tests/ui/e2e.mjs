@@ -97,6 +97,7 @@ const toast = page => page.locator("[data-testid=toast]").first().textContent({ 
 // ---------------- ادمین سازمان ----------------
 await session("org_admin", "qazvin_admin", "admin123", async page => {
   check("org_admin", "lands on dashboard", /\/app\/?$/.test(page.url()), page.url());
+  await page.click("[data-testid=overview-toggle]");
   await page.waitForSelector("text=کالاهای رو‌به‌اتمام");
 
   await page.click("[data-testid=app-nav] >> text=سفارش‌ها");
@@ -283,9 +284,9 @@ await session("kyc-driver", null, null, async page => {
   await page.fill("[data-testid=ob-first-name]", "راننده");
   await page.fill("[data-testid=ob-last-name]", "آزمون");
   await page.fill("[data-testid=ob-national-code]", nationalCode());
-  await choose(page, "[data-testid=ob-birth-date] [role=combobox][aria-label=روز]", "12");
-  await choose(page, "[data-testid=ob-birth-date] [role=combobox][aria-label=ماه]", "5");
-  await choose(page, "[data-testid=ob-birth-date] [role=combobox][aria-label=سال]", "1370");
+  await choose(page, "[data-testid=ob-birth-date] button[aria-haspopup=listbox][aria-label=روز]", "12");
+  await choose(page, "[data-testid=ob-birth-date] button[aria-haspopup=listbox][aria-label=ماه]", "5");
+  await choose(page, "[data-testid=ob-birth-date] button[aria-haspopup=listbox][aria-label=سال]", "1370");
   for (const kind of ["national_card", "selfie", "driving_license"]) await upload(page, kind);
 
   // ویدیوی طولانی و حجیم با پیام روشن رد می‌شوند
@@ -344,9 +345,9 @@ await session("kyc-driver", null, null, async page => {
   await page.fill("[data-testid=plate-region]", kycPlate.region);
   await page.fill("[data-testid=ob-max-weight]", "1200");
   const year = await page.locator("[data-testid=ob-inspection] [data-select-root]:has([aria-label=سال]) select option").nth(2).getAttribute("value");
-  await choose(page, "[data-testid=ob-inspection] [role=combobox][aria-label=روز]", "1");
-  await choose(page, "[data-testid=ob-inspection] [role=combobox][aria-label=ماه]", "1");
-  await choose(page, "[data-testid=ob-inspection] [role=combobox][aria-label=سال]", year);
+  await choose(page, "[data-testid=ob-inspection] button[aria-haspopup=listbox][aria-label=روز]", "1");
+  await choose(page, "[data-testid=ob-inspection] button[aria-haspopup=listbox][aria-label=ماه]", "1");
+  await choose(page, "[data-testid=ob-inspection] button[aria-haspopup=listbox][aria-label=سال]", year);
   await page.check("[data-testid=ob-intercity]");
   for (const kind of ["vehicle_photo", "vehicle_card", "technical_inspection"]) await upload(page, kind);
   await page.click("[data-testid=onboarding-next]");
@@ -490,9 +491,9 @@ await session("portal-driver", kycUser, "driver123", async page => {
   await page.fill("[data-testid=vehicle-request-modal] [data-testid=plate-region]", newPlate.region);
   await page.fill("[data-testid=vr-weight]", "1500");
   const y = await page.locator("[data-testid=vr-inspection] [data-select-root]:has([aria-label=سال]) select option").nth(2).getAttribute("value");
-  await choose(page, "[data-testid=vr-inspection] [role=combobox][aria-label=روز]", "1");
-  await choose(page, "[data-testid=vr-inspection] [role=combobox][aria-label=ماه]", "1");
-  await choose(page, "[data-testid=vr-inspection] [role=combobox][aria-label=سال]", y);
+  await choose(page, "[data-testid=vr-inspection] button[aria-haspopup=listbox][aria-label=روز]", "1");
+  await choose(page, "[data-testid=vr-inspection] button[aria-haspopup=listbox][aria-label=ماه]", "1");
+  await choose(page, "[data-testid=vr-inspection] button[aria-haspopup=listbox][aria-label=سال]", y);
   await page.click("[data-testid=vehicle-request-next]");
   for (const kind of ["vehicle_photo", "vehicle_card", "technical_inspection"]) await upload(page, kind);
   await page.click("[data-testid=vehicle-request-submit]");
@@ -651,10 +652,13 @@ await session("search", "qazvin_admin", "admin123", async page => {
   const waitList = () => page.waitForFunction(() => !document.querySelector("[data-testid=orders-count]")?.textContent?.includes("در حال"));
 
   await page.click("[data-testid=date-presets] [data-preset=today]");
+  check("search", "preset remains a draft until applied", !page.url().includes("delivery_from="));
+  await page.click("[data-testid=search-submit]");
   await page.waitForURL(/delivery_from=/);
   await waitList();
   check("search", "«today» preset includes today's order", (await codes()).includes(perfOrder.tracking_code));
   await page.click("[data-testid=date-presets] [data-preset=tomorrow]");
+  await page.click("[data-testid=search-submit]");
   await page.waitForFunction(c => !document.querySelector("[data-testid=orders-table]")?.textContent?.includes(c), perfOrder.tracking_code);
   check("search", "«tomorrow» preset excludes today's order", (await codes()).includes(pendingOrder.tracking_code));
 
@@ -679,7 +683,7 @@ await session("search", "qazvin_admin", "admin123", async page => {
   await page.waitForSelector(`[data-testid=orders-table] >> text=${perfOrder.tracking_code}`);
   check("search", "product filter", true);
   await page.goto(`${BASE}/app/orders?product=کالای-ناموجود-xyz`);
-  await page.waitForSelector("text=سفارشی یافت نشد");
+  await page.waitForSelector("text=سفارشی با این فیلترها یافت نشد");
   check("search", "no results state", true);
 
   // لینک پیگیری در جزئیات سفارش
@@ -1201,7 +1205,8 @@ await session("catalog", "qazvin_admin", "admin123", async page => {
   await page.fill("[data-testid=variant-sku]", `VAR-${runId}`);
   await page.fill("[data-testid=variant-label]", "سری آزمون مرورگر");
   await page.click("[data-testid=variant-submit]");
-  await page.waitForSelector("[data-testid=catalog-product] >> text=سری آزمون مرورگر");
+  // نام تنوع در اجراهای قبلی هم هست؛ منتظر SKU تازه بمان تا نتیجه پیش از پایان درخواست سنجیده نشود.
+  await page.waitForSelector(`[data-testid=catalog-product] >> text=VAR-${runId}`);
   check("catalog", "variant created and opened", (await page.locator("[data-testid=catalog-product]").textContent()).includes(`VAR-${runId}`));
   await page.keyboard.press("Escape");
 
@@ -1980,6 +1985,7 @@ await session("productivity", "qazvin_admin", "admin123", async page => {
   const listed = Number(latinize((await page.textContent("[data-testid=orders-count]")).split(" ")[0]).replace(/[٬,]/g, ""));
   check("productivity", "action card count equals the list it opens", cardCount > 0 && cardCount === listed, `${cardCount} vs ${listed}`);
   await page.goto(`${BASE}/app`);
+  await page.click("[data-testid=overview-toggle]");
   await page.waitForSelector("text=کالاهای رو‌به‌اتمام");
   await page.click("[data-testid=overview-toggle]");
   await page.waitForSelector("text=کالاهای رو‌به‌اتمام", { state: "detached" });
@@ -2433,9 +2439,17 @@ await session("role-home", "qazvin_admin", "admin123", async page => {
   await page.waitForURL(/\/app\/backorders$/);
   check("role-home", "kpi drills down to its list", true);
   await page.goto(`${BASE}/app`);
-  await page.click("[data-testid=biz-late]");
-  await page.waitForURL(/view=late/);
-  check("role-home", "late count drills down to late orders", true);
+  await page.waitForSelector("[data-testid=action-center]");
+  if (await page.locator("[data-testid=action-center-all]").count()) await page.click("[data-testid=action-center-all]");
+  const late = await apiCall(adminToken, "GET", "/orders/page?view=late&limit=1");
+  check("role-home", "operational late count is not duplicated in business summary", await page.locator("[data-testid=biz-late]").count() === 0);
+  if (late.total > 0) {
+    await page.click("[data-testid=action-go-orders_late]");
+    await page.waitForURL(/view=late/);
+    check("role-home", "late action drills down to late orders", true);
+  } else {
+    check("role-home", "zero late orders do not appear as work needing action", await page.locator("[data-testid=action-go-orders_late]").count() === 0);
+  }
   await page.goto(`${BASE}/app/map`);
   await page.waitForSelector("[data-testid=updated-at]");
   const map = await page.textContent("main");

@@ -154,6 +154,71 @@ def test_search_never_crosses_organizations(env):
     assert all_alpha == _expect(a, *a["orders"]) and not all_alpha & _expect(b, *b["orders"])
 
 
+def test_order_pages_are_complete_stable_and_tenant_scoped(env):
+    client, _, world = env
+    a = world["alpha"]
+    headers = _auth(a["admin"])
+    seen = []
+    # همه شهرها یکسان نیستند؛ وضعیت‌های مساوی، ترتیب ثانویه ثابت را هم می‌آزمایند.
+    for skip in (0, 2):
+        response = client.get("/orders/page", headers=headers, params={"skip": skip, "limit": 2, "sort": "status", "direction": "asc"})
+        assert response.status_code == 200, response.text
+        page = response.json()
+        assert page["total"] == 4 and page["skip"] == skip and page["limit"] == 2
+        assert len(page["items"]) == 2
+        seen.extend(o["tracking_code"] for o in page["items"])
+        assert client.get("/orders/page", headers=headers, params={"skip": skip, "limit": 2, "sort": "status", "direction": "asc"}).json() == page
+    assert len(set(seen)) == 4 and set(seen) == _expect(a, *a["orders"])
+    beyond = client.get("/orders/page", headers=headers, params={"skip": 10, "limit": 2}).json()
+    assert beyond["total"] == 4 and beyond["items"] == []
+
+
+@pytest.mark.parametrize("filters", [
+    {"product": "برنج"}, {"driver": "علی"}, {"province": "قزوین", "priority": "true"},
+    {"order_status": "pending"}, {"product": "RICE-beta"}, {"q": "ماکارونی"},
+    {"delivery_from": TODAY.isoformat(), "delivery_to": TODAY.isoformat()}, {"view": "today"},
+])
+def test_order_page_total_uses_exact_same_filters_as_list(env, filters):
+    client, _, world = env
+    admin = world["alpha"]["admin"]
+    expected = _codes(client, admin, **filters)
+    response = client.get("/orders/page", headers=_auth(admin), params={**filters, "limit": 1})
+    assert response.status_code == 200, response.text
+    page = response.json()
+    assert page["total"] == len(expected)
+    assert {o["tracking_code"] for o in page["items"]} <= expected
+    assert len(page["items"]) == min(1, len(expected))
+
+
+def test_driver_page_counts_only_own_orders_and_fleet_keeps_money_private(env):
+    client, db, world = env
+    a = world["alpha"]
+    own = client.get("/orders/page", headers=_auth(a["ali"]), params={"limit": 1})
+    assert own.status_code == 200, own.text
+    assert own.json()["total"] == 2
+    assert {o["tracking_code"] for o in own.json()["items"]} <= _expect(a, "today_rice_ali", "week_oil_ali")
+    set_tenant(db, a["org"].id)
+    fleet = User(username="alpha_fleet", email="fleet@x.io", role=RoleEnum.FLEET_MANAGER, hashed_password="x")
+    operator = User(username="alpha_operator", email="operator@x.io", role=RoleEnum.WAREHOUSE_OPERATOR, hashed_password="x")
+    db.add_all([fleet, operator])
+    db.commit()
+    response = client.get("/orders/page", headers=_auth(fleet))
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 4
+    from app.schemas.order import ORDER_MONEY_FIELDS
+    for order in response.json()["items"]:
+        assert all(order[field] is None for field in ORDER_MONEY_FIELDS)
+        assert all(item["unit_price"] is None for item in order["items"])
+    assert client.get("/orders/page", headers=_auth(operator)).status_code == 403
+
+
+@pytest.mark.parametrize("params", [{"skip": -1}, {"limit": 0}, {"limit": 501}, {"q": "x"}, {"sort": "unknown"}, {"direction": "sideways"}, {"driver_id": 0}])
+def test_order_list_and_page_share_validation(env, params):
+    client, _, world = env
+    for path in ("/orders/", "/orders/page"):
+        assert client.get(path, headers=_auth(world["alpha"]["admin"]), params=params).status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # پیگیری عمومی
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, Info, UserRound } from "lucide-react";
 import { api, unwrap, type Schemas } from "@/api/client";
 import { faNumber } from "@/lib/format";
+import { QueryFeedback } from "./QueryFeedback";
 import { Badge, Card, ErrorState, Skeleton, cn, toneColor } from "@/ui/primitives";
 
 type ActionCard = Schemas["ActionCard"];
@@ -16,7 +17,7 @@ const SAMPLE_ROWS = 3;
 
 export function ActionCenter({ compact = false }: { compact?: boolean }) {
   const [all, setAll] = useState(false);
-  const { data, error, refetch, isLoading } = useQuery({
+  const { data, error, refetch, isLoading, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ["action-center"],
     queryFn: () => unwrap(api.GET("/action-center")),
     refetchInterval: 30_000,
@@ -27,13 +28,14 @@ export function ActionCenter({ compact = false }: { compact?: boolean }) {
       {Array.from({ length: compact ? 2 : 4 }, (_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}
     </div>
   );
-  if (error) return <div className="mb-6"><ErrorState error={error} onRetry={refetch} /></div>;
+  if (error && (!data || (error as { status?: number }).status === 403)) return <div className="mb-6"><ErrorState error={error} onRetry={refetch} /></div>;
   const cards = data?.cards ?? [];
   if (!cards.length) return (
     <Card className="mb-6 flex items-center gap-3 px-5 py-4" data-testid="action-center-empty">
+      <QueryFeedback error={error} retry={refetch} updatedAt={dataUpdatedAt} />
       <CheckCircle2 className="size-5 text-success" />
       <div>
-        <div className="font-semibold">کار فوری‌ای نیست</div>
+        <div className="font-semibold">{error ? "در آخرین دریافت موفق، کار فوری‌ای نبود" : "کار فوری‌ای نیست"}</div>
         <div className="text-sm text-muted">هر چه نیاز به اقدام داشته باشد همین‌جا نمایش داده می‌شود.</div>
       </div>
     </Card>
@@ -41,7 +43,8 @@ export function ActionCenter({ compact = false }: { compact?: boolean }) {
   const shown = all ? cards : cards.slice(0, FIRST);
 
   return (
-    <section className="mb-6" data-testid="action-center" aria-label="نیازمند اقدام">
+    <section className="mb-6" data-testid="action-center" aria-label="نیازمند اقدام" aria-busy={isFetching}>
+      <QueryFeedback error={error} retry={refetch} updatedAt={dataUpdatedAt} />
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-base font-bold">نیازمند اقدام</h2>
         {cards.length > FIRST && (

@@ -755,6 +755,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orders/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** فهرست صفحه‌بندی‌شده سفارش‌ها با شمارش دقیق */
+        get: operations["get_order_page_orders_page_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orders/bulk": {
         parameters: {
             query?: never;
@@ -8939,6 +8956,17 @@ export interface components {
             /** Unit Weight Kg */
             unit_weight_kg: number;
         };
+        /** OrderPage */
+        OrderPage: {
+            /** Items */
+            items: components["schemas"]["OrderResponse"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
         /** OrderRatings */
         OrderRatings: {
             organization?: components["schemas"]["RatingOut"] | null;
@@ -15577,44 +15605,25 @@ export interface operations {
     get_all_orders_orders__get: {
         parameters: {
             query?: {
-                /** @description وضعیت */
                 order_status?: ("pending" | "assigned" | "picking_up" | "picked_up" | "in_transit" | "delivered" | "failed" | "canceled" | "expired") | null;
-                /** @description استان مقصد */
                 province?: string | null;
-                /** @description شهر مقصد */
                 city?: string | null;
-                /** @description جستجوی سراسری: کد، مشتری، تحویل‌گیرنده، شهر، کالا، راننده، پلاک */
                 q?: string | null;
-                /** @description خودرو */
                 vehicle_id?: number | null;
-                /** @description ثبت‌شده از تاریخ */
                 date_from?: string | null;
-                /** @description ثبت‌شده تا تاریخ */
                 date_to?: string | null;
-                /** @description تعداد عبور از اول (Pagination) */
                 skip?: number;
-                /** @description حداکثر تعداد دریافت */
                 limit?: number;
-                /** @description کد سفارش (بخشی از کد هم کافی است) */
                 tracking_code?: string | null;
-                /** @description نام یا کد کالا */
                 product?: string | null;
-                /** @description راننده */
                 driver_id?: number | null;
-                /** @description نام، نام کاربری یا کد راننده */
                 driver?: string | null;
-                /** @description پلاک (با ارقام فارسی یا لاتین) */
                 plate?: string | null;
-                /** @description روز تحویل از (وقت ایران، شامل) */
                 delivery_from?: string | null;
-                /** @description روز تحویل تا (وقت ایران، شامل) */
                 delivery_to?: string | null;
-                /** @description فقط فوری‌ها */
                 priority?: boolean | null;
-                /** @description ستون مرتب‌سازی */
-                sort?: ("tracking_code" | "delivery_window_start" | "status" | "destination_city") | null;
+                sort?: ("tracking_code" | "destination_city" | "delivery_window_start" | "status") | null;
                 direction?: "asc" | "desc";
-                /** @description نمای نام‌دار (مثل دیرکرد) */
                 view?: ("late" | "today" | "needs_update" | "awaiting_resolution" | "at_risk" | "driver_returns" | "customer_requests") | null;
             };
             header?: never;
@@ -15666,6 +15675,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_order_page_orders_page_get: {
+        parameters: {
+            query?: {
+                order_status?: ("pending" | "assigned" | "picking_up" | "picked_up" | "in_transit" | "delivered" | "failed" | "canceled" | "expired") | null;
+                province?: string | null;
+                city?: string | null;
+                q?: string | null;
+                vehicle_id?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                skip?: number;
+                limit?: number;
+                tracking_code?: string | null;
+                product?: string | null;
+                driver_id?: number | null;
+                driver?: string | null;
+                plate?: string | null;
+                delivery_from?: string | null;
+                delivery_to?: string | null;
+                priority?: boolean | null;
+                sort?: ("tracking_code" | "destination_city" | "delivery_window_start" | "status") | null;
+                direction?: "asc" | "desc";
+                view?: ("late" | "today" | "needs_update" | "awaiting_resolution" | "at_risk" | "driver_returns" | "customer_requests") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderPage"];
                 };
             };
             /** @description Validation Error */

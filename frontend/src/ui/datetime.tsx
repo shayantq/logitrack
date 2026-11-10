@@ -7,6 +7,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock3, X } from "lucide-react
 import { JALALI_MONTHS, isoToJalali, jalaliMonthLength, jalaliToIso, todayJalali } from "@/lib/jalali";
 import { Popover } from "./popover";
 import { cn } from "./primitives";
+import { useField } from "./fieldContext";
 
 const FA = (v: number | string) => String(v).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -25,6 +26,7 @@ export function DateField({ value, onChange, required, disabled, placeholder = "
   value: string; onChange: (iso: string) => void; required?: boolean; disabled?: boolean; placeholder?: string;
   clearable?: boolean; testId?: string; className?: string; "aria-label"?: string;
 }) {
+  const field = useField();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const today = todayJalali();
@@ -40,17 +42,18 @@ export function DateField({ value, onChange, required, disabled, placeholder = "
     const m = v.jm + delta;
     return m < 1 ? { jy: v.jy - 1, jm: 12 } : m > 12 ? { jy: v.jy + 1, jm: 1 } : { jy: v.jy, jm: m };
   });
-  const pick = (iso: string) => { onChange(iso); setOpen(false); trigger.current?.focus(); };
+  const pick = (iso: string) => { field?.clearError?.(); onChange(iso); setOpen(false); trigger.current?.focus(); };
 
   return (
     <div className="relative" data-field-root data-date-field>
-      <button ref={trigger} type="button" disabled={disabled} onClick={() => setOpen(o => !o)} data-testid={testId} data-value={value}
-        aria-label={ariaLabel ?? placeholder} aria-haspopup="dialog" aria-expanded={open} data-focus-target
+      <button ref={trigger} id={field?.id} type="button" disabled={disabled} onClick={() => setOpen(o => !o)} data-testid={testId} data-value={value}
+        aria-labelledby={ariaLabel ? undefined : field?.labelId} aria-describedby={field?.describedBy} aria-invalid={field?.invalid || undefined}
+        aria-label={ariaLabel ?? (field ? undefined : placeholder)} aria-haspopup="dialog" aria-expanded={open} data-focus-target
         className={cn(TRIGGER, open && "border-brand ring-4 ring-brand/15", className)}>
         <CalendarDays className="size-4 shrink-0 text-muted" />
         <span className={cn("min-w-0 flex-1 truncate", !value && "text-muted")}>{value ? formatJalali(value) : placeholder}</span>
         {clearable && value && !disabled && (
-          <span role="button" tabIndex={-1} aria-label="پاک کردن" onClick={e => { e.stopPropagation(); onChange(""); }}
+          <span role="button" tabIndex={-1} aria-label="پاک کردن" onClick={e => { e.stopPropagation(); field?.clearError?.(); onChange(""); }}
             className="grid size-6 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-text"><X className="size-3.5" /></span>
         )}
       </button>
@@ -99,6 +102,7 @@ export function TimeField({ value, onChange, required, disabled, step = 5, testI
   value: string; onChange: (hhmm: string) => void; required?: boolean; disabled?: boolean; step?: number;
   testId?: string; className?: string; "aria-label"?: string;
 }) {
+  const field = useField();
   const trigger = useRef<HTMLButtonElement>(null);
   const hoursRef = useRef<HTMLDivElement>(null);
   const minutesRef = useRef<HTMLDivElement>(null);
@@ -110,7 +114,7 @@ export function TimeField({ value, onChange, required, disabled, step = 5, testI
     return list.sort((a, b) => a - b);
   }, [step, m]);
   const set = (hour: number, minute: number, close: boolean) => {
-    onChange(`${pad(hour)}:${pad(minute)}`);
+    field?.clearError?.(); onChange(`${pad(hour)}:${pad(minute)}`);
     if (close) { setOpen(false); trigger.current?.focus(); }
   };
   useEffect(() => {
@@ -125,8 +129,9 @@ export function TimeField({ value, onChange, required, disabled, step = 5, testI
     selected ? "bg-brand font-bold text-brand-ink" : "hover:bg-surface-2");
   return (
     <div className="relative" data-field-root data-time-field>
-      <button ref={trigger} type="button" disabled={disabled} onClick={() => setOpen(o => !o)} data-testid={testId} data-value={value}
-        aria-label={ariaLabel ?? "ساعت"} aria-haspopup="dialog" aria-expanded={open} data-focus-target
+      <button ref={trigger} id={field?.id} type="button" disabled={disabled} onClick={() => setOpen(o => !o)} data-testid={testId} data-value={value}
+        aria-labelledby={ariaLabel ? undefined : field?.labelId} aria-describedby={field?.describedBy} aria-invalid={field?.invalid || undefined}
+        aria-label={ariaLabel ?? (field ? undefined : "ساعت")} aria-haspopup="dialog" aria-expanded={open} data-focus-target
         className={cn(TRIGGER, open && "border-brand ring-4 ring-brand/15", className)}>
         <Clock3 className="size-4 shrink-0 text-muted" />
         <span className={cn("flex-1 tnum", !value && "text-muted")}>{value ? FA(value) : "--:--"}</span>

@@ -40,7 +40,11 @@ export function useOrderFilters() {
   for (const k of FILTER_KEYS) { const v = params.get(k); if (v) filters[k] = v; }
   const setFilters = (next: OrderFilters) => {
     const clean = Object.fromEntries(Object.entries(next).filter(([, v]) => v)) as Record<string, string>;
-    setParams(clean, { replace: true });
+    const paramsNext = new URLSearchParams(params);
+    for (const key of FILTER_KEYS) paramsNext.delete(key);
+    paramsNext.delete("page");
+    for (const [key, value] of Object.entries(clean)) paramsNext.set(key, value);
+    setParams(paramsNext);
   };
   return [filters, setFilters] as const;
 }
@@ -56,38 +60,39 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
     for (const k of ["q", "tracking_code", "product", "driver", "plate"] as const) if (valid[k] && valid[k]!.trim().length < 2) delete valid[k];
     onChange(valid);
   };
-  const presetActive = (r: [string, string]) => filters.delivery_from === r[0] && filters.delivery_to === r[1];
+  const presetActive = (r: [string, string]) => draft.delivery_from === r[0] && draft.delivery_to === r[1];
   const setPreset = (r: [string, string] | null) => {
     const next = { ...draft, delivery_from: r?.[0], delivery_to: r?.[1] };
     setDraft(next);
-    apply(next);
   };
   const active = Object.entries(filters).filter(([, v]) => v);
+  const pending = FILTER_KEYS.some(key => (draft[key] ?? "") !== (filters[key] ?? ""));
 
   return (
     <div className="border-b border-border" data-testid="order-search">
       <form className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-[1fr_180px_170px_auto_auto_auto]" onSubmit={(e: FormEvent) => { e.preventDefault(); apply(); }}>
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted" />
-          <Input className="pr-10" placeholder="جستجو در کد، مشتری، کالا، راننده، پلاک، شهر…" value={draft.q ?? ""} onChange={e => set("q", e.target.value)} data-testid="search-q" />
+          <Input className="pr-10" aria-label="جستجوی سفارش‌ها" placeholder="جستجو در کد، مشتری، کالا، راننده، پلاک، شهر…" value={draft.q ?? ""} onChange={e => set("q", e.target.value)} data-testid="search-q" />
         </div>
-        <Select value={draft.order_status ?? ""} onChange={e => { set("order_status", e.target.value); apply({ ...draft, order_status: e.target.value || undefined }); }} data-testid="search-status">
+        <Select aria-label="وضعیت سفارش" value={draft.order_status ?? ""} onChange={e => set("order_status", e.target.value)} data-testid="search-status">
           <option value="">همه وضعیت‌ها</option>
           {Object.entries(ORDER_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </Select>
-        <Select value={draft.province ?? ""} onChange={e => { set("province", e.target.value); apply({ ...draft, province: e.target.value || undefined }); }} data-testid="search-province">
+        <Select aria-label="استان مقصد" value={draft.province ?? ""} onChange={e => set("province", e.target.value)} data-testid="search-province">
           <option value="">همه استان‌ها</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
         </Select>
-        <Button type="button" variant="ghost" icon={<SlidersHorizontal className="size-4" />} onClick={() => setOpen(o => !o)} data-testid="search-advanced-toggle">
+        <Button type="button" variant="ghost" aria-expanded={open} aria-controls={open ? "order-advanced-filters" : undefined} icon={<SlidersHorizontal className="size-4" />} onClick={() => setOpen(o => !o)} data-testid="search-advanced-toggle">
           پیشرفته<ChevronDown className={cn("size-4 transition", open && "rotate-180")} /></Button>
-        <Button variant="secondary" type="submit" icon={<Search className="size-4" />} data-testid="search-submit">جستجو</Button>
+        <Button variant="secondary" type="submit" icon={<Search className="size-4" />} data-testid="search-submit">اعمال فیلترها</Button>
         <SavedViews page="orders" filters={filters} onApply={f => { setDraft(f as OrderFilters); onChange(f as OrderFilters); }} />
       </form>
+      {pending && <p role="status" className="px-4 pb-3 text-xs text-muted" data-testid="filters-pending">تغییرات فیلتر هنوز اعمال نشده؛ «اعمال فیلترها» را بزنید.</p>}
 
       <div className="flex flex-wrap items-center gap-2 px-4 pb-3" data-testid="date-presets">
         <span className="text-xs text-muted">روز تحویل:</span>
         <button type="button" onClick={() => setPreset(null)} className={cn("rounded-full border px-3 py-1 text-xs transition",
-          !filters.delivery_from ? "border-brand bg-brand text-brand-ink" : "border-border hover:border-border-strong")}>همه</button>
+          !draft.delivery_from ? "border-brand bg-brand text-brand-ink" : "border-border hover:border-border-strong")}>همه</button>
         {PRESETS.map(p => {
           const r = p.range();
           return <button key={p.key} type="button" onClick={() => setPreset(r)} data-preset={p.key}
@@ -96,7 +101,7 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
       </div>
 
       {open && (
-        <div className="grid gap-4 border-t border-border bg-surface-2/50 p-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="search-advanced">
+        <div id="order-advanced-filters" className="grid gap-4 border-t border-border bg-surface-2/50 p-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="search-advanced">
           <Field label="کد سفارش" hint="بخشی از کد هم کافی است"><Input className="ltr font-mono" value={draft.tracking_code ?? ""} onChange={e => set("tracking_code", e.target.value)} data-testid="search-code" /></Field>
           <Field label="کالا" hint="نام یا کد کالا"><Input value={draft.product ?? ""} onChange={e => set("product", e.target.value)} data-testid="search-product" /></Field>
           <Field label="راننده" hint="نام، نام کاربری یا کد راننده"><Input value={draft.driver ?? ""} onChange={e => set("driver", e.target.value)} data-testid="search-driver" /></Field>

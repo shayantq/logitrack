@@ -1,5 +1,4 @@
-from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Path, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -10,9 +9,10 @@ from app.dependencies import IdempotencyKey, require_role, user_dependency
 from app.models import ACTIVE_ORDER_STATUSES, Order, RoleEnum, Vehicle
 from app.schemas.order import (
     DeliveryEvidenceOut,
-    DeliveryAttemptOut, OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatus, OrderStatusRequest,
+    DeliveryAttemptOut, OrderAssignRequest, OrderDetailResponse, OrderRequest, OrderResponse, OrderStatusRequest,
     ResolveFailureRequest,
 )
+from app.schemas.order_query import OrderListQuery, OrderPage
 from app.schemas.action_center import BulkIn, BulkOut, OrderTimelineOut, PriorityIn
 from app.services import bulk_service, delivery_service, order_service, order_timeline_service
 from app.services.exceptions import DomainError
@@ -47,35 +47,18 @@ def get_dashboard_stats(
 
 
 @router.get('/', status_code=status.HTTP_200_OK, response_model=list[OrderResponse], summary="📋 دریافت لیست فیلتر شده سفارشات")
-def get_all_orders(
-        db: db_dependency,
-        user: user_dependency,
-        order_status: Optional[OrderStatus] = Query(None, description='وضعیت'),
-        province: Optional[str] = Query(None, description='استان مقصد'),
-        city: Optional[str] = Query(None, description='شهر مقصد'),
-        q: Optional[str] = Query(None, min_length=2, description='جستجوی سراسری: کد، مشتری، تحویل‌گیرنده، شهر، کالا، راننده، پلاک'),
-        vehicle_id: Optional[int] = Query(None, gt=0, description='خودرو'),
-        date_from: Optional[datetime] = Query(None, description='ثبت‌شده از تاریخ'),
-        date_to: Optional[datetime] = Query(None, description='ثبت‌شده تا تاریخ'),
-        skip: int = Query(0, ge=0, description='تعداد عبور از اول (Pagination)'),
-        limit: int = Query(100, ge=1, le=500, description='حداکثر تعداد دریافت'),
-        tracking_code: Optional[str] = Query(None, min_length=2, description='کد سفارش (بخشی از کد هم کافی است)'),
-        product: Optional[str] = Query(None, min_length=2, description='نام یا کد کالا'),
-        driver_id: Optional[int] = Query(None, gt=0, description='راننده'),
-        driver: Optional[str] = Query(None, min_length=2, description='نام، نام کاربری یا کد راننده'),
-        plate: Optional[str] = Query(None, min_length=2, description='پلاک (با ارقام فارسی یا لاتین)'),
-        delivery_from: Optional[date] = Query(None, description='روز تحویل از (وقت ایران، شامل)'),
-        delivery_to: Optional[date] = Query(None, description='روز تحویل تا (وقت ایران، شامل)'),
-        priority: Optional[bool] = Query(None, description='فقط فوری‌ها'),
-        sort: Optional[Literal[tuple(order_service.ORDER_SORTS)]] = Query(None, description='ستون مرتب‌سازی'),
-        direction: Literal["asc", "desc"] = Query("desc"),
-        view: Optional[Literal[tuple(order_service.ORDER_VIEWS)]] = Query(None, description='نمای نام‌دار (مثل دیرکرد)'),
-    ):
-    return order_service.list_orders(
-        db, user, order_status, province, city, q, vehicle_id, date_from, date_to, skip, limit,
-        sort=sort, direction=direction,
-        tracking_code=tracking_code, product=product, driver_id=driver_id, driver=driver, plate=plate,
-        delivery_from=delivery_from, delivery_to=delivery_to, priority=priority, view=view,
+def get_all_orders(db: db_dependency, user: user_dependency, query: Annotated[OrderListQuery, Query()]):
+    return order_service.list_orders(db, user, **query.model_dump())
+
+
+@router.get('/page', response_model=OrderPage, summary="فهرست صفحه‌بندی‌شده سفارش‌ها با شمارش دقیق")
+def get_order_page(db: db_dependency, user: user_dependency, query: Annotated[OrderListQuery, Query()]):
+    params = query.model_dump()
+    filters = {key: value for key, value in params.items() if key not in {"skip", "limit", "sort", "direction"}}
+    return OrderPage(
+        items=order_service.list_orders(db, user, **params),
+        total=order_service.count_orders(db, user, **filters),
+        skip=query.skip, limit=query.limit,
     )
 
 

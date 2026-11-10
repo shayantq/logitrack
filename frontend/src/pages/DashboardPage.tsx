@@ -2,17 +2,18 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, Boxes, ChevronDown, Package, PackageCheck, PieChart, Truck, Zap } from "lucide-react";
-import { api, unwrap, type Schemas } from "@/api/client";
+import { ApiError, api, unwrap, type Schemas } from "@/api/client";
 import { useMe } from "@/auth/AuthContext";
 import { ActionCenter } from "@/components/ActionCenter";
 import { UpdatedAt } from "@/components/UpdatedAt";
+import { QueryFeedback } from "@/components/QueryFeedback";
 import { BusinessHome } from "@/pages/home/BusinessHome";
 import { WarehouseHome } from "@/pages/home/WarehouseHome";
 import { OrderStatusBadge } from "@/components/StatusBadges";
 import { ACTIVE_ORDER_STATUSES, orderStatusLabel, orderStatusTone, VEHICLE_STATUS, VEHICLE_STATUS_TONE } from "@/lib/labels";
 import { faNumber, faShortDateTime } from "@/lib/format";
 import { BarChart, DonutChart } from "@/ui/brand";
-import { Badge, Card, CardHeader, EmptyState, ErrorState, PageHeader, Skeleton, StatCard, Table, cn, toneColor } from "@/ui/primitives";
+import { Badge, buttonClass, Card, CardHeader, EmptyState, PageHeader, Skeleton, StatCard, Table, cn, toneColor } from "@/ui/primitives";
 
 interface Stats {
   orders_by_status: Record<string, number>;
@@ -30,7 +31,7 @@ function greeting() {
 
 /** نمای کلی (نمودارها) زیر مرکز اقدام است و جمع‌شدنش برای هر کاربر در همین مرورگر به یاد می‌ماند */
 function useOverviewOpen() {
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem("dashboard-overview") !== "closed"; } catch { return true; } });
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("dashboard-overview") === "open"; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem("dashboard-overview", open ? "open" : "closed"); } catch { /* */ } }, [open]);
   return [open, setOpen] as const;
 }
@@ -38,19 +39,22 @@ function useOverviewOpen() {
 export default function DashboardPage() {
   const me = useMe();
   const [overviewOpen, setOverviewOpen] = useOverviewOpen();
-  const stats = useQuery({ queryKey: ["stats"], queryFn: async () => (await unwrap(api.GET("/reports/stats"))) as Stats, refetchInterval: 15_000 });
+  const stats = useQuery({ queryKey: ["stats"], queryFn: async () => (await unwrap(api.GET("/reports/stats"))) as Stats, refetchInterval: 15_000, enabled: overviewOpen });
   const recent = useQuery({
     queryKey: ["orders", "recent"],
     queryFn: () => unwrap(api.GET("/orders/", { params: { query: { limit: 6 } } })),
     refetchInterval: 15_000,
+    enabled: overviewOpen,
   });
 
-  const data = stats.data;
+  const data = stats.error instanceof ApiError && stats.error.status === 403 ? undefined : stats.data;
+  const recentData = recent.error instanceof ApiError && recent.error.status === 403 ? undefined : recent.data;
   const active = data ? ACTIVE_ORDER_STATUSES.reduce((sum, s) => sum + (data.orders_by_status[s] ?? 0), 0) : 0;
 
   return (
     <>
-      <PageHeader eyebrow="نمای کلی" title={`${greeting()}، ${me.full_name || me.username}`} subtitle="کارهای نیازمند اقدام و وضعیت سازمان" />
+      <PageHeader eyebrow="نمای کلی" title={`${greeting()}، ${me.full_name || me.username}`} subtitle="کارهای جاری سازمان؛ عملکرد دوره‌ای در بخش پایین صفحه"
+        actions={<><Link className={buttonClass()} to="/app/orders?new=1">ثبت سفارش</Link><Link className={buttonClass("secondary")} to="/app/receipts">دریافت کالا</Link></>} />
       {me.role === "warehouse_manager" && <WarehouseHome />}
       <ActionCenter />
       {me.role === "org_admin" && <BusinessHome />}
@@ -62,36 +66,37 @@ export default function DashboardPage() {
         <ChevronDown className={cn("size-5 text-muted transition-transform duration-200", overviewOpen && "rotate-180")} />
       </button>
       {overviewOpen && <div className="animate-fade">
-      {stats.error && <ErrorState error={stats.error} onRetry={stats.refetch} />}
+      <QueryFeedback error={stats.error} retry={stats.refetch} updatedAt={stats.dataUpdatedAt} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {!data ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />) : <>
+        {stats.isPending ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />) : data ? <>
           <StatCard label="کل سفارش‌ها" value={faNumber(data.total_orders)} icon={<PackageCheck className="size-[18px]" />} />
           <StatCard label="سفارش‌های فعال" value={faNumber(active)} tone="orange" icon={<Zap className="size-[18px]" />} hint="در انتظار تا در مسیر" />
           <StatCard label="کالاها" value={faNumber(data.total_products)} tone="info" icon={<Boxes className="size-[18px]" />} />
           <StatCard label="خودروها" value={faNumber(data.total_vehicles)} tone="violet" icon={<Truck className="size-[18px]" />} />
-        </>}
+        </> : null}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="سفارش‌ها بر اساس وضعیت" icon={<PieChart className="size-[18px]" />} />
           <div className="p-5">{data ? <DonutChart data={Object.entries(data.orders_by_status).map(([s, v]) => ({ label: orderStatusLabel(s), value: v, color: toneColor(orderStatusTone(s)) }))} />
-            : <Skeleton className="h-44" />}</div>
+            : stats.isPending ? <Skeleton className="h-44" /> : <p className="text-sm text-muted">اطلاعات آمار دریافت نشد.</p>}</div>
         </Card>
         <Card>
           <CardHeader title="ناوگان بر اساس وضعیت" icon={<Truck className="size-[18px]" />} tone="violet" />
           <div className="p-5">{data ? <BarChart data={Object.entries(data.vehicles_by_status).map(([s, v]) => ({ label: VEHICLE_STATUS[s] ?? s, value: v, color: toneColor(VEHICLE_STATUS_TONE[s] ?? "muted") }))} />
-            : <Skeleton className="h-44" />}</div>
+            : stats.isPending ? <Skeleton className="h-44" /> : <p className="text-sm text-muted">اطلاعات ناوگان دریافت نشد.</p>}</div>
         </Card>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader title="آخرین سفارش‌ها" icon={<Package className="size-[18px]" />} tone="info" actions={<Link to="/app/orders" className="tap-target inline-flex items-center gap-1 text-sm font-medium text-brand">همه سفارش‌ها <ArrowLeft className="size-4" /></Link>} />
-          {!recent.data ? <div className="p-5"><Skeleton className="h-40" /></div> : recent.data.length === 0 ? <EmptyState title="هنوز سفارشی ثبت نشده" /> : (
+          <QueryFeedback error={recent.error} retry={recent.refetch} updatedAt={recent.dataUpdatedAt} />
+          {recent.isPending ? <div className="p-5"><Skeleton className="h-40" /></div> : !recentData ? null : recentData.length === 0 ? <EmptyState title="هنوز سفارشی ثبت نشده" /> : (
             <ul className="divide-y divide-border">
-              {recent.data.map((o: Schemas["OrderResponse"]) => (
+              {recentData.map((o: Schemas["OrderResponse"]) => (
                 <li key={o.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div className="min-w-0">
                     <div className="font-mono text-sm font-semibold ltr">{o.tracking_code}</div>
@@ -106,7 +111,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader title="کالاهای رو‌به‌اتمام" subtitle="به تفکیک انبار" icon={<AlertTriangle className="size-[18px]" />} tone="warning"
             actions={<Link to="/app/reorder" className="tap-target text-xs font-medium text-brand hover:underline">نقطه سفارش ←</Link>} />
-          {!data ? <div className="p-5"><Skeleton className="h-40" /></div> : data.low_stock_products.length === 0 ? (
+          {stats.isPending ? <div className="p-5"><Skeleton className="h-40" /></div> : !data ? null : data.low_stock_products.length === 0 ? (
             <EmptyState title="همه کالاها بالای حد آستانه‌اند" icon={<PackageCheck className="size-5" />} />
           ) : (
             <Table>

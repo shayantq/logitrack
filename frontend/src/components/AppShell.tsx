@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -15,7 +15,7 @@ import { ROLE_LABELS } from "@/lib/labels";
 import { Logo, LogoMark, ThemeToggle } from "@/ui/brand";
 import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Tooltip } from "@/ui/overlays";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
-import { Button, cn } from "@/ui/primitives";
+import { Button, cn, Skeleton } from "@/ui/primitives";
 
 // فقط برای نسخه نمایشی خصوصی بارگذاری می‌شود
 const DemoChrome = lazy(() => import("@/components/demo/DemoChrome"));
@@ -83,6 +83,19 @@ export function AppShell() {
   return <TourProvider><Shell /></TourProvider>;
 }
 
+function PanelPage({ navigationKey }: { navigationKey: string }) {
+  const root = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const heading = root.current?.querySelector<HTMLElement>("h1");
+    document.title = `${heading?.textContent?.trim() || "پنل مدیریت"} — پسینه`;
+    if (document.querySelector("[role=dialog]")) return;
+    const target = heading ?? document.getElementById("app-main");
+    target?.setAttribute("tabindex", "-1");
+    target?.focus({ preventScroll: true });
+  }, [navigationKey]);
+  return <div ref={root} className="stagger"><Outlet /></div>;
+}
+
 function Shell() {
   const me = useMe();
   const tour = useTour();
@@ -113,6 +126,7 @@ function Shell() {
 
   return (
     <div className="flex min-h-dvh bg-bg">
+      <a href="#app-main" className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-surface focus:p-3 focus:text-brand">رفتن به محتوای اصلی</a>
       {/* سایدبار دسکتاپ: پنل شناور با فاصله از لبه‌ها */}
       <aside data-testid="sidebar" data-collapsed={collapsed}
         className={cn("sticky top-0 hidden h-dvh shrink-0 py-3 ps-3 transition-[width] duration-300 ease-out lg:block",
@@ -189,13 +203,15 @@ function Shell() {
           description="با تغییر رمز، از همه دستگاه‌های دیگر خارج می‌شوید؛ این دستگاه وارد می‌ماند.">
           <PasswordChangeForm onDone={() => setPasswordOpen(false)} />
         </Modal>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8">
+        <main id="app-main" tabIndex={-1} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8">
           {me.organization?.suspended && (
             <p className="mb-4 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm font-medium text-warning" data-testid="suspended-banner">
               حساب سازمان تعلیق است: کار تازه ثبت نمی‌شود، ولی سفرها و برگشت‌های در جریان را می‌توانید تمام کنید. برای رفع تعلیق با پشتیبانی پسینه تماس بگیرید.
             </p>
           )}
-          <div key={pageKey(location.pathname)} className="stagger"><Outlet /></div>
+          <Suspense fallback={<div className="min-h-[50vh] space-y-5" role="status" aria-label="در حال بارگذاری صفحه" aria-busy="true" data-testid="page-loading"><Skeleton className="h-9 w-48" /><div className="grid grid-cols-2 gap-4"><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}>
+            <PanelPage key={pageKey(location.pathname)} navigationKey={pageKey(location.pathname)} />
+          </Suspense>
         </main>
       </div>
     </div>

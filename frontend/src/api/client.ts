@@ -84,12 +84,12 @@ export async function authFetch(input: string, init: RequestInit = {}): Promise<
 
 /** خطای API با پیام قابل نمایش به کاربر. */
 export class ApiError extends Error {
-  constructor(message: string, public status?: number) {
+  constructor(message: string, public status?: number, public validationErrors: ValidationItem[] = []) {
     super(message);
   }
 }
 
-type ValidationItem = { msg?: string };
+export type ValidationItem = { msg?: string; loc?: (string | number)[] };
 
 export function errorMessage(error: unknown, fallback = "خطایی رخ داد؛ دوباره تلاش کنید."): string {
   if (error instanceof ApiError) return error.message;
@@ -125,7 +125,8 @@ export async function unwrap<T>(promise: Promise<{ data?: T; error?: unknown; re
     // خطای پیش‌بینی‌نشده سرور: کد پیگیری برای پشتیبانی (اگر در خود پیام نیامده باشد)
     const requestId = (error as { request_id?: string } | undefined)?.request_id ?? response.headers.get("x-request-id");
     if (response.status >= 500 && requestId && !message.includes(requestId)) message += ` (کد پیگیری: ${requestId})`;
-    throw new ApiError(message, response.status);
+    const detail = (error as { detail?: unknown } | undefined)?.detail;
+    throw new ApiError(message, response.status, response.status === 422 && Array.isArray(detail) ? detail as ValidationItem[] : []);
   }
   return data as T;
 }

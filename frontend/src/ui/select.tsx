@@ -5,12 +5,13 @@
  * یک <select> مخفی کنارش هست تا required و اعتبارسنجی فرم مثل قبل کار کند.
  */
 import {
-  Children, Fragment, forwardRef, isValidElement, useEffect, useImperativeHandle, useMemo, useRef, useState,
+  Children, Fragment, forwardRef, isValidElement, useEffect, useId, useImperativeHandle, useMemo, useRef, useState,
   type KeyboardEvent, type ReactNode, type SelectHTMLAttributes,
 } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { Popover } from "./popover";
 import { cn } from "./primitives";
+import { describedBy, useField } from "./fieldContext";
 
 type Opt = { value: string; label: ReactNode; text: string; disabled: boolean; group?: string };
 
@@ -51,6 +52,10 @@ export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChang
 export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select(
   { value, onChange, children, className, disabled, required, name, searchable, id, ...rest }, ref,
 ) {
+  const field = useField(id);
+  const generatedId = useId();
+  const controlId = id ?? field?.id ?? generatedId;
+  const listId = `${controlId}-options`;
   const options = useMemo(() => collect(children), [children]);
   const current = String(value ?? "");
   const selected = options.find(o => o.value === current);
@@ -69,9 +74,13 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     const q = norm(query);
     return q ? options.filter(o => norm(o.text).includes(q)) : options;
   }, [options, query]);
+  const firstEnabled = visible.findIndex(o => !o.disabled);
+  const activeId = open && visible[active] && !visible[active].disabled ? `${listId}-${active}` : undefined;
+  const labelId = rest["aria-labelledby"] ?? (ariaLabel ? undefined : field?.labelId);
 
   const choose = (opt: Opt) => {
     if (opt.disabled) return;
+    field?.clearError?.();
     setOpen(false);
     setQuery("");
     trigger.current?.focus();
@@ -80,17 +89,21 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
   const openList = () => {
     if (disabled) return;
     setQuery("");
-    setActive(Math.max(0, options.findIndex(o => o.value === current)));
+    const chosen = options.findIndex(o => o.value === current && !o.disabled);
+    setActive(chosen >= 0 ? chosen : options.findIndex(o => !o.disabled));
     setOpen(true);
   };
 
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(() => {
-      (withSearch ? search.current : list.current)?.focus({ preventScroll: true });
+      (withSearch ? search.current : trigger.current)?.focus({ preventScroll: true });
       list.current?.querySelector("[data-active=true]")?.scrollIntoView({ block: "nearest" });
     });
   }, [open, withSearch]);
+  useEffect(() => {
+    if (open && (!visible[active] || visible[active].disabled)) setActive(firstEnabled);
+  }, [open, visible, active, firstEnabled]);
   useEffect(() => { list.current?.querySelector("[data-active=true]")?.scrollIntoView({ block: "nearest" }); }, [active]);
 
   const move = (delta: number) => {
@@ -105,13 +118,13 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
   const onListKey = (e: KeyboardEvent) => {
     if (e.key === "ArrowDown") { e.preventDefault(); move(1); }
     else if (e.key === "ArrowUp") { e.preventDefault(); move(-1); }
-    else if (e.key === "Home") { e.preventDefault(); setActive(0); }
-    else if (e.key === "End") { e.preventDefault(); setActive(visible.length - 1); }
-    else if (e.key === "Enter") { e.preventDefault(); if (visible[active]) choose(visible[active]); }
-    else if (e.key === "Tab") setOpen(false);
+    else if (e.key === "Home" && !withSearch) { e.preventDefault(); setActive(firstEnabled); }
+    else if (e.key === "End" && !withSearch) { e.preventDefault(); setActive(visible.reduce((last, o, i) => o.disabled ? last : i, -1)); }
+    else if (e.key === "Enter" || (e.key === " " && !withSearch)) { e.preventDefault(); if (visible[active]) choose(visible[active]); }
+    else if (e.key === "Tab") { setOpen(false); trigger.current?.focus(); }
     else if (!withSearch && e.key.length === 1) {
       // پرش با حرف اول
-      const i = visible.findIndex(o => norm(o.text).startsWith(norm(e.key)));
+      const i = visible.findIndex(o => !o.disabled && norm(o.text).startsWith(norm(e.key)));
       if (i >= 0) setActive(i);
     }
   };
@@ -119,10 +132,13 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
   let lastGroup: string | undefined;
   return (
     <div className="relative" data-select-root data-field-root>
-      <button ref={trigger} type="button" id={id} role="combobox" aria-expanded={open} aria-haspopup="listbox"
-        aria-label={ariaLabel} data-testid={testId} data-value={current} disabled={disabled} data-focus-target
+      <button ref={trigger} type="button" id={controlId} role={withSearch ? undefined : "combobox"} aria-expanded={open} aria-haspopup="listbox"
+        aria-controls={open ? listId : undefined} aria-activedescendant={!withSearch ? activeId : undefined}
+        aria-label={ariaLabel} aria-labelledby={labelId} aria-required={!withSearch && required || undefined}
+        aria-describedby={describedBy(rest["aria-describedby"], field?.describedBy)} aria-invalid={rest["aria-invalid"] ?? (field?.invalid || undefined)}
+        data-testid={testId} data-value={current} disabled={disabled} data-focus-target
         onClick={() => (open ? setOpen(false) : openList())}
-        onKeyDown={e => { if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) { e.preventDefault(); openList(); } }}
+        onKeyDown={e => { if (open) onListKey(e); else if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) { e.preventDefault(); openList(); } }}
         className={cn("flex h-10 w-full items-center gap-2 rounded-xl border border-border-strong bg-surface px-3.5 text-start text-sm text-text transition",
           "focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:cursor-not-allowed disabled:opacity-60",
           open && "border-brand ring-4 ring-brand/15", className)}>
@@ -143,12 +159,14 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           <div className="border-b border-border p-2">
             <label className="relative block">
               <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted" />
-              <input ref={search} value={query} onChange={e => { setQuery(e.target.value); setActive(0); }} onKeyDown={onListKey}
+              <input ref={search} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={listId} aria-activedescendant={activeId} aria-required={required || undefined}
+                aria-label={labelId ? undefined : ariaLabel ? `جست‌وجو در ${ariaLabel}` : "جست‌وجو در گزینه‌ها"} aria-labelledby={labelId}
+                value={query} onChange={e => { setQuery(e.target.value); setActive(0); }} onKeyDown={onListKey}
                 placeholder="جست‌وجو..." className="h-9 w-full rounded-lg bg-surface-2 ps-8 pe-2 text-sm outline-none focus:ring-2 focus:ring-brand/30" />
             </label>
           </div>
         )}
-        <div ref={list} role="listbox" tabIndex={-1} onKeyDown={onListKey} data-select-list className="overflow-y-auto p-1 outline-none">
+        <div ref={list} id={listId} role="listbox" aria-label={labelId ? undefined : ariaLabel ?? "گزینه‌ها"} aria-labelledby={labelId} data-select-list className="overflow-y-auto p-1 outline-none">
           {visible.length === 0 && <div className="px-3 py-6 text-center text-sm text-muted">موردی پیدا نشد</div>}
           {visible.map((o, i) => {
             const header = o.group && o.group !== lastGroup ? o.group : null;
@@ -157,8 +175,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
             return (
               <Fragment key={`${o.group ?? ""}:${o.value}`}>
                 {header && <div className="px-3 pb-1 pt-2.5 text-[11px] font-semibold text-muted">{header}</div>}
-                <div role="option" aria-selected={isSelected} aria-disabled={o.disabled} data-value={o.value} data-active={i === active}
-                  onPointerMove={() => i !== active && setActive(i)} onClick={() => choose(o)}
+                <div id={`${listId}-${i}`} role="option" aria-selected={isSelected} aria-disabled={o.disabled} data-value={o.value} data-active={i === active}
+                  onPointerMove={() => !o.disabled && i !== active && setActive(i)} onClick={() => choose(o)}
                   className={cn("flex cursor-pointer select-none items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
                     i === active && "bg-surface-2", isSelected ? "font-semibold text-brand" : "text-text",
                     o.value === "" && !isSelected && "text-muted", o.disabled && "cursor-not-allowed opacity-40")}>
