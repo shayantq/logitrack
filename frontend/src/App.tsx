@@ -4,6 +4,7 @@ import { AuthProvider, homePathFor, isApprovedDriver, useAuth } from "./auth/Aut
 import { AppShell } from "./components/AppShell";
 import type { Role } from "./lib/labels";
 import { Spinner } from "./ui/primitives";
+import { PageSkeleton } from "./ui/PageSkeleton";
 
 // هر صفحه جدا بارگذاری می‌شود — بازدیدکننده صفحه اصلی کد پنل‌ها را دانلود نمی‌کند و برعکس
 const LandingPage = lazy(() => import("./pages/public/LandingPage"));
@@ -85,6 +86,8 @@ const ORG_STAFF: Role[] = ["org_admin", "warehouse_manager"];
 const PLATFORM: Role[] = ["platform_admin", "platform_support"];
 
 function PageLoader() {
+  const { pathname } = useLocation();
+  if (pathname.startsWith("/app")) return <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-8"><PageSkeleton pathname={pathname} /></div>;
   return <div className="grid min-h-[50vh] place-items-center" data-testid="loading"><Spinner className="size-7" /></div>;
 }
 

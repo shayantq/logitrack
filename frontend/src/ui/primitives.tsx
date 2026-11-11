@@ -14,7 +14,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: "bg-brand text-brand-ink hover:bg-brand-strong shadow-sm",
   secondary: "border border-border-strong bg-surface text-text hover:bg-surface-2",
   ghost: "text-text-2 hover:bg-surface-2 hover:text-text",
-  danger: "bg-danger text-white hover:opacity-90",
+  danger: "bg-danger text-danger-ink hover:opacity-90",
   "outline-danger": "border border-danger/40 text-danger hover:bg-danger-soft",
   soft: "bg-brand-soft text-brand-strong hover:brightness-95",
 };
@@ -22,7 +22,7 @@ const BUTTON_SIZES = { sm: "h-8 px-3 text-xs gap-1.5", md: "h-10 px-4 text-sm ga
 
 /** کلاس‌های دکمه برای لینک‌هایی که باید شبیه دکمه باشند */
 export function buttonClass(variant: ButtonVariant = "primary", size: keyof typeof BUTTON_SIZES = "md", className?: string) {
-  return cn("inline-flex shrink-0 items-center justify-center rounded-xl font-medium transition-all active:scale-[.98]",
+  return cn("ui-button inline-flex shrink-0 items-center justify-center rounded-xl font-medium transition-colors active:scale-[.98] motion-reduce:active:scale-100",
     BUTTON_VARIANTS[variant], BUTTON_SIZES[size], className);
 }
 
@@ -88,7 +88,7 @@ export function CardHeader({ title, subtitle, actions, icon, tone = "brand" }: {
 // ---------------------------------------------------------------- Form fields
 // فهرست انتخاب سفارشی (به‌جای <select> پیش‌فرض مرورگر)
 export { Select } from "./select";
-const FIELD_BASE = "w-full rounded-xl border border-border-strong bg-surface px-3.5 text-sm text-text placeholder:text-muted/70 transition focus:border-brand focus:ring-4 focus:ring-brand/15 focus:outline-none disabled:opacity-60";
+const FIELD_BASE = "ui-field w-full rounded-xl border border-border-strong bg-surface px-3.5 text-sm text-text placeholder:text-muted transition focus:border-brand focus:ring-4 focus:ring-brand/15 focus:outline-none disabled:opacity-60";
 
 /**
  * پیام فارسی به‌جای پیام انگلیسی مرورگر برای قاعده‌هایی که خود فیلد دارد (required، type، min، max، طول، pattern).
@@ -166,7 +166,7 @@ export function Field({ label, hint, error: explicitError, name, children, class
 
 export function Checkbox({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-2">
+    <label className="ui-checkbox inline-flex cursor-pointer items-center gap-2 text-sm text-text-2">
       <input type="checkbox" className="size-4 rounded accent-[var(--brand)]" {...props} />
       {label}
     </label>
@@ -181,7 +181,7 @@ export function Spinner({ className }: { className?: string }) {
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div aria-hidden="true" className={cn("relative overflow-hidden rounded-lg bg-surface-2", className)}>
-      <div className="absolute inset-0 translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-l from-transparent via-border/60 to-transparent" />
+      <div className="absolute inset-0 translate-x-full animate-[shimmer_1.4s_infinite] motion-reduce:hidden bg-gradient-to-l from-transparent via-border/60 to-transparent" />
     </div>
   );
 }
@@ -310,7 +310,7 @@ export function SegmentedControl<T extends string>({ value, options, onChange }:
   value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-xl border border-border bg-surface-2 p-1" role="group">
+    <div className="ui-segmented inline-flex flex-wrap rounded-xl border border-border bg-surface-2 p-1" role="group">
       {options.map(o => (
         <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
           className={cn("rounded-lg px-3 py-1.5 text-xs font-medium transition",

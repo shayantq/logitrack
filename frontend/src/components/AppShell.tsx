@@ -15,7 +15,8 @@ import { ROLE_LABELS } from "@/lib/labels";
 import { Logo, LogoMark, ThemeToggle } from "@/ui/brand";
 import { Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Tooltip } from "@/ui/overlays";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
-import { Button, cn, Skeleton } from "@/ui/primitives";
+import { Button, cn } from "@/ui/primitives";
+import { PageSkeleton } from "@/ui/PageSkeleton";
 
 // فقط برای نسخه نمایشی خصوصی بارگذاری می‌شود
 const DemoChrome = lazy(() => import("@/components/demo/DemoChrome"));
@@ -209,7 +210,7 @@ function Shell() {
               حساب سازمان تعلیق است: کار تازه ثبت نمی‌شود، ولی سفرها و برگشت‌های در جریان را می‌توانید تمام کنید. برای رفع تعلیق با پشتیبانی پسینه تماس بگیرید.
             </p>
           )}
-          <Suspense fallback={<div className="min-h-[50vh] space-y-5" role="status" aria-label="در حال بارگذاری صفحه" aria-busy="true" data-testid="page-loading"><Skeleton className="h-9 w-48" /><div className="grid grid-cols-2 gap-4"><Skeleton className="h-28" /><Skeleton className="h-28" /></div><Skeleton className="h-64" /></div>}>
+          <Suspense fallback={<PageSkeleton pathname={location.pathname} />}>
             <PanelPage key={pageKey(location.pathname)} navigationKey={pageKey(location.pathname)} />
           </Suspense>
         </main>

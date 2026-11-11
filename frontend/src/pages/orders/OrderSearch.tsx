@@ -121,7 +121,7 @@ export function OrderSearch({ filters, onChange }: { filters: OrderFilters; onCh
           {active.map(([k, v]) => (
             <span key={k} className="flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs text-brand-strong">
               {LABELS[k]}: <b>{k.startsWith("delivery") ? faDate(v) : k === "order_status" ? ORDER_STATUS[v as keyof typeof ORDER_STATUS]?.label : k === "priority" ? "بله" : k === "view" ? ORDER_VIEW_LABELS[v] ?? v : v}</b>
-              <button type="button" aria-label={`حذف فیلتر ${LABELS[k]}`} onClick={() => { const next = { ...filters, [k]: undefined }; setDraft(next); onChange(next); }}><X className="size-3" /></button>
+              <button type="button" className="filter-remove inline-flex min-h-6 min-w-6 items-center justify-center rounded-full hover:bg-brand/15" aria-label={`حذف فیلتر ${LABELS[k]}`} onClick={() => { const next = { ...filters, [k]: undefined }; setDraft(next); onChange(next); }}><X className="size-3" /></button>
             </span>
           ))}
         </div>

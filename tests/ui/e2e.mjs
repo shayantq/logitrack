@@ -41,6 +41,9 @@ async function runSession(scope, username, password, scenario, contextOptions = 
   if (!tours) await context.addInitScript(() => { try { localStorage.setItem("tours-off", "1"); } catch { /* */ } });
   const page = await context.newPage();
   const errors = [];
+  const failedRequests = [];
+  page.on("requestfailed", request => failedRequests.push(`${new URL(request.url()).pathname}: ${request.failure()?.errorText}`));
+  page.on("response", response => { if (response.status() >= 500) failedRequests.push(`${new URL(response.url()).pathname}: HTTP ${response.status()}`); });
   page.on("pageerror", e => errors.push(`pageerror: ${e.message}`));
   // پاسخ‌های 4xx سناریوهای خطای عمدی (رمز اشتباه و ...) را مرورگر به‌صورت «Failed to load resource» لاگ می‌کند؛
   // درستی آن جریان‌ها با assertion خودشان بررسی می‌شود
@@ -61,7 +64,7 @@ async function runSession(scope, username, password, scenario, contextOptions = 
     // برای عیب‌یابی: انتظار ناموفق + پیام‌های روی صفحه + اسکرین‌شات
     const toasts = await page.locator("[data-testid=toast]").allTextContents().catch(() => []);
     await page.screenshot({ path: `e2e-failure-${scope}.png`, fullPage: true }).catch(() => {});
-    errors.push(`scenario: ${e.message.split("\n").slice(0, 3).join(" ")} — toasts: ${toasts.join(" / ")}`);
+    errors.push(`scenario: ${e.message.split("\n").slice(0, 3).join(" ")} — toasts: ${toasts.join(" / ")} — network: ${failedRequests.slice(-8).join(" / ")}`);
   }
   check(scope, "no JS/console errors", errors.length === 0, errors.slice(0, 4).join(" | "));
   await context.close();

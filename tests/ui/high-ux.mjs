@@ -46,6 +46,7 @@ try {
   ok("Dashboard removes duplicate summaries and starts with overview collapsed");
   await page.locator("[data-testid=app-nav]").getByText("سفارش‌ها", { exact: true }).click();
   await page.waitForSelector("[data-testid=page-loading]");
+  assert.equal(await page.locator("[data-testid=page-loading]").getAttribute("data-skeleton"), "list");
   assert(await page.locator("[data-testid=app-nav]").isVisible());
   assert(await page.locator("[data-testid=org-name]").isVisible());
   await page.screenshot({ animations: "disabled", path: join(evidence, "shell-loading.png") });
@@ -196,18 +197,51 @@ try {
   await failure.ctx.close();
 
   for (const theme of ["light", "dark"]) {
-    const mobile = await context({ viewport: { width: 390, height: 844 } });
+    const mobile = await context({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
     await mobile.ctx.addInitScript(t => localStorage.setItem("theme", t), theme);
     await mobile.page.goto(`${BASE}/app`); await mobile.page.waitForSelector("[data-testid=business-home]");
+    const contrast = await mobile.page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement);
+      const color = name => css.getPropertyValue(`--${name}`).trim();
+      const luminance = name => {
+        const channels = color(name).slice(1).match(/../g).map(c => parseInt(c, 16) / 255)
+          .map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      };
+      const pairs = [
+        ...["bg", "surface", "surface-2"].flatMap(bg => ["text", "text-2", "muted"].map(fg => [fg, bg, 4.5])),
+        ...["success", "warning", "danger", "info", "violet", "orange", "pink"].flatMap(tone => [[tone, `${tone}-soft`, 4.5], [tone, "surface", 4.5]]),
+        ["brand-ink", "brand", 4.5], ["brand-ink", "brand-strong", 4.5], ["danger-ink", "danger", 4.5],
+        ["border-strong", "surface", 3], ["border-strong", "surface-2", 3],
+      ];
+      return pairs.map(([fg, bg, min]) => {
+        const a = luminance(fg), b = luminance(bg);
+        return { pair: `${fg}/${bg}`, ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), min };
+      });
+    });
+    assert.deepEqual(contrast.filter(c => c.ratio < c.min), [], `${theme}: token contrast`);
+    assert.equal(await mobile.page.evaluate(() => document.getAnimations().some(a => {
+      const timing = a.effect?.getComputedTiming();
+      return timing && (timing.iterations === Infinity || Number(timing.duration) > 20);
+    })), false, `${theme}: reduced motion stops long and repeated animations`);
     assert(await mobile.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    await mobile.page.screenshot({ animations: "disabled", path: join(evidence, `dashboard-mobile-${theme}.png`), fullPage: true });
     await mobile.page.goto(`${BASE}/app/orders?new=1`); await mobile.page.waitForSelector("#order-form");
+    assert(await mobile.page.evaluate(() => matchMedia("(pointer: coarse)").matches), "Touch emulation is active during target measurement");
+    const smallTargets = await mobile.page.locator("#order-form .ui-button, #order-form .ui-field, #order-form .ui-checkbox").evaluateAll(els => els
+      .filter(el => el.getClientRects().length)
+      .map(el => ({ tag: el.tagName, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }))
+      .filter(r => r.width < 44 || r.height < 44));
+    assert.deepEqual(smallTargets, [], `${theme}: shared form targets on touch screens`);
     assert(!mobile.page.url().includes("new=1"));
     assert(await mobile.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await mobile.page.screenshot({ animations: "disabled", path: join(evidence, `form-mobile-${theme}.png`) });
+    // تصویربرداری بعد از اندازه‌گیری: fullPage در برخی نسخه‌های Chromium/Playwright شبیه‌سازی لمس را reset می‌کند.
+    await mobile.page.goto(`${BASE}/app`); await mobile.page.waitForSelector("[data-testid=business-home]");
+    await mobile.page.screenshot({ animations: "disabled", path: join(evidence, `dashboard-mobile-${theme}.png`) });
     await mobile.ctx.close();
   }
   ok("Quick-create link works; dashboard and form fit mobile in light and dark themes");
+  ok("Semantic color tokens meet text/control contrast thresholds in both themes; shared touch targets reach 44px");
   assert.deepEqual(errors, [], "Browser runtime errors");
   console.log(`PASS ${passed} High UX scenarios; evidence: ${evidence}`);
 } catch (error) {

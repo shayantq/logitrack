@@ -139,7 +139,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         data-testid={testId} data-value={current} disabled={disabled} data-focus-target
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={e => { if (open) onListKey(e); else if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) { e.preventDefault(); openList(); } }}
-        className={cn("flex h-10 w-full items-center gap-2 rounded-xl border border-border-strong bg-surface px-3.5 text-start text-sm text-text transition",
+        className={cn("ui-field flex h-10 w-full items-center gap-2 rounded-xl border border-border-strong bg-surface px-3.5 text-start text-sm text-text transition",
           "focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:cursor-not-allowed disabled:opacity-60",
           open && "border-brand ring-4 ring-brand/15", className)}>
         <span className={cn("min-w-0 flex-1 truncate", (!selected || selected.value === "") && "text-muted")}>

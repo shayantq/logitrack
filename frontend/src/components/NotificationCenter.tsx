@@ -113,7 +113,7 @@ export function NotificationCenter() {
       <Button variant="ghost" size="icon" className="relative" aria-label="اعلان‌ها" aria-expanded={open} data-testid="notifications-bell"
         onClick={() => setOpen(o => !o)}>
         <Bell className={cn("size-[18px]", unread > 0 && "origin-top animate-[bell_1.2s_ease-in-out_1]")} />
-        {unread > 0 && <span className="absolute -top-0.5 -left-0.5 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-surface"
+        {unread > 0 && <span className="absolute -top-0.5 -left-0.5 grid min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-danger-ink ring-2 ring-surface"
           data-testid="notifications-count">{unread > 99 ? "۹۹+" : unread.toLocaleString("fa-IR")}</span>}
       </Button>
 

@@ -222,7 +222,7 @@ function VideoRecorder({ onClose, onDone }: { onClose: () => void; onDone: (blob
           )}
           {phase === "starting" && <div className="absolute inset-0 grid place-items-center text-white"><Loader2 className="size-7 animate-spin" /></div>}
           {phase === "recording" && (
-            <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-danger px-2.5 py-1 text-xs font-bold text-white">
+            <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-danger px-2.5 py-1 text-xs font-bold text-danger-ink">
               <span className="size-2 animate-pulse rounded-full bg-white" />{fa(MAX_VIDEO_SECONDS_RECORD - elapsed)}
             </span>
           )}

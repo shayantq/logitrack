@@ -229,7 +229,7 @@ export function NavLinks({ items, collapsed, onNavigate }: { items: NavItem[]; c
                         </span>
                         {!collapsed && <span className="truncate">{label}</span>}
                         {!collapsed && count > 0 && (
-                          <span className={cn("ms-auto tabular-nums", urgent ? "grid min-w-5 animate-pulse place-items-center rounded-full bg-danger px-1.5 text-[11px] font-bold text-white" : "text-xs text-muted")}
+                          <span className={cn("ms-auto tabular-nums", urgent ? "grid min-w-5 animate-pulse place-items-center rounded-full bg-danger px-1.5 text-[11px] font-bold text-danger-ink" : "text-xs text-muted")}
                             data-testid={BADGE_TESTID[badge!]}>
                             {count.toLocaleString("fa-IR")}
                           </span>

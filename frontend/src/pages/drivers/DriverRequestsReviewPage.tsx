@@ -79,7 +79,7 @@ function RequestCard({ r, flash }: { r: Req; flash?: boolean }) {
     <Card className={cn("overflow-hidden", urgent && r.status === "pending" && "border-danger/50", flash && "focus-flash")} data-testid="driver-request" data-kind={r.kind}
       data-focus={`request-${r.id}`}>
       <div className={cn("flex flex-wrap items-center gap-3 border-b border-border px-5 py-3.5", urgent && r.status === "pending" && "bg-danger-soft/50")}>
-        <span className={cn("grid size-9 place-items-center rounded-xl", r.kind === "leave" ? (urgent ? "bg-danger text-white" : "bg-warning-soft text-warning") : "bg-info-soft text-info")}>
+        <span className={cn("grid size-9 place-items-center rounded-xl", r.kind === "leave" ? (urgent ? "bg-danger text-danger-ink" : "bg-warning-soft text-warning") : "bg-info-soft text-info")}>
           {r.kind === "leave" ? <CalendarOff className="size-[18px]" /> : <Car className="size-[18px]" />}
         </span>
         <div>

@@ -176,6 +176,9 @@ jobs:
       - name: Start full stack (web, worker, beat, PostgreSQL, Redis)
         run: docker compose up -d --build --wait --wait-timeout 300
 
+      - name: Verify task queue readiness
+        run: docker compose exec -T web python -m scripts.check_task_queue
+
       - name: Seed demo data
         run: docker compose exec -T web python seed_demo_data.py
 
