@@ -47,7 +47,7 @@ anyio==4.14.2
 certifi==2026.10.19
 click==8.4.2
 colorama==0.4.6
-dnspython==2.9.0
+dnspython==2.9.2
 ecdsa==0.19.2
 greenlet==3.5.3
 h11==0.16.0
