@@ -7,6 +7,7 @@
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from urllib.parse import unquote
 
 import pytest
 
@@ -232,12 +233,14 @@ class _FakeResult:
 def test_report_result_of_other_organization_is_hidden(tenants, monkeypatch):
     client, db, a, b, *_ = tenants
     from app.routers import reports
-    payload = {"organization_id": b.org_id, "filename": "x.xlsx", "content_type": "text/plain", "content_b64": "eA=="}
+    payload = {"organization_id": b.org_id, "filename": "Pasineh_x.xlsx", "content_type": "text/plain", "content_b64": "eA=="}
     monkeypatch.setattr(reports, "AsyncResult", lambda task_id, app=None: _FakeResult(payload))
 
     assert client.get("/reports/task-result/some-task", headers=_auth(a.admin)).status_code == 404
     assert client.get("/reports/task-status/some-task", headers=_auth(a.admin)).status_code == 404
-    assert client.get("/reports/task-result/some-task", headers=_auth(b.admin)).status_code == 200
+    download = client.get("/reports/task-result/some-task", headers=_auth(b.admin))
+    assert download.status_code == 200 and download.content == b"x"
+    assert unquote(download.headers["content-disposition"]) == "attachment; filename=\"x.xlsx\"; filename*=UTF-8''پسینه_x.xlsx"
 
 
 # ---------------------------------------------------------------------------

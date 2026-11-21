@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { ArrowLeft, LogIn, Menu as MenuIcon, PackageSearch, X } from "lucide-react";
 import { BRAND } from "@/brand";
-import { Logo, ThemeToggle } from "@/ui/brand";
+import { BrandWordmark, Logo, ThemeToggle } from "@/ui/brand";
 import { buttonClass, cn } from "@/ui/primitives";
 import { ScrollTrigger, gsap, useReducedMotion } from "./motion";
 
@@ -71,7 +71,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
     <header className={cn("fixed inset-x-0 top-0 z-50 transition-colors duration-300",
       scrolled || open ? "border-b border-border bg-bg/80 backdrop-blur-xl" : "border-b border-transparent")}>
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <Link to="/" aria-label={BRAND.name}><Logo /></Link>
+        <Link to="/" aria-label={BRAND.nameFa}><Logo /></Link>
         {landing && (
           <div className="hidden min-w-0 items-center gap-2 text-sm text-muted md:flex" data-testid="section-indicator">
             <span className="live-dot" />
@@ -128,17 +128,21 @@ function SectionName({ value }: { value: string }) {
 }
 
 /**
- * پانویس با نام بزرگ برند که هم‌زمان با رسیدن به انتهای صفحه، از چپ به راست پر می‌شود.
+ * پانویس با نام بزرگ برند که هم‌زمان با رسیدن به انتهای صفحه، از راست به چپ پر می‌شود.
  * پیشرفت مستقیم از فاصله تا انتهای صفحه حساب می‌شود (نه موقعیت‌های ذخیره‌شده ScrollTrigger که با تغییر
  * چیدمان صفحه کهنه می‌شدند و باعث می‌شد نوشته تا آخرین لحظه خالی بماند و یک‌باره پر شود).
  */
 export function PublicFooter() {
-  const word = useRef<HTMLSpanElement>(null);
+  const word = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   useEffect(() => {
     const el = word.current;
     if (!el) return;
-    if (reduced) { el.style.clipPath = "none"; return; }
+    if (reduced) {
+      el.dataset.progress = "1.00";
+      el.style.clipPath = "none";
+      return;
+    }
     let frame = 0;
     const update = () => {
       frame = 0;
@@ -153,7 +157,7 @@ export function PublicFooter() {
       else p = Math.min(1, Math.max(0, (vh - top) / range));
       el.dataset.progress = p.toFixed(2);
       el.style.transitionDuration = range < 80 ? "1.2s" : "";
-      el.style.clipPath = `inset(-10% ${((1 - p) * 100).toFixed(2)}% -10% 0)`;
+      el.style.clipPath = `inset(0 0 0 ${((1 - p) * 100).toFixed(2)}%)`;
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
     update();
@@ -200,16 +204,15 @@ export function PublicFooter() {
           </ul>
         </div>
       </div>
-      <div className="relative mx-auto max-w-7xl select-none px-4 sm:px-6" aria-hidden="true">
-        <div className="relative -mb-[0.18em] text-[17vw] font-black leading-[1.15] tracking-tighter ltr xl:text-[15rem]">
-          <span className="block text-transparent [-webkit-text-stroke:1px_var(--border-strong)]">{BRAND.name.toUpperCase()}</span>
-          <span ref={word} data-testid="footer-wordmark" style={{ clipPath: "inset(-10% 100% -10% 0)" }}
-            className="absolute inset-0 block bg-linear-to-r from-brand via-brand to-accent bg-clip-text text-transparent transition-[clip-path] duration-300 ease-out">{BRAND.name.toUpperCase()}</span>
+      <div className="relative mx-auto w-[min(80vw,40rem)] select-none" aria-hidden="true">
+        <BrandWordmark className="block w-full" />
+        <div ref={word} data-testid="footer-wordmark" style={{ clipPath: "inset(0 0 0 100%)" }}
+          className="absolute inset-0 transition-[clip-path] duration-300 ease-out motion-reduce:transition-none">
+          <BrandWordmark className="block w-full" gradient />
         </div>
       </div>
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted sm:px-6">
-        <span>© {new Date().getFullYear()} {BRAND.name}</span>
-        <span className="font-mono">v2 · multi-tenant</span>
+      <div className="mx-auto max-w-7xl px-4 py-6 text-center text-xs text-muted sm:px-6">
+        © {new Date().getFullYear()} {BRAND.nameFa}
       </div>
     </footer>
   );

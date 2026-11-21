@@ -3,7 +3,6 @@
  * برای تغییر نام محصول فقط همین فایل (و عنوان index.html) را عوض کنید.
  */
 export const BRAND = {
-  name: "Pasineh",
   nameFa: "پسینه",
   tagline: "مدیریت هوشمند ارسال و انبار",
   domain: "passineh.ir",

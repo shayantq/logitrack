@@ -2,10 +2,10 @@
 import { useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import * as Accordion from "@radix-ui/react-accordion";
-import { ArrowLeft, Building2, Check, ChevronDown, ClipboardList, History, KeyRound, Layers, MapPin, Phone, ShieldCheck, Sheet, Truck, UserCog } from "lucide-react";
+import { ArrowLeft, Building2, Check, ChevronDown, ClipboardList, History, KeyRound, Layers, MapPin, Phone, ShieldCheck, Truck, UserCog } from "lucide-react";
 import { faNumber } from "@/lib/format";
 import { buttonClass, cn } from "@/ui/primitives";
-import { CountUp, Reveal, ScrubText, SectionTag, useProgressState, useReducedMotion } from "../motion";
+import { range, Reveal, ScrubText, SectionTag, useProgressState, useReducedMotion } from "../motion";
 import { ALL_FAQ, LANDING_FAQ_IDS } from "../content/faq";
 
 // ------------------------------------------------------------------ [03] محصول
@@ -175,7 +175,8 @@ const HOW = [
 export function HowSection() {
   const list = useRef<HTMLOListElement>(null);
   const reduced = useReducedMotion();
-  const p = useProgressState(list, { smooth: 0.4, start: "top 70%", end: "bottom 55%", disabled: reduced });
+  const progress = useProgressState(list, { smooth: 0.4, start: "top 70%", end: "bottom 55%", disabled: reduced });
+  const p = reduced ? 1 : progress;
   return (
     <section id="how" data-section="شروع کار" className="py-28 sm:py-36">
       <div className="mx-auto grid max-w-7xl gap-14 px-4 sm:px-6 lg:grid-cols-2">
@@ -184,13 +185,18 @@ export function HowSection() {
           <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="از ثبت‌نام تا اولین تحویل، در چهار قدم." />
           <Link to="/request?plan=trial" className={buttonClass("primary", "lg", "mt-8")}>شروع رایگان<ArrowLeft className="size-4" /></Link>
         </div>
-        <ol ref={list} className="relative space-y-6">
-          <span className="absolute right-[23px] top-6 bottom-6 w-0.5 bg-border" />
-          <span className="absolute right-[23px] top-6 bottom-6 w-0.5 origin-top bg-linear-to-b from-brand to-accent" style={{ transform: `scaleY(${p})` }} />
+        <ol ref={list} className="flex flex-col gap-6">
           {HOW.map((step, i) => {
-            const reached = p >= (i + 0.2) / HOW.length || (i === 0 && p > 0.02);
+            const reachedAt = i === 0 ? 0.02 : (i + 0.2) / HOW.length;
+            const reached = p >= reachedAt;
             return (
               <li key={step.title} className="relative flex gap-5">
+                {i < HOW.length - 1 && (
+                  <span aria-hidden="true" className="absolute start-[23px] top-6 -bottom-12 w-0.5 bg-border">
+                    <span className="block size-full origin-top bg-linear-to-b from-brand to-accent"
+                      style={{ transform: `scaleY(${range(p, reachedAt, (i + 1.2) / HOW.length)})` }} />
+                  </span>
+                )}
                 <span className={cn("relative z-10 grid size-12 shrink-0 place-items-center rounded-2xl border-2 font-mono text-sm font-bold transition-all duration-500",
                   reached ? "border-brand bg-brand text-brand-ink" : "border-border-strong bg-bg text-muted")}>
                   {reached ? <Check className="size-5" /> : `0${i + 1}`}
@@ -210,10 +216,9 @@ export function HowSection() {
 
 // ------------------------------------------------------------------ [05] اعتماد
 const TRUST = [
-  { icon: Layers, title: "جداسازی کامل سازمان‌ها", text: "داده‌های هر سازمان کاملاً جداست و در پنل هیچ سازمان دیگری دیده نمی‌شود." },
-  { icon: UserCog, title: "دسترسی بر اساس نقش", text: "مدیر، انباردار و راننده هر کدام فقط بخش مربوط به کار خودشان را می‌بینند." },
-  { icon: History, title: "ردپای هر تغییر", text: "هر تغییر در سفارش و انبار با زمان و نام ثبت‌کننده ذخیره می‌شود." },
-  { icon: Sheet, title: "گزارش‌های آماده", text: "داشبورد مدیریتی و خروجی اکسل و PDF برای حسابداری و جلسه‌های مدیریت." },
+  { icon: Layers, title: "پنل اختصاصی سازمان", text: "سفارش‌ها، موجودی و گزارش‌های سازمانتان را در فضای جداگانهٔ خودتان ببینید." },
+  { icon: UserCog, title: "دسترسی متناسب با مسئولیت", text: "دسترسی را بر اساس نقش اعضای تیم تنظیم کنید. برای نمونه، راننده سفارش‌های تخصیص‌یافته به خودش را می‌بیند." },
+  { icon: History, title: "تاریخچهٔ قابل پیگیری", text: "زمان و ثبت‌کنندهٔ تغییرات مهم را در تاریخچهٔ سفارش و گردش کالا پیدا کنید." },
 ];
 
 export function TrustSection() {
@@ -221,18 +226,8 @@ export function TrustSection() {
     <section id="trust" data-section="اعتماد" className="bg-bg-2 py-28 sm:py-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <SectionTag label="اعتماد" />
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-end">
-          <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="اطلاعات شما، امن و فقط برای شما." />
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-            {[[100, " درصد", "جداسازی داده سازمان‌ها"], [5, "", "نقش دسترسی جدا"], [15, " ثانیه", "به‌روزرسانی خودکار صفحه‌ها"], [30, " روز", "استفاده رایگان"]].map(([v, s, l]) => (
-              <div key={l as string}>
-                <CountUp to={v as number} suffix={s as string} className="text-4xl font-black tracking-tight text-brand" />
-                <div className="mt-1 text-sm text-muted">{l as string}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <Reveal className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">دسترسی به اطلاعات تیم، در اختیار شماست</h2>
+        <div className="mt-9 grid gap-4 md:grid-cols-3">
           {TRUST.map(t => (
             <div key={t.title} className="card group p-6 transition-[translate,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-lg)]">
               <div className="grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6"><t.icon className="size-6" /></div>
@@ -240,7 +235,10 @@ export function TrustSection() {
               <p className="mt-2 text-sm leading-7 text-text-2">{t.text}</p>
             </div>
           ))}
-        </Reveal>
+        </div>
+        <Link to="/security" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-brand hover:text-brand-strong">
+          دربارهٔ امنیت و پایداری <ArrowLeft aria-hidden="true" className="size-4" />
+        </Link>
       </div>
     </section>
   );

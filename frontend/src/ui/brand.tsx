@@ -1,29 +1,9 @@
 /** لوگو، کلید تم و نمودارهای ساده SVG (بدون کتابخانه سنگین نمودار) */
 import { Moon, Sun } from "lucide-react";
-import { BRAND } from "@/brand";
 import { useTheme } from "@/theme/ThemeProvider";
 import { Button, cn } from "./primitives";
 
-/** نشان: مسیر خط‌چین روی یک جعبه — ترکیب «ارسال» و «انبار» */
-export function LogoMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" className={cn("size-8", className)} aria-hidden="true">
-      <rect x="2" y="2" width="28" height="28" rx="9" fill="var(--brand)" />
-      <path d="M9 21.5 15 18l8 4.5" stroke="var(--brand-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity=".55" />
-      <path d="M9 13.5 16 9.5l7 4v7.5" stroke="var(--brand-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="23" cy="21" r="2.6" fill="var(--mark-dot)" />
-    </svg>
-  );
-}
-
-export function Logo({ className, compact }: { className?: string; compact?: boolean }) {
-  return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <LogoMark />
-      {!compact && <span className="text-lg font-extrabold tracking-tight">{BRAND.name}</span>}
-    </span>
-  );
-}
+export { BrandWordmark, Logo, LogoMark } from "./brandMark";
 
 /** کلید تم: یک کلیک بین روز و شب؛ خورشید و ماه با چرخش به هم تبدیل می‌شوند */
 export function ThemeToggle() {

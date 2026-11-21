@@ -121,7 +121,7 @@ def inventory(db: Session, user: User, warehouse_id: int | None = None, **_) -> 
             ("ارزش کل موجودی", _money(value_total)), ("ناموجود یا زیر نقطه سفارش", f"{low:,}")]
     scope = f"انبار {warehouses.get(wid)}" if wid else "همه انبارها"
     return Report(title=TITLES["inventory"], period=f"{scope} — در تاریخ {jalali(catalog_service.today_local())}",
-                  sections=[Section("موجودی کالاها", cols, rows)], kpis=kpis, landscape=True, filename="Pasineh_Inventory")
+                  sections=[Section("موجودی کالاها", cols, rows)], kpis=kpis, landscape=True, filename="Inventory")
 
 
 def orders(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, status: str | None = None,
@@ -155,7 +155,7 @@ def orders(db: Session, user: User, date_from: date | None = None, date_to: date
             ("مبلغ کالا", _money(sum(r["goods"] for r in rows))), ("کرایه", _money(sum(r["fee"] for r in rows)))]
     title = TITLES["orders"] + (f" ({STATUS_LABELS.get(status, status)})" if status else "")
     return Report(title=title, period=period_text(start, end), sections=[Section("سفارش‌ها", cols, rows)], kpis=kpis,
-                  landscape=True, filename="Pasineh_Orders")
+                  landscape=True, filename="Orders")
 
 
 def ledger(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, warehouse_id: int | None = None, **_) -> Report:
@@ -179,7 +179,7 @@ def ledger(db: Session, user: User, date_from: date | None = None, date_to: date
     kpis = [("گردش‌ها", f"{len(rows):,}"), ("کل ورود", f"{sum(r['in'] or 0 for r in rows):,}"),
             ("کل خروج", f"{sum(r['out'] or 0 for r in rows):,}")]
     return Report(title=TITLES["ledger"], period=period_text(start, end), sections=[Section("گردش کالا", cols, rows)], kpis=kpis,
-                  landscape=True, filename="Pasineh_Ledger")
+                  landscape=True, filename="Ledger")
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ def finance(db: Session, user: User, date_from: date | None = None, date_to: dat
                                  Col("driver_share", "سهم راننده", "money", 13, True)], d["details"]),
     ]
     return Report(title=TITLES["finance"], period=period_text(d["start"], d["end"]), sections=sections, kpis=kpis, landscape=True,
-                  filename="Pasineh_Transport_Finance")
+                  filename="Transport_Finance")
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ def reorder(db: Session, user: User, warehouse_id: int | None = None, **_) -> Re
             f"سطح خدمت {pol['service_level'] * 100:g}٪، تاریخچه {pol['history_days']} روز")
     return Report(title=TITLES["reorder"], period=f"در تاریخ {jalali(catalog_service.today_local())} — {note}",
                   sections=[Section("اقلام به ترتیب اولویت خرید", cols, rows)], kpis=kpis, landscape=True,
-                  filename="Pasineh_Reorder_Points")
+                  filename="Reorder_Points")
 
 
 def capital(db: Session, user: User, warehouse_id: int | None = None, months: int | None = None, **_) -> Report:
@@ -334,7 +334,7 @@ def capital(db: Session, user: User, warehouse_id: int | None = None, months: in
     return Report(title=TITLES["capital"], period=period,
                   sections=[Section("سرمایه لازم به تفکیک ماه", month_cols, month_rows),
                             Section("سرمایه لازم به تفکیک کالا", item_cols, item_rows)],
-                  kpis=kpis, landscape=True, filename="Pasineh_Purchase_Capital_Plan")
+                  kpis=kpis, landscape=True, filename="Purchase_Capital_Plan")
 
 
 def kpi(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, warehouse_id: int | None = None, **_) -> Report:
@@ -357,7 +357,7 @@ def kpi(db: Session, user: User, date_from: date | None = None, date_to: date | 
             ("جانمایی باز", f"{snap['open_putaway']:,}"), ("در انتظار بازرسی", f"{snap['pending_inspection']:,}")]
     return Report(title=TITLES["kpi"], period=period_text(data["date_from"], data["date_to"]),
                   sections=[Section("شاخص‌ها", cols, rows, totals=False), Section("روند روزانه", tcols, trend)],
-                  kpis=kpis, landscape=True, filename="Pasineh_KPI")
+                  kpis=kpis, landscape=True, filename="KPI")
 
 
 def valuation(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, warehouse_id: int | None = None, **_) -> Report:
@@ -377,7 +377,7 @@ def valuation(db: Session, user: User, date_from: date | None = None, date_to: d
             ("بهای فروش رفته FIFO", _money(c["fifo"])), ("بهای فروش رفته میانگین", _money(c["weighted_average"]))]
     return Report(title=TITLES["valuation"], period=period_text(data["date_from"], data["date_to"]),
                   sections=[Section("ارزش هر کالا به سه روش", cols, rows)], kpis=kpis, landscape=True,
-                  filename="Pasineh_Inventory_Valuation")
+                  filename="Inventory_Valuation")
 
 
 def health(db: Session, user: User, warehouse_id: int | None = None, **_) -> Report:
@@ -399,7 +399,7 @@ def health(db: Session, user: User, warehouse_id: int | None = None, **_) -> Rep
     kpis = [(labels[b["status"]], f"{b['count']:,} کالا — {_money(b['value'])}") for b in data["buckets"] if b["status"] != "active"]
     return Report(title=TITLES["health"], period=f"در تاریخ {jalali(catalog_service.today_local())}",
                   sections=[Section("کالای کم‌گردش، راکد و بی‌فروش", cols, rows), Section("نزدیک به انقضا و منقضی", ecols, exp)],
-                  kpis=kpis, landscape=True, filename="Pasineh_Inventory_Health")
+                  kpis=kpis, landscape=True, filename="Inventory_Health")
 
 
 def audit(db: Session, user: User, date_from: date | None = None, date_to: date | None = None, **_) -> Report:
@@ -418,7 +418,7 @@ def audit(db: Session, user: User, date_from: date | None = None, date_to: date 
     cols = [Col("at", "زمان", width=16), Col("actor", "انجام‌دهنده", width=16), Col("category", "بخش", width=14),
             Col("summary", "چه شد", width=44), Col("reason", "چرا", width=24), Col("ip", "IP", width=13)]
     return Report(title=TITLES["audit"], period=period_text(start, end), sections=[Section("رویدادها", cols, rows, totals=False)],
-                  kpis=[("تعداد رویداد", f"{len(rows):,}")], landscape=True, filename="Pasineh_Audit_Log")
+                  kpis=[("تعداد رویداد", f"{len(rows):,}")], landscape=True, filename="Audit_Log")
 
 
 BUILDERS = {"inventory": inventory, "orders": orders, "ledger": ledger, "finance": finance, "reorder": reorder, "capital": capital,

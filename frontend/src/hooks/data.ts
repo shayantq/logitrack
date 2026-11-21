@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, authFetch, errorMessage, unwrap } from "@/api/client";
+import { BRAND } from "@/brand";
 
 export const useProducts = () =>
   useQuery({ queryKey: ["products"], queryFn: () => unwrap(api.GET("/inventory/products")) });
@@ -66,7 +67,12 @@ export function useAsyncExport(onError: (message: string) => void, onDone: () =>
           const fileRes = await authFetch(`/reports/task-result/${task_id}`);
           if (!fileRes.ok) throw new Error("خطا در دریافت فایل نهایی.");
           // نام فایل سرور تاریخ شمسی تهیه را هم دارد
-          const served = /filename="([^"]+)"/.exec(fileRes.headers.get("Content-Disposition") ?? "")?.[1];
+          const disposition = fileRes.headers.get("Content-Disposition") ?? "";
+          const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+          let served = /filename="([^"]+)"/.exec(disposition)?.[1]?.replace(/^Pasineh_/i, `${BRAND.nameFa}_`);
+          if (encoded) {
+            try { served = decodeURIComponent(encoded); } catch { /* استفاده از نام جایگزین */ }
+          }
           const link = document.createElement("a");
           link.href = URL.createObjectURL(await fileRes.blob());
           link.download = served ?? filename;

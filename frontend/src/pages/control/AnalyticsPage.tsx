@@ -34,7 +34,7 @@ export default function AnalyticsPage() {
     queryFn: () => unwrap(api.GET("/analytics/kpis", { params: { query: { date_from: period.from, date_to: period.to, warehouse_id: warehouseId } } })),
   });
   const exporter = useAsyncExport(toast.error, () => toast.success("گزارش شاخص‌ها آماده و دانلود شد."));
-  const exportAs = (format: "excel" | "pdf" | "csv") => exporter.run("/reports/generate", `Pasineh_KPI.${format === "excel" ? "xlsx" : format}`,
+  const exportAs = (format: "excel" | "pdf" | "csv") => exporter.run("/reports/generate", `پسینه_KPI.${format === "excel" ? "xlsx" : format}`,
     { report: "kpi", format, date_from: period.from, date_to: period.to, ...(warehouseId ? { warehouse_id: warehouseId } : {}) }, `kpi-${format}`);
   const data = query.data;
 

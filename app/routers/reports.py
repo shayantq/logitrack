@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from celery.result import AsyncResult
 
+from app.core.downloads import branded_attachment
 from app.core.rate_limit import RateLimiter
 from app.database import db_dependency
 from app.core.wms import AVAILABLE
@@ -175,7 +176,7 @@ def get_task_result(
     payload = result.result
     file_bytes = base64.b64decode(payload["content_b64"])
     headers = {
-        "Content-Disposition": f'attachment; filename="{payload["filename"]}"',
+        "Content-Disposition": branded_attachment(payload["filename"]),
         "Access-Control-Expose-Headers": "Content-Disposition"
     }
     return StreamingResponse(

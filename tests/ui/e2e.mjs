@@ -1156,7 +1156,7 @@ await session("reports", "qazvin_admin", "admin123", async page => {
   check("reports", "admin sees all ten report cards", (await page.locator("[data-testid^=report-card-]").count()) === 10);
   await page.click("[data-testid=period-picker] button >> text=امسال");
   const pdf = await grabDownload(page, "[data-testid=report-pdf-finance]");
-  check("reports", "finance PDF downloads with Jalali-stamped name", pdf.head === "%PDF" && /^Pasineh_Transport_Finance_14\d\d-\d\d-\d\d\.pdf$/.test(pdf.name), pdf.name);
+  check("reports", "finance PDF downloads with Jalali-stamped name", pdf.head === "%PDF" && /^پسینه_Transport_Finance_14\d\d-\d\d-\d\d\.pdf$/.test(pdf.name), pdf.name);
   const xlsx = await grabDownload(page, "[data-testid=report-excel-inventory]");
   check("reports", "inventory Excel downloads", xlsx.head.startsWith("PK") && xlsx.name.endsWith(".xlsx"), xlsx.name);
   const ledger = await grabDownload(page, "[data-testid=report-pdf-ledger]");
@@ -1718,10 +1718,14 @@ await session("info-pages", null, null, async page => {
   await page.evaluate(y => window.scrollTo({ top: y, behavior: "instant" }), max - 120);
   await page.waitForFunction(() => Number(document.querySelector("[data-testid=footer-wordmark]").dataset.progress) > 0, null, { timeout: 8000 }).catch(() => {});
   const mid = await progress();
+  const rtlCentered = await page.locator("[data-testid=footer-wordmark]").evaluate(el => {
+    const box = el.getBoundingClientRect();
+    return /^inset\(0px 0px 0px [\d.]+%\)$/.test(el.style.clipPath) && Math.abs(box.left + box.width / 2 - innerWidth / 2) < 1;
+  });
   await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
   await page.waitForFunction(() => document.querySelector("[data-testid=footer-wordmark]").dataset.progress === "1.00", null, { timeout: 8000 }).catch(() => {});
   const end = await progress();
-  check("info", "footer wordmark fills gradually", mid > 0.2 && mid < 0.95 && end === 1, `${mid} → ${end}`);
+  check("info", "centered footer wordmark fills right to left", rtlCentered && mid > 0.2 && mid < 0.95 && end === 1, `${mid} → ${end}`);
 }, { viewport: { width: 1280, height: 800 } });
 
 // هیچ صفحه عمومی روی موبایل اسکرول افقی نداشته باشد

@@ -4,6 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, Form, HTTPException, Path, UploadFile
 from fastapi.responses import Response
 
+from app.core.downloads import branded_attachment
 from app.database import db_dependency
 from app.dependencies import user_dependency
 from app.schemas.catalog import ImportReport, PriceIn, ProductDetail, ProductUpdate, SupplierLinkIn, UomIn, VariantIn
@@ -26,7 +27,7 @@ def _call(fn, *args, **kwargs):
 
 
 def _xlsx(content: bytes, filename: str) -> Response:
-    return Response(content, media_type=XLSX, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return Response(content, media_type=XLSX, headers={"Content-Disposition": branded_attachment(filename)})
 
 
 @router.get("/categories", response_model=list[str], summary="📂 گروه‌های کالا")
@@ -36,12 +37,12 @@ def categories(db: db_dependency, user: user_dependency):
 
 @router.get("/template", summary="📄 قالب اکسل کاتالوگ (با راهنما و نمونه)")
 def template(db: db_dependency, user: user_dependency):
-    return _xlsx(catalog_io.template(db), "Pasineh_Catalog_Template.xlsx")
+    return _xlsx(catalog_io.template(db), "Catalog_Template.xlsx")
 
 
 @router.get("/export", summary="📥 خروجی اکسل کل کاتالوگ (قابل ویرایش و ورود دوباره)")
 def export(db: db_dependency, user: user_dependency):
-    return _xlsx(catalog_io.export(db, user), "Pasineh_Catalog.xlsx")
+    return _xlsx(catalog_io.export(db, user), "Catalog.xlsx")
 
 
 @router.post("/import", response_model=ImportReport, summary="📤 ورود کاتالوگ از اکسل (پیش‌نمایش یا ثبت نهایی)")

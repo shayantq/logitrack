@@ -47,7 +47,7 @@ export default function AboutPage() {
   return (
     <InfoLayout title="درباره ما" testId="about-page" eyebrow={`درباره ${BRAND.nameFa}`}
       heading={<>سفارش، انبار و ناوگان؛<br className="hidden sm:block" /> روی یک مسیر روشن.</>}
-      lead={`${BRAND.nameFa} (${BRAND.name}) سامانه‌ای ابری برای کسب‌وکارهای ایرانی است که سفارش، موجودی انبار، رانندگان و ارسال را در یک‌جا و به‌صورت شفاف مدیریت می‌کند — از لحظه ثبت سفارش تا ثبت نظر مشتری.`}
+      lead={`${BRAND.nameFa} سامانه‌ای ابری برای کسب‌وکارهای ایرانی است که سفارش، موجودی انبار، رانندگان و ارسال را در یک‌جا و به‌صورت شفاف مدیریت می‌کند — از لحظه ثبت سفارش تا ثبت نظر مشتری.`}
       hero={
         <div className="flex flex-wrap gap-3">
           <Link to="/request" className={buttonClass("primary", "lg")}>درخواست دسترسی</Link>

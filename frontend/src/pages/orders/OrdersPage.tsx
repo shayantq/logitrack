@@ -95,9 +95,9 @@ export default function OrdersPage() {
         subtitle={me.role === "warehouse_manager" ? "سفارش‌های سازمان — ارسال از انبار شما را مدیریت کنید" : "ثبت، پیگیری و مدیریت سفارش‌ها"}
         actions={<>
           <Button variant="secondary" size="sm" loading={exporter.running === "/reports/export/orders/excel"} icon={<FileSpreadsheet className="size-4" />}
-            onClick={() => exporter.run("/reports/export/orders/excel", "Pasineh_Orders.xlsx")}>اکسل</Button>
+            onClick={() => exporter.run("/reports/export/orders/excel", "پسینه_Orders.xlsx")}>اکسل</Button>
           <Button variant="secondary" size="sm" loading={exporter.running === "/reports/export/orders/pdf"} icon={<FileText className="size-4" />}
-            onClick={() => exporter.run("/reports/export/orders/pdf", "Pasineh_Orders.pdf")}>PDF</Button>
+            onClick={() => exporter.run("/reports/export/orders/pdf", "پسینه_Orders.pdf")}>PDF</Button>
           <Button icon={<Plus className="size-4" />} onClick={() => setFormOpen(true)} data-testid="new-order">ثبت سفارش</Button>
         </>} />
 
@@ -116,7 +116,7 @@ export default function OrdersPage() {
                 disabled={!selectionReady} onClick={() => setBulk({ endpoint: "/orders/bulk", action: "priority", ids, params: { priority: false }, title: `عادی کردن ${label}` })}>عادی کردن</Button>
             </>}
             <Button size="sm" variant="secondary" icon={<FileSpreadsheet className="size-4" />} loading={exporter.running === "selected"}
-              disabled={!selectionReady} onClick={() => exporter.run("/reports/generate", "Pasineh_Orders.xlsx", { report: "orders", format: "excel", order_ids: ids }, "selected")}>اکسل انتخاب‌شده‌ها</Button>
+              disabled={!selectionReady} onClick={() => exporter.run("/reports/generate", "پسینه_Orders.xlsx", { report: "orders", format: "excel", order_ids: ids }, "selected")}>اکسل انتخاب‌شده‌ها</Button>
             <Button size="sm" variant="ghost" icon={<X className="size-4" />} onClick={() => setSelected(new Set())}>لغو انتخاب</Button>
           </div>
         )}

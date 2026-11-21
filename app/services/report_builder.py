@@ -63,7 +63,7 @@ class Report:
     sections: list[Section]
     kpis: list[tuple[str, str]] = field(default_factory=list)
     landscape: bool = False
-    filename: str = "Pasineh_Report"
+    filename: str = "Report"
 
 
 @dataclass

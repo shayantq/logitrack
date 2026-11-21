@@ -53,7 +53,7 @@ configure_logging()
 # مستندات API فقط در توسعه و تست؛ در سرور اصلی نقشه کامل API در دسترس عموم نیست
 _PRODUCTION = is_production()
 app = FastAPI(
-    title="🏢 Pasineh API",
+    title="🏢 رابط برنامه‌نویسی پسینه",
     version="2.1.0",
     docs_url=None if _PRODUCTION else "/docs",
     redoc_url=None if _PRODUCTION else "/redoc",

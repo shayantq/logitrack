@@ -138,7 +138,7 @@ function ImportCard() {
       if (!r.ok) throw new Error("دریافت قالب ناموفق بود.");
       const a = document.createElement("a");
       a.href = URL.createObjectURL(await r.blob());
-      a.download = kind === "opening" ? "Pasineh_Opening_Balance_Template.xlsx" : "Pasineh_Locations_Template.xlsx";
+      a.download = kind === "opening" ? "پسینه_Opening_Balance_Template.xlsx" : "پسینه_Locations_Template.xlsx";
       a.click();
     } catch (e) {
       toast.error(errorMessage(e));

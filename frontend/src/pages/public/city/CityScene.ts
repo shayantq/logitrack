@@ -11,7 +11,7 @@ type ThemeName = "light" | "dark";
 // هم‌رنگ پالت سایت (styles.css): روز آبی روشن، شب سرمه‌ای. چراغ‌ها (پنجره، خیابان، خودرو) در شب گرم‌اند
 const PALETTE = {
   light: {
-    bg: "#f7fbfc", ground: "#ecf3f9", plate: "#e2edf6", road: "#d6e6f2", roadLine: "#f7fbfc",
+    plate: "#e2edf6", road: "#d6e6f2", roadLine: "#f7fbfc",
     building: "#ffffff", buildingAlt: "#eff5fa", roof: "#dae8f3", window: "#b9d7ea", windowLit: "#b9d7ea",
     tree: "#86c3a8", treeAlt: "#b0dbc6", trunk: "#b9a58c", dash: "#b9d7ea", route: "#4672ad",
     van: "#ffffff", vanStripe: "#4672ad", glass: "#29405c", wheel: "#22344a",
@@ -20,7 +20,7 @@ const PALETTE = {
     hemiSky: "#ffffff", hemiGround: "#d6e6f2", hemi: 1.6, sun: 2.2, shadow: 0.18, night: 0,
   },
   dark: {
-    bg: "#091540", ground: "#0a1747", plate: "#0d1c51", road: "#13225c", roadLine: "#22357a",
+    plate: "#0d1c51", road: "#13225c", roadLine: "#22357a",
     building: "#1a2b6b", buildingAlt: "#162563", roof: "#203476", window: "#203476", windowLit: "#ffd27a",
     tree: "#1d5a63", treeAlt: "#246b72", trunk: "#2f2b45", dash: "#2b4290", route: "#7692ff",
     van: "#eaf2fd", vanStripe: "#7692ff", glass: "#08123a", wheel: "#050a24",
@@ -124,6 +124,7 @@ export class CityScene {
   private camera: THREE.OrthographicCamera;
   private hemi: THREE.HemisphereLight;
   private sun: THREE.DirectionalLight;
+  private groundShadow = new THREE.ShadowMaterial({ depthWrite: false });
   private materials = new Map<string, THREE.MeshStandardMaterial>();
   private windows!: THREE.InstancedMesh;
   private windowLit: boolean[] = [];
@@ -156,9 +157,10 @@ export class CityScene {
   private resizeObserver: ResizeObserver;
   private disposed = false;
 
-  constructor(private canvas: HTMLCanvasElement, private labels: CityLabels = {}) {
+  constructor(private canvas: HTMLCanvasElement, private labels: CityLabels, initialTheme: ThemeName) {
     const mobile = window.matchMedia("(max-width: 768px)").matches;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, alpha: false, powerPreference: "high-performance" });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, alpha: true, powerPreference: "high-performance" });
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1.5 : 2));
     this.renderer.shadowMap.enabled = !mobile;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -191,9 +193,8 @@ export class CityScene {
     this.buildTraffic();
     this.buildStreetLights();
     this.mergeStatic();
-    const initial = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-    this.night = this.nightTarget = PALETTE[initial].night;   // بار اول بدون انیمیشن
-    this.setTheme(initial);
+    this.night = this.nightTarget = PALETTE[initialTheme].night;   // بار اول بدون انیمیشن
+    this.setTheme(initialTheme);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
@@ -219,7 +220,8 @@ export class CityScene {
   }
 
   private buildGround() {
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), this.mat("ground"));
+    // بیرون صفحهٔ شهر فقط سایه رندر می‌شود تا زمینه همان رنگ بخش بعدی باشد.
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), this.groundShadow);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.05;
     ground.receiveShadow = true;
@@ -536,7 +538,7 @@ export class CityScene {
   setTheme(theme: ThemeName) {
     this.theme = theme;
     const p = PALETTE[theme];
-    this.scene.background = new THREE.Color(p.bg);
+    this.groundShadow.opacity = p.shadow;
     for (const [key, material] of this.materials) {
       const color = (p as Record<string, string | number>)[key];
       if (typeof color === "string") material.color.set(color);

@@ -8,6 +8,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Form, HTTPException, Path, Query, UploadFile
 from fastapi.responses import Response
 
+from app.core.downloads import branded_attachment
 from app.core.workflows import workflows
 from app.database import db_dependency
 from app.dependencies import user_dependency
@@ -129,8 +130,8 @@ def set_manual(data: ManualCheckIn, db: db_dependency, user: user_dependency, ke
                response_class=Response, responses={200: {"content": {XLSX: {}}}})
 def import_template(db: db_dependency, user: user_dependency, kind: Literal["locations", "opening"] = Path()):
     content = _call(migration_io.template, db, user, kind)
-    name = "Pasineh_Locations_Template.xlsx" if kind == "locations" else "Pasineh_Opening_Balance_Template.xlsx"
-    return Response(content, media_type=XLSX, headers={"Content-Disposition": f'attachment; filename="{name}"',
+    name = "Locations_Template.xlsx" if kind == "locations" else "Opening_Balance_Template.xlsx"
+    return Response(content, media_type=XLSX, headers={"Content-Disposition": branded_attachment(name),
                                                        "Access-Control-Expose-Headers": "Content-Disposition"})
 
 

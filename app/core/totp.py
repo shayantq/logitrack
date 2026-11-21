@@ -16,7 +16,7 @@ import urllib.parse
 STEP = 30
 DIGITS = 6
 WINDOW = 1
-ISSUER = "Pasineh"
+ISSUER = "پسینه"
 
 
 def new_secret() -> str:
@@ -55,7 +55,8 @@ def verify(secret: str, code: str, last_step: int | None, now: float | None = No
 
 def provisioning_uri(secret: str, account: str) -> str:
     label = urllib.parse.quote(f"{ISSUER}:{account}")
-    return f"otpauth://totp/{label}?secret={secret}&issuer={ISSUER}&digits={DIGITS}&period={STEP}"
+    params = urllib.parse.urlencode({"secret": secret, "issuer": ISSUER, "digits": DIGITS, "period": STEP})
+    return f"otpauth://totp/{label}?{params}"
 
 
 def qr_svg_data_uri(uri: str) -> str:

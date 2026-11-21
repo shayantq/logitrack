@@ -38,7 +38,7 @@ export default function JoinPage() {
   return (
     <div className="grid min-h-svh bg-bg text-text lg:grid-cols-2">
       <aside className="relative hidden overflow-hidden bg-linear-to-br from-brand to-brand-strong p-12 text-brand-ink lg:flex lg:flex-col">
-        <Link to="/" className="w-fit rounded-xl bg-white/90 px-3 py-2 text-text"><Logo /></Link>
+        <Link to="/" className="w-fit rounded-xl bg-surface/90 px-3 py-2 text-text"><Logo /></Link>
         <div className="mt-auto max-w-md">
           <h2 className="text-4xl font-black leading-tight">به ناوگان بپیوندید.</h2>
           <p className="mt-4 text-lg leading-8 opacity-90">بعد از ساخت حساب، مشخصات و مدارک خود را مرحله‌به‌مرحله بارگذاری می‌کنید. پس از تأیید سازمان، سفارش‌ها مستقیم در پنل شما ظاهر می‌شوند.</p>

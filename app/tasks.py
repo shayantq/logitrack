@@ -223,7 +223,7 @@ def generate_inventory_excel_task(organization_id, warehouse_id=None):
         )
         return {
             "organization_id": organization_id,
-            "filename": "Pasineh_Inventory.xlsx",
+            "filename": "Inventory.xlsx",
             "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "content_b64": _dataframe_to_base64_xlsx(df, "موجودی انبار")
         }
@@ -249,7 +249,7 @@ def generate_orders_excel_task(organization_id):
         df = pd.DataFrame(data) if data else pd.DataFrame(columns=columns)
         return {
             "organization_id": organization_id,
-            "filename": "Pasineh_Orders.xlsx",
+            "filename": "Orders.xlsx",
             "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "content_b64": _dataframe_to_base64_xlsx(df, "سفارشات")
         }
@@ -271,7 +271,7 @@ def generate_inventory_pdf_task(organization_id, warehouse_id=None):
             ["SKU", "نام کالا", "موجودی", "وزن (کیلوگرم)", "قیمت"],
             rows
         )
-        return {"organization_id": organization_id, "filename": "Pasineh_Inventory.pdf", "content_type": "application/pdf", "content_b64": content_b64}
+        return {"organization_id": organization_id, "filename": "Inventory.pdf", "content_type": "application/pdf", "content_b64": content_b64}
     finally:
         db.close()
 
@@ -291,7 +291,7 @@ def generate_orders_pdf_task(organization_id):
             ["کد پیگیری", "اقلام", "تعداد", "مقصد", "خودرو", "وضعیت"],
             rows
         )
-        return {"organization_id": organization_id, "filename": "Pasineh_Orders.pdf", "content_type": "application/pdf", "content_b64": content_b64}
+        return {"organization_id": organization_id, "filename": "Orders.pdf", "content_type": "application/pdf", "content_b64": content_b64}
     finally:
         db.close()
 

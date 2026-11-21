@@ -2,7 +2,7 @@
  * بخش آغازین: شهر سه‌بعدی ثابت می‌ماند و با اسکرول، ون از انبار تا مشتری می‌رود؛
  * متن هر مرحله به‌جای اسکرول شدن، جای مرحله قبل ظاهر می‌شود و کارت سفر پر می‌شود.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Check, ChevronsDown, CircleCheck, Package, Truck, Warehouse, type LucideIcon } from "lucide-react";
 import { BRAND } from "@/brand";
@@ -45,8 +45,14 @@ export function Hero() {
   const [failed, setFailed] = useState(false);
   const reduced = useReducedMotion();
   const { resolved } = useTheme();
+  const theme = useRef(resolved);
   const visible = useInView(sticky);
   const [progress, setProgress] = useState(reduced ? 0.6 : 0);
+
+  useLayoutEffect(() => {
+    theme.current = resolved;
+    scene.current?.setTheme(resolved);
+  }, [resolved]);
 
   // Three.js فقط در این صفحه و به‌صورت تنبل بارگذاری می‌شود
   useEffect(() => {
@@ -54,7 +60,7 @@ export function Hero() {
     import("../city/CityScene").then(({ CityScene }) => {
       if (cancelled || !canvas.current) return;
       try {
-        scene.current = new CityScene(canvas.current, { warehouse: labels.warehouse.current, customer: labels.customer.current, van: labels.van.current });
+        scene.current = new CityScene(canvas.current, { warehouse: labels.warehouse.current, customer: labels.customer.current, van: labels.van.current }, theme.current);
         scene.current.setProgress(sceneProgress(reduced ? 0.6 : 0));
         setReady(true);
       } catch {
@@ -65,7 +71,6 @@ export function Hero() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { scene.current?.setTheme(resolved); }, [resolved, ready]);
   useEffect(() => { scene.current?.setRunning(visible && !reduced); }, [visible, reduced, ready]);
 
   useScrubProgress(section, p => {
@@ -79,8 +84,10 @@ export function Hero() {
 
   return (
     <section ref={section} id="hero" data-section="سفر یک سفارش" className={cn("relative", reduced ? "h-svh" : "h-[460vh]")}>
-      <div ref={sticky} className="sticky top-0 h-svh overflow-hidden">
-        <canvas ref={canvas} className={cn("absolute inset-0 size-full transition-opacity duration-1000", ready ? "opacity-100" : "opacity-0")} data-testid="city-canvas" />
+      <div ref={sticky} className="sticky top-0 h-svh overflow-hidden bg-bg">
+        <canvas ref={canvas} aria-hidden="true"
+          className={cn("absolute inset-0 size-full [mask-image:linear-gradient(to_bottom,black_74%,transparent)] transition-opacity duration-1000", ready ? "opacity-100" : "opacity-0")}
+          data-testid="city-canvas" />
         {failed && <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,var(--brand-soft),transparent_60%)]" />}
 
         {/* برچسب‌های شناور روی صحنه — مکانشان را خود صحنه تنظیم می‌کند */}
