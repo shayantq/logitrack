@@ -1741,42 +1741,17 @@ await session("brand-pages", null, null, async page => {
   await page.goto(`${BASE}/pricing`);
   await page.waitForSelector("[data-testid=pricing-page]");
   check("brand", "four pricing plans", (await page.locator("[data-testid=plan-card]").count()) === 4);
-  const monthly = await page.textContent("[data-plan=pro] [data-testid=plan-price]");
-  await page.click("[data-testid=billing-annual]");
-  await page.waitForFunction(m => document.querySelector("[data-plan=pro] [data-testid=plan-price]")?.textContent !== m, monthly);
-  check("brand", "annual billing changes the price", ((await page.textContent("[data-plan=pro] [data-testid=plan-price]")) ?? "").includes("در سال"));
+  const prices = await page.getByTestId("plan-price").allTextContents();
+  check("brand", "all four plan prices say coming soon", prices.length === 4 && prices.every(price => price.trim() === "به‌زودی"));
+  check("brand", "no price or billing controls while prices are unpublished", (await page.locator("[data-monthly], [data-testid^=billing-], [data-testid=early-offer], [data-testid=plan-customize]").count()) === 0);
+  check("brand", "custom pricing says coming soon", (await page.getByTestId("pricing-calculator-status").innerText()).trim() === "به‌زودی");
+  check("brand", "no custom pricing controls while prices are unpublished", (await page.getByTestId("pricing-calculator").count()) === 0);
   check("brand", "feature comparison table", (await page.locator("[data-testid=pricing-compare] tbody tr").count()) >= 8);
 
-  // ماشین‌حساب پلن سفارشی: قیمت لحظه‌ای، ماژول‌ها، پیشنهاد پلن ارزان‌تر و انتقال به فرم درخواست
-  const calcTotal = () => page.getAttribute("[data-testid=calc-total]", "data-monthly").then(Number);
-  const slide = async (id, key, times = 1) => { await page.focus(`[data-testid=calc-${id}-range]`); for (let i = 0; i < times; i++) await page.keyboard.press(key); };
-  const t0 = await calcTotal();
-  await page.click("[data-testid=calc-drivers-plus]");
-  await page.waitForFunction(t => Number(document.querySelector("[data-testid=calc-total]").dataset.monthly) > t, t0);
-  check("brand", "calculator price follows the + button", true);
-  await slide("orders", "End");
-  check("brand", "orders slider reaches 20,000", ((await page.textContent("[data-testid=calc-orders-value]")) ?? "").includes("۲۰٬۰۰۰"));
-  const t1 = await calcTotal();
-  await page.click("[data-testid=calc-module-phone]");
-  await page.waitForFunction(t => Number(document.querySelector("[data-testid=calc-total]").dataset.monthly) === t + 100000, t1);
-  check("brand", "module toggle adds its price", (await page.locator("[data-testid=calc-lines] li").count()) >= 6);
-  // «شخصی‌سازی این پلن»: مشخصات هر پلن در ماشین‌حساب دقیقاً همان قیمت کارت پلن را می‌دهد
-  const samePrice = [];
-  for (const id of ["basic", "pro", "enterprise"]) {
-    const planPrice = Number(await page.getAttribute(`[data-plan=${id}] [data-testid=plan-price]`, "data-monthly"));
-    await page.click(`[data-plan=${id}] [data-testid=plan-customize]`);
-    await page.waitForFunction(p => Number(document.querySelector("[data-testid=calc-total]")?.dataset.monthly) === p, planPrice, { timeout: 5000 }).catch(() => {});
-    const kind = await page.getAttribute("[data-testid=calc-better-plan]", "data-kind").catch(() => null);
-    samePrice.push(`${id}:${planPrice}/${await calcTotal()}/${kind}`);
-  }
-  check("brand", "plan specs in the calculator give the plan's own price", samePrice.every(s => { const [, v, k] = s.split(":"); const [a, b, kind] = v.split("/"); return a === b && kind === "same"; }), samePrice.join(" "));
-  // یک راننده کمتر از پلن حرفه‌ای ← پلن سفارشی ارزان‌تر و قابل ثبت
-  await page.click("[data-plan=pro] [data-testid=plan-customize]");
-  await page.click("[data-testid=calc-drivers-minus]");
-  check("brand", "fewer resources than a plan cost less", (await calcTotal()) === 3_900_000 - 30_000, String(await calcTotal()));
-  await page.click("[data-testid=calc-cta]");
-  await page.waitForSelector("[data-testid=request-plan] >> text=سفارشی");
-  check("brand", "custom plan carried into the request form", page.url().includes("plan=custom") && page.url().includes("d=24"));
+  // لینک‌های قبلی پلن سفارشی هنوز مشخصات را روی فرم درخواست نمایش می‌دهند.
+  await page.goto(`${BASE}/request?plan=custom&w=3&d=24&o=3000&u=10&m=phone`);
+  const custom = await page.getByTestId("request-plan").innerText();
+  check("brand", "previous custom-plan links show resources and hide the price", custom.includes("سفارشی") && custom.includes("۲۴ راننده") && custom.includes("به‌زودی") && !custom.includes("تومان"));
   await page.goto(`${BASE}/pricing`);
   await page.waitForSelector("[data-testid=plan-card]");
 

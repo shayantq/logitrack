@@ -7,7 +7,7 @@ import { BRAND } from "@/brand";
 import { buttonClass, cn } from "@/ui/primitives";
 import { InfoLayout } from "./InfoLayout";
 import { PricingCalculator } from "./PricingCalculator";
-import { ANNUAL_MONTHS, EARLY_OFFER, FEATURE_GROUPS, PLANS, PRICING_FAQ, TRIAL_DAYS, type CustomConfig, type Plan } from "./content/pricing";
+import { ANNUAL_MONTHS, EARLY_OFFER, FEATURE_GROUPS, PLANS, PRICING_COMING_SOON, PRICING_FAQ, PRICING_PUBLISHED, TRIAL_DAYS, type CustomConfig, type Plan } from "./content/pricing";
 
 type Billing = "monthly" | "annual";
 const fa = (n: number) => n.toLocaleString("fa-IR");
@@ -35,6 +35,9 @@ function BillingToggle({ value, onChange }: { value: Billing; onChange: (b: Bill
  * سالانه: معادل ماهانه درشت، قیمت ماهانه خط‌خورده و مبلغ کل سال زیرش.
  */
 function Price({ plan, billing }: { plan: Plan; billing: Billing }) {
+  if (!PRICING_PUBLISHED) {
+    return <div data-testid="plan-price" className="text-2xl font-black text-brand">{PRICING_COMING_SOON}</div>;
+  }
   let main: string, unit: string, was: string | undefined, note: string | undefined;
   if (plan.monthly === 0) { main = "رایگان"; unit = `به مدت ${fa(TRIAL_DAYS)} روز`; }
   else if (billing === "monthly") { main = fa(plan.monthly); unit = "تومان در ماه"; }
@@ -59,26 +62,27 @@ const LIMIT_ITEMS: [keyof Plan["limits"], string, LucideIcon][] = [
 
 function PlanCard({ plan, billing, onCustomize }: { plan: Plan; billing: Billing; onCustomize: () => void }) {
   const to = `/request?plan=${plan.id}`;
+  const trialBeforePricing = !PRICING_PUBLISHED && plan.id === "trial";
   return (
     <div data-testid="plan-card" data-plan={plan.id}
       className={cn("relative flex flex-col rounded-3xl border bg-surface p-6 transition-shadow",
         plan.highlight ? "border-brand shadow-[var(--shadow-lg)] ring-1 ring-brand/40" : "border-border shadow-[var(--shadow)]")}>
       {plan.highlight && <span className="absolute -top-3.5 right-6 rounded-full bg-brand px-3.5 py-1 text-sm font-bold text-brand-ink shadow">پیشنهاد ما</span>}
       <h2 className={cn("text-2xl font-black", plan.highlight && "text-brand")}>{plan.name}</h2>
-      <p className="mt-1 text-sm leading-6 text-text-2">{plan.audience}</p>
+      <p className="mt-1 text-sm leading-6 text-text-2">{trialBeforePricing ? "برای آشنایی با سامانه" : plan.audience}</p>
 
       <div className="mt-5"><Price plan={plan} billing={billing} /></div>
 
       <div className="mt-5">
         {plan.id === "enterprise" ? (
           <div className="grid gap-2">
-            <a href={`tel:${BRAND.phone}`} className={buttonClass("primary", "lg", "w-full")} data-testid="plan-cta"><Phone className="size-4" />{plan.cta}</a>
+            <a href={`tel:${BRAND.phone}`} className={buttonClass("primary", "lg", "w-full")} data-testid="plan-cta"><Phone className="size-4" />{PRICING_PUBLISHED ? plan.cta : "تماس برای مشاوره"}</a>
             <Link to={to} className={buttonClass("ghost", "md", "w-full")}>یا ثبت درخواست</Link>
           </div>
         ) : (
-          <Link to={to} className={buttonClass(plan.highlight ? "primary" : "secondary", "lg", "w-full")} data-testid="plan-cta">{plan.cta}<ArrowLeft className="size-4" /></Link>
+          <Link to={to} className={buttonClass(plan.highlight ? "primary" : "secondary", "lg", "w-full")} data-testid="plan-cta">{trialBeforePricing ? "شروع دورهٔ آزمایشی" : plan.cta}<ArrowLeft className="size-4" /></Link>
         )}
-        {plan.monthly > 0 && (
+        {PRICING_PUBLISHED && plan.monthly > 0 && (
           <button type="button" onClick={onCustomize} data-testid="plan-customize"
             className="mx-auto mt-2 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-brand transition hover:bg-brand-soft">
             <SlidersHorizontal className="size-4" />شخصی‌سازی این پلن
@@ -168,9 +172,11 @@ export default function PricingPage() {
   };
   return (
     <InfoLayout title="تعرفه‌ها" testId="pricing-page" eyebrow="تعرفه‌ها" cta={false}
-      heading="یک قیمت ثابت برای کل سازمان"
-      lead={`بدون هزینه به ازای هر کاربر. ${fa(TRIAL_DAYS)} روز رایگان امتحان کنید و هر زمان خواستید، پلن را تغییر دهید.`}
-      hero={
+      heading={PRICING_PUBLISHED ? "یک قیمت ثابت برای کل سازمان" : "پلن‌های پسینه"}
+      lead={PRICING_PUBLISHED
+        ? `بدون هزینه به ازای هر کاربر. ${fa(TRIAL_DAYS)} روز رایگان امتحان کنید و هر زمان خواستید، پلن را تغییر دهید.`
+        : `امکانات پلن‌ها را مقایسه کنید یا با دورهٔ آزمایشی ${fa(TRIAL_DAYS)}روزه شروع کنید.`}
+      hero={PRICING_PUBLISHED && (
         <div className="flex flex-col items-start gap-4">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <BillingToggle value={billing} onChange={setBilling} />
@@ -184,26 +190,36 @@ export default function PricingPage() {
             </div>
           )}
         </div>
-      }>
+      )}>
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20">
         <div className="grid gap-6 pt-2 sm:grid-cols-2 xl:grid-cols-4">
           {PLANS.map(p => <PlanCard key={p.id} plan={p} billing={billing} onCustomize={() => customize(p)} />)}
         </div>
-        <p className="mt-6 text-center text-sm text-muted">همه مبالغ به تومان و بدون احتساب مالیات بر ارزش افزوده است.</p>
+        {PRICING_PUBLISHED && (
+          <>
+            <p className="mt-6 text-center text-sm text-muted">همه مبالغ به تومان و بدون احتساب مالیات بر ارزش افزوده است.</p>
 
-        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="pricing-promises">
-          {PROMISES.map(([Icon, title, text]) => (
-            <div key={title} className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-4">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><Icon className="size-5" /></span>
-              <div><div className="font-bold">{title}</div><div className="text-sm text-muted">{text}</div></div>
+            <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" data-testid="pricing-promises">
+              {PROMISES.map(([Icon, title, text]) => (
+                <div key={title} className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-4">
+                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand"><Icon className="size-5" /></span>
+                  <div><div className="font-bold">{title}</div><div className="text-sm text-muted">{text}</div></div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
 
         <section id="custom-plan" className="mt-20 scroll-mt-24">
-          <h2 className="text-2xl font-black tracking-tight sm:text-3xl">پلن خودتان را بسازید</h2>
-          <p className="mt-2 text-text-2">فقط برای همان چیزی که لازم دارید هزینه کنید؛ قیمت همزمان با تغییرات محاسبه می‌شود.</p>
-          <div className="mt-6"><PricingCalculator key={preset?.n ?? 0} billing={billing} initial={preset?.config} /></div>
+          <h2 className="text-2xl font-black tracking-tight sm:text-3xl">{PRICING_PUBLISHED ? "پلن خودتان را بسازید" : "محاسبهٔ قیمت پلن سفارشی"}</h2>
+          {PRICING_PUBLISHED ? (
+            <>
+              <p className="mt-2 text-text-2">فقط برای همان چیزی که لازم دارید هزینه کنید؛ قیمت همزمان با تغییرات محاسبه می‌شود.</p>
+              <div className="mt-6"><PricingCalculator key={preset?.n ?? 0} billing={billing} initial={preset?.config} /></div>
+            </>
+          ) : (
+            <p data-testid="pricing-calculator-status" className="mt-4 rounded-2xl border border-border bg-surface px-6 py-4 font-bold text-brand">{PRICING_COMING_SOON}</p>
+          )}
         </section>
 
         <div className="mt-20">

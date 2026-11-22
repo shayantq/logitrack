@@ -6,6 +6,8 @@
  */
 export const ANNUAL_MONTHS = 10;
 export const TRIAL_DAYS = 30;
+export const PRICING_PUBLISHED = false;
+export const PRICING_COMING_SOON = "به‌زودی";
 
 // ---------------------------------------------------------------------------
 // نرخ‌ها (تومان در ماه). با این نرخ‌ها: پایه ۱٬۵۰۰٬۰۰۰، حرفه‌ای ۳٬۹۰۰٬۰۰۰، سازمانی ۱۲٬۳۰۰٬۰۰۰
@@ -192,7 +194,7 @@ export const FEATURE_GROUPS: { title: string; rows: FeatureRow[] }[] = [
 
 /** پرسش‌های پرتکرار درباره خرید */
 export const PRICING_FAQ: { q: string; a: string }[] = [
-  { q: "هزینه به ازای هر کاربر حساب می‌شود؟", a: "خیر. قیمت هر پلن برای کل سازمان است و تا سقف کاربران همان پلن، هزینه اضافه‌ای ندارد." },
+  ...(PRICING_PUBLISHED ? [{ q: "هزینه به ازای هر کاربر حساب می‌شود؟", a: "خیر. قیمت هر پلن برای کل سازمان است و تا سقف کاربران همان پلن، هزینه اضافه‌ای ندارد." }] : []),
   { q: "بعد از ۳۰ روز آزمایشی چه می‌شود؟", a: "با انتخاب یکی از پلن‌ها، کار را با همان سازمان و همه اطلاعاتی که ثبت کرده‌اید ادامه می‌دهید." },
   { q: "اگر تعداد سفارش‌ها از سقف پلن بیشتر شود؟", a: "کار شما متوقف نمی‌شود. با شما تماس می‌گیریم تا در صورت نیاز، پلن مناسب‌تری انتخاب کنید." },
   { q: "می‌توانم پلن را عوض کنم؟", a: "بله. هر زمان خواستید، با پشتیبانی تماس بگیرید تا پلن شما ارتقا یا تغییر کند." },
@@ -221,8 +223,9 @@ export function customFromQuery(search: string): CustomConfig | null {
 }
 export function customSummary(c: CustomConfig) {
   const mods = MODULES.filter(m => c.modules.includes(m.id)).map(m => m.label);
+  const price = PRICING_PUBLISHED ? `${fa(customMonthly(c))} تومان در ماه` : `اعلام تعرفه ${PRICING_COMING_SOON}`;
   return `${fa(c.warehouses)} انبار، ${fa(c.drivers)} راننده، ${fa(c.orders)} سفارش در ماه، ${fa(c.users)} کاربر`
-    + (mods.length ? ` + ${mods.join("، ")}` : "") + ` — ${fa(customMonthly(c))} تومان در ماه`;
+    + (mods.length ? ` + ${mods.join("، ")}` : "") + ` — ${price}`;
 }
 
 /** پیشنهاد مشتریان اولیه (برای حذف: null) */
