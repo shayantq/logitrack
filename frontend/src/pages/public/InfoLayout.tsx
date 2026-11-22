@@ -1,8 +1,8 @@
 /** قالب مشترک صفحه‌های اطلاع‌رسانی (درباره ما، سوالات متداول، قوانین): سربرگ، بخش آغازین، محتوا، دعوت پایانی و پانویس */
 import { useEffect, type ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { BRAND } from "@/brand";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { buttonClass } from "@/ui/primitives";
 import { PublicFooter, PublicHeader } from "./chrome";
 
@@ -65,7 +65,7 @@ function ContactStrip() {
         <div className="flex flex-col gap-3 sm:flex-row">
           <a href={`tel:${BRAND.phone}`} className={buttonClass("secondary", "lg")}><Phone className="size-4" /><span className="text-sm">{BRAND.phoneDisplay}</span></a>
           <a href={`mailto:${BRAND.supportEmail}`} className={buttonClass("secondary", "lg")}><Mail className="size-4" /><span className="font-mono text-sm ltr">{BRAND.supportEmail}</span></a>
-          <Link to="/request?plan=trial" className={buttonClass("primary", "lg")}>شروع رایگان<ArrowLeft className="size-4" /></Link>
+          <RequestAccessLink to="/request?plan=trial" className={buttonClass("primary", "lg")}>شروع رایگان<ArrowLeft className="size-4" /></RequestAccessLink>
         </div>
       </div>
     </section>

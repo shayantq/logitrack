@@ -1611,6 +1611,38 @@ await session("ux-scroll", null, null, async page => {
 
 // ---------------- فرم درخواست سازمان + پیگیری ----------------
 let referralRun = "";
+await session("request-paused", null, null, async page => {
+  await page.route("**/organization-requests/form-options", route => route.fulfill({
+    json: { provinces: [], accepting_requests: false },
+  }));
+  let submissions = 0;
+  await page.route("**/organization-requests", route => {
+    if (route.request().method() !== "POST") return route.continue();
+    submissions++;
+    return route.abort();
+  });
+
+  await page.goto(`${BASE}/`);
+  await page.getByTestId("hero-cta").waitFor();
+  check("request-paused", "header and hero registration buttons are disabled",
+    await page.getByTestId("cta-request").isDisabled() && await page.getByTestId("hero-cta").isDisabled());
+
+  await page.goto(`${BASE}/pricing`);
+  await page.getByTestId("pricing-page").waitFor();
+  check("request-paused", "each plan's registration button is disabled",
+    (await page.getByTestId("plan-card").locator("button:disabled").count()) === 4);
+
+  await page.goto(`${BASE}/request?plan=trial`);
+  check("request-paused", "direct registration link shows the pause notice",
+    (await page.getByTestId("request-paused").innerText()).trim() === "این بخش بزودی فعال میشود");
+  check("request-paused", "name field and next step are disabled",
+    await page.getByTestId("req-name").isDisabled() && await page.getByTestId("request-next").isDisabled());
+  await page.locator("#request-form").dispatchEvent("submit");
+  check("request-paused", "submitting stays on the first step and sends no request",
+    (await page.getByTestId("request-step").getAttribute("data-step")) === "0" && submissions === 0);
+  check("request-paused", "the tracking field remains enabled", await page.getByTestId("status-code").isEnabled());
+});
+
 await session("request", null, null, async page => {
   await page.goto(`${BASE}/`);
   await page.click("[data-testid=cta-request]");

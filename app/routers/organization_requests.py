@@ -1,7 +1,9 @@
 """
 API عمومی (بدون لاگین) برای فرم «درخواست استفاده از پسینه» در لندینگ پیج.
 """
-from fastapi import APIRouter, HTTPException, Request
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette import status
 
 from app.core.iran import PROVINCES
@@ -19,12 +21,22 @@ router = APIRouter(
 )
 
 
+def organization_requests_enabled() -> bool:
+    return os.getenv("PUBLIC_ORGANIZATION_REQUESTS_ENABLED", "false").strip().lower() == "true"
+
+
+def require_organization_requests_enabled() -> None:
+    if not organization_requests_enabled():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="این بخش بزودی فعال میشود")
+
+
 @router.get("/form-options", summary="📋 گزینه‌های فرم درخواست (استان‌ها و ...)")
 def form_options():
-    return {"provinces": list(PROVINCES)}
+    return {"provinces": list(PROVINCES), "accepting_requests": organization_requests_enabled()}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=OrganizationRequestSubmitted,
+             dependencies=[Depends(require_organization_requests_enabled)],
              summary="📝 ثبت درخواست استفاده از پسینه برای یک کسب‌وکار")
 def submit_request(data: OrganizationRequestCreate, request: Request, db: db_dependency):
     client_ip = request.client.host if request.client else "unknown"

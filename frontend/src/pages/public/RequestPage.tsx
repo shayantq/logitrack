@@ -5,7 +5,8 @@ import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Building2, Check, ClipboardCheck, Copy, Search, Settings2, UserRound } from "lucide-react";
 import { api, errorMessage, unwrap, type Schemas } from "@/api/client";
 import { BRAND } from "@/brand";
-import { useProvinces } from "@/hooks/data";
+import { ORGANIZATION_REQUESTS_PAUSED_MESSAGE } from "@/components/RequestAccessLink";
+import { useOrganizationRequestOptions } from "@/hooks/data";
 import { BUSINESS_TYPES, EMPLOYEE_RANGES, FEATURES, ORDER_VOLUMES, REFERRAL_SOURCES, REQUEST_STATUS } from "@/lib/labels";
 import { faDate, latinDigits, normalizeDigits } from "@/lib/format";
 import { Badge, Button, Field, Input, Select, Textarea, buttonClass, cn } from "@/ui/primitives";
@@ -40,7 +41,9 @@ export default function RequestPage() {
   // پلن سفارشی از ماشین‌حساب تعرفه‌ها
   const custom = customFromQuery(search);
   const planLabel = plan ? plan.name : custom ? "سفارشی" : null;
-  const { data: provinces = [] } = useProvinces();
+  const { data: requestOptions, isSuccess, isPending } = useOrganizationRequestOptions();
+  const acceptingRequests = isSuccess && requestOptions.accepting_requests === true;
+  const provinces = requestOptions?.provinces ?? [];
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(() => {
     let draft: FormState = EMPTY;
@@ -55,8 +58,9 @@ export default function RequestPage() {
 
   useEffect(() => { document.title = `درخواست دسترسی — ${BRAND.nameFa}`; }, []);
   useEffect(() => {
+    if (!acceptingRequests) return;
     try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...form, company_fax: "" })); } catch { /* حالت خصوصی */ }
-  }, [form]);
+  }, [acceptingRequests, form]);
   useEffect(() => { if (hash === "#status") document.getElementById("status")?.scrollIntoView(); }, [hash]);
 
   const set = (k: keyof FormState) => (e: { target: { value: string } }) => setForm(f => ({ ...f, [k]: e.target.value }));
@@ -83,6 +87,7 @@ export default function RequestPage() {
 
   function next(e: FormEvent) {
     e.preventDefault();
+    if (!acceptingRequests) return;
     setError(null);
     if (step === 0 && (!form.business_type)) return setError("حوزه فعالیت را انتخاب کنید.");
     if (step === 1) {
@@ -100,10 +105,10 @@ export default function RequestPage() {
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-28 sm:px-6" ref={top}>
         <div className="grid gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
           <aside className="lg:sticky lg:top-28 lg:h-fit">
-            <div className="eyebrow mb-4">درخواست دسترسی</div>
-            <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl">فضای اختصاصی سازمانتان را درخواست کنید.</h1>
-            <p className="mt-4 leading-8 text-text-2">پر کردن فرم حدود ۳ دقیقه طول می‌کشد. پس از بررسی، سازمان شما ساخته و اطلاعات ورود ادمین برایتان ارسال می‌شود.</p>
-            {!done && (
+            {acceptingRequests && <div className="eyebrow mb-4">درخواست دسترسی</div>}
+            <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl">{acceptingRequests ? "فضای اختصاصی سازمانتان را درخواست کنید." : "درخواست دسترسی سازمان"}</h1>
+            {acceptingRequests && <p className="mt-4 leading-8 text-text-2">پر کردن فرم حدود ۳ دقیقه طول می‌کشد. پس از بررسی، سازمان شما ساخته و اطلاعات ورود ادمین برایتان ارسال می‌شود.</p>}
+            {acceptingRequests && !done && (
               <ol className="mt-8 space-y-1" data-testid="request-stepper">
                 {STEPS.map((s, i) => (
                   <li key={s.title} className={cn("flex items-center gap-3 rounded-2xl p-3 transition", i === step && "bg-surface shadow-[var(--shadow)]")}>
@@ -120,109 +125,117 @@ export default function RequestPage() {
           </aside>
 
           <div>
-            {done ? <Success result={done} onAgain={() => { setDone(null); setForm(EMPTY); setStep(0); }} /> : (
-              <form id="request-form" onSubmit={next} className="card p-6 sm:p-8" data-testid="request-step" data-step={step}>
-                {planLabel && (
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-soft px-4 py-2.5 text-sm text-brand-strong" data-testid="request-plan">
-                    <span>پلن انتخابی: <b>{planLabel}</b>{custom && <span className="mt-1 block text-xs leading-5">{customSummary(custom)}</span>}</span>
-                    <Link to="/pricing" className="text-xs font-medium hover:underline">تغییر پلن</Link>
-                  </div>
+            {done ? <Success result={done} onAgain={acceptingRequests ? () => { setDone(null); setForm(EMPTY); setStep(0); } : undefined} /> : (
+              <form id="request-form" onSubmit={next} className="card relative p-6 sm:p-8" data-testid="request-step" data-step={step}>
+                {!isPending && !acceptingRequests && (
+                  <p role="status" data-testid="request-paused" className="absolute inset-x-4 top-6 z-10 rounded-2xl border border-border bg-surface px-4 py-4 text-center font-bold shadow-[var(--shadow)] sm:inset-x-8">
+                    {ORGANIZATION_REQUESTS_PAUSED_MESSAGE}
+                  </p>
                 )}
-                <div className="mb-6 h-1 overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full rounded-full bg-linear-to-l from-brand to-accent transition-all duration-500" style={{ width: `${((step + 1) / 3) * 100}%` }} />
-                </div>
-                {/* تله ربات — برای انسان دیده نمی‌شود */}
-                <input type="text" name="company_fax" tabIndex={-1} autoComplete="off" value={form.company_fax} onChange={set("company_fax")} className="sr-only" aria-hidden="true" />
-
-                <div key={step} className="animate-rise">
-                  {step === 0 && (
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <Field label="نام تجاری *"><Input required minLength={2} maxLength={200} value={form.name} onChange={set("name")} placeholder="مثلاً فروشگاه نمونه" data-testid="req-name" /></Field>
-                      <Field label="نام ثبتی شرکت *"><Input required minLength={2} maxLength={200} value={form.legal_name} onChange={set("legal_name")} data-testid="req-legal-name" /></Field>
-                      <Choice label="حوزه فعالیت *" className="sm:col-span-2" options={BUSINESS_TYPES} value={form.business_type} onPick={v => pick("business_type", v)} testId="req-business" />
-                      <Field label="شناسه ملی *" hint="۱۱ رقم"><Input className="ltr" required inputMode="numeric" pattern="[0-9۰-۹]{11}" title={FORMAT_HINTS.nationalId} value={form.national_id} onChange={set("national_id")} data-testid="req-national-id" /></Field>
-                      <Field label="کد اقتصادی" hint="اختیاری — ۱۱ تا ۱۴ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{11,14}" title={FORMAT_HINTS.economicCode} value={form.economic_code} onChange={set("economic_code")} /></Field>
-                      <Field label="استان *">
-                        <Select required value={form.province} onChange={set("province")} data-testid="req-province">
-                          <option value="">انتخاب کنید</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
-                        </Select>
-                      </Field>
-                      <Field label="شهر *"><CitySelect required province={form.province} value={form.city} onChange={v => pick("city", v)} testId="req-city" /></Field>
-                      <Field label="نشانی *" className="sm:col-span-2"><Input required minLength={10} maxLength={500} value={form.address} onChange={set("address")} data-testid="req-address" /></Field>
-                      <Field label="کد پستی" hint="اختیاری — ۱۰ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{10}" title={FORMAT_HINTS.postalCode} value={form.postal_code} onChange={set("postal_code")} /></Field>
-                      <Field label="وب‌سایت" hint="اختیاری"><Input className="ltr" value={form.website} onChange={set("website")} placeholder="example.ir" /></Field>
+                <fieldset disabled={!acceptingRequests} ref={element => { if (element) element.inert = !acceptingRequests; }}
+                  className={cn("min-w-0", !acceptingRequests && "opacity-50 grayscale")}>
+                  {planLabel && (
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-soft px-4 py-2.5 text-sm text-brand-strong" data-testid="request-plan">
+                      <span>پلن انتخابی: <b>{planLabel}</b>{custom && <span className="mt-1 block text-xs leading-5">{customSummary(custom)}</span>}</span>
+                      <Link to="/pricing" className="text-xs font-medium hover:underline">تغییر پلن</Link>
                     </div>
                   )}
-                  {step === 1 && (
-                    <div className="grid gap-6">
-                      <Choice label="تعداد کارکنان *" options={EMPLOYEE_RANGES} value={form.employee_count} onPick={v => pick("employee_count", v)} testId="req-employees" />
-                      <Choice label="حجم سفارش ماهانه *" options={ORDER_VOLUMES} value={form.monthly_order_volume} onPick={v => pick("monthly_order_volume", v)} testId="req-volume" />
+                  <div className="mb-6 h-1 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full bg-linear-to-l from-brand to-accent transition-all duration-500" style={{ width: `${((step + 1) / 3) * 100}%` }} />
+                  </div>
+                  {/* تله ربات — برای انسان دیده نمی‌شود */}
+                  <input type="text" name="company_fax" tabIndex={-1} autoComplete="off" value={form.company_fax} onChange={set("company_fax")} className="sr-only" aria-hidden="true" />
+
+                  <div key={step} className="animate-rise">
+                    {step === 0 && (
                       <div className="grid gap-5 sm:grid-cols-2">
-                        <Field label="تعداد انبار" hint="اختیاری"><Input type="number" min={0} max={10000} value={form.warehouse_count} onChange={set("warehouse_count")} /></Field>
-                        <Field label="تعداد خودرو / راننده" hint="اختیاری"><Input type="number" min={0} max={100000} value={form.fleet_size} onChange={set("fleet_size")} /></Field>
+                        <Field label="نام تجاری *"><Input required minLength={2} maxLength={200} value={form.name} onChange={set("name")} placeholder="مثلاً فروشگاه نمونه" data-testid="req-name" /></Field>
+                        <Field label="نام ثبتی شرکت *"><Input required minLength={2} maxLength={200} value={form.legal_name} onChange={set("legal_name")} data-testid="req-legal-name" /></Field>
+                        <Choice label="حوزه فعالیت *" className="sm:col-span-2" options={BUSINESS_TYPES} value={form.business_type} onPick={v => pick("business_type", v)} testId="req-business" />
+                        <Field label="شناسه ملی *" hint="۱۱ رقم"><Input className="ltr" required inputMode="numeric" pattern="[0-9۰-۹]{11}" title={FORMAT_HINTS.nationalId} value={form.national_id} onChange={set("national_id")} data-testid="req-national-id" /></Field>
+                        <Field label="کد اقتصادی" hint="اختیاری — ۱۱ تا ۱۴ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{11,14}" title={FORMAT_HINTS.economicCode} value={form.economic_code} onChange={set("economic_code")} /></Field>
+                        <Field label="استان *">
+                          <Select required value={form.province} onChange={set("province")} data-testid="req-province">
+                            <option value="">انتخاب کنید</option>{provinces.map(p => <option key={p} value={p}>{p}</option>)}
+                          </Select>
+                        </Field>
+                        <Field label="شهر *"><CitySelect required province={form.province} value={form.city} onChange={v => pick("city", v)} testId="req-city" /></Field>
+                        <Field label="نشانی *" className="sm:col-span-2"><Input required minLength={10} maxLength={500} value={form.address} onChange={set("address")} data-testid="req-address" /></Field>
+                        <Field label="کد پستی" hint="اختیاری — ۱۰ رقم"><Input className="ltr" inputMode="numeric" pattern="[0-9۰-۹]{10}" title={FORMAT_HINTS.postalCode} value={form.postal_code} onChange={set("postal_code")} /></Field>
+                        <Field label="وب‌سایت" hint="اختیاری"><Input className="ltr" value={form.website} onChange={set("website")} placeholder="example.ir" /></Field>
                       </div>
-                      <div>
-                        <div className="mb-2 text-sm font-medium text-text-2">بخش‌های مورد نیاز *</div>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                          {Object.entries(FEATURES).map(([key, label]) => {
-                            const on = form.requested_features.includes(key);
-                            return (
-                              <button type="button" key={key} onClick={() => toggleFeature(key)} data-testid="req-feature" aria-pressed={on}
-                                className={cn("flex items-center gap-2 rounded-xl border px-3 py-3 text-sm transition",
-                                  on ? "border-brand bg-brand-soft font-semibold text-brand-strong" : "border-border bg-surface text-text-2 hover:border-border-strong")}>
-                                <span className={cn("grid size-5 place-items-center rounded-md border transition", on ? "border-brand bg-brand text-brand-ink" : "border-border-strong")}>{on && <Check className="size-3.5" strokeWidth={3} />}</span>
-                                {label}
-                              </button>
-                            );
-                          })}
+                    )}
+                    {step === 1 && (
+                      <div className="grid gap-6">
+                        <Choice label="تعداد کارکنان *" options={EMPLOYEE_RANGES} value={form.employee_count} onPick={v => pick("employee_count", v)} testId="req-employees" />
+                        <Choice label="حجم سفارش ماهانه *" options={ORDER_VOLUMES} value={form.monthly_order_volume} onPick={v => pick("monthly_order_volume", v)} testId="req-volume" />
+                        <div className="grid gap-5 sm:grid-cols-2">
+                          <Field label="تعداد انبار" hint="اختیاری"><Input type="number" min={0} max={10000} value={form.warehouse_count} onChange={set("warehouse_count")} /></Field>
+                          <Field label="تعداد خودرو / راننده" hint="اختیاری"><Input type="number" min={0} max={100000} value={form.fleet_size} onChange={set("fleet_size")} /></Field>
                         </div>
-                      </div>
-                      <Field label="توضیحات" hint="اختیاری — نیاز خاص یا سؤالی که دارید"><Textarea rows={3} maxLength={2000} value={form.notes} onChange={set("notes")} /></Field>
-                    </div>
-                  )}
-                  {step === 2 && (
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <Field label="نام و نام خانوادگی مسئول *" className="sm:col-span-2"><Input required minLength={2} maxLength={100} value={form.contact_name} onChange={set("contact_name")} data-testid="req-contact-name" /></Field>
-                      <Field label="شماره همراه *" hint="مثل ۰۹۱۲۱۲۳۴۵۶۷"><Input className="ltr" required inputMode="tel" pattern="[0۰][9۹][0-9۰-۹]{9}" title={FORMAT_HINTS.mobile} value={form.contact_mobile} onChange={set("contact_mobile")} data-testid="req-mobile" /></Field>
-                      <Field label="ایمیل *"><Input className="ltr" type="email" required value={form.contact_email} onChange={set("contact_email")} data-testid="req-email" /></Field>
-                      <Field label="تلفن ثابت" hint="اختیاری"><Input className="ltr" inputMode="tel" value={form.phone} onChange={set("phone")} /></Field>
-                      <div className="sm:col-span-2">
-                        <Choice label={<>چطور با ما آشنا شدید؟ <span className="text-xs font-normal text-muted">(اختیاری — با کلیک دوباره، انتخاب برداشته می‌شود)</span></>}
-                          options={REFERRAL_SOURCES} value={form.referral_source} testId="req-referral" clearable
-                          onPick={v => setForm(f => ({ ...f, referral_source: v, referral_detail: v === f.referral_source ? f.referral_detail : "" }))} />
-                        {(form.referral_source === "other" || form.referral_source === "referral") && (
-                          <div className="mt-3 animate-rise">
-                            <Field label={form.referral_source === "other" ? "از کجا با ما آشنا شدید؟ *" : "معرف شما"} hint={form.referral_source === "other" ? undefined : "اختیاری — نام شخص یا شرکت معرف"}>
-                              <Input required={form.referral_source === "other"} minLength={form.referral_source === "other" ? 2 : undefined} maxLength={200}
-                                value={form.referral_detail} onChange={set("referral_detail")} data-testid="req-referral-detail"
-                                placeholder={form.referral_source === "other" ? "مثلاً پادکست، وبلاگ، آپارات، …" : "مثلاً شرکت نمونه"} />
-                            </Field>
+                        <div>
+                          <div className="mb-2 text-sm font-medium text-text-2">بخش‌های مورد نیاز *</div>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                            {Object.entries(FEATURES).map(([key, label]) => {
+                              const on = form.requested_features.includes(key);
+                              return (
+                                <button type="button" key={key} onClick={() => toggleFeature(key)} data-testid="req-feature" aria-pressed={on}
+                                  className={cn("flex items-center gap-2 rounded-xl border px-3 py-3 text-sm transition",
+                                    on ? "border-brand bg-brand-soft font-semibold text-brand-strong" : "border-border bg-surface text-text-2 hover:border-border-strong")}>
+                                  <span className={cn("grid size-5 place-items-center rounded-md border transition", on ? "border-brand bg-brand text-brand-ink" : "border-border-strong")}>{on && <Check className="size-3.5" strokeWidth={3} />}</span>
+                                  {label}
+                                </button>
+                              );
+                            })}
                           </div>
-                        )}
-                      </div>
-                      <div className="rounded-2xl border border-border bg-surface-2 p-4 text-sm sm:col-span-2">
-                        <div className="mb-2 font-bold">خلاصه</div>
-                        <div className="grid gap-1.5 text-text-2 sm:grid-cols-2">
-                          <span>{form.name || "—"} · {BUSINESS_TYPES[form.business_type] ?? "—"}</span>
-                          <span>{form.province} / {form.city}</span>
-                          <span>سفارش ماهانه: {ORDER_VOLUMES[form.monthly_order_volume] ?? "—"}</span>
-                          <span>{form.requested_features.map(f => FEATURES[f]).join("، ")}</span>
                         </div>
+                        <Field label="توضیحات" hint="اختیاری — نیاز خاص یا سؤالی که دارید"><Textarea rows={3} maxLength={2000} value={form.notes} onChange={set("notes")} /></Field>
                       </div>
-                      <p className="text-xs leading-6 text-muted sm:col-span-2" data-testid="req-terms">
-                        با ثبت درخواست، <Link to="/terms" target="_blank" className="font-medium text-brand hover:underline">قوانین و مقررات</Link> و <Link to="/privacy" target="_blank" className="font-medium text-brand hover:underline">سیاست حریم خصوصی</Link> {BRAND.nameFa} را می‌پذیرید.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                    {step === 2 && (
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <Field label="نام و نام خانوادگی مسئول *" className="sm:col-span-2"><Input required minLength={2} maxLength={100} value={form.contact_name} onChange={set("contact_name")} data-testid="req-contact-name" /></Field>
+                        <Field label="شماره همراه *" hint="مثل ۰۹۱۲۱۲۳۴۵۶۷"><Input className="ltr" required inputMode="tel" pattern="[0۰][9۹][0-9۰-۹]{9}" title={FORMAT_HINTS.mobile} value={form.contact_mobile} onChange={set("contact_mobile")} data-testid="req-mobile" /></Field>
+                        <Field label="ایمیل *"><Input className="ltr" type="email" required value={form.contact_email} onChange={set("contact_email")} data-testid="req-email" /></Field>
+                        <Field label="تلفن ثابت" hint="اختیاری"><Input className="ltr" inputMode="tel" value={form.phone} onChange={set("phone")} /></Field>
+                        <div className="sm:col-span-2">
+                          <Choice label={<>چطور با ما آشنا شدید؟ <span className="text-xs font-normal text-muted">(اختیاری — با کلیک دوباره، انتخاب برداشته می‌شود)</span></>}
+                            options={REFERRAL_SOURCES} value={form.referral_source} testId="req-referral" clearable
+                            onPick={v => setForm(f => ({ ...f, referral_source: v, referral_detail: v === f.referral_source ? f.referral_detail : "" }))} />
+                          {(form.referral_source === "other" || form.referral_source === "referral") && (
+                            <div className="mt-3 animate-rise">
+                              <Field label={form.referral_source === "other" ? "از کجا با ما آشنا شدید؟ *" : "معرف شما"} hint={form.referral_source === "other" ? undefined : "اختیاری — نام شخص یا شرکت معرف"}>
+                                <Input required={form.referral_source === "other"} minLength={form.referral_source === "other" ? 2 : undefined} maxLength={200}
+                                  value={form.referral_detail} onChange={set("referral_detail")} data-testid="req-referral-detail"
+                                  placeholder={form.referral_source === "other" ? "مثلاً پادکست، وبلاگ، آپارات، …" : "مثلاً شرکت نمونه"} />
+                              </Field>
+                            </div>
+                          )}
+                        </div>
+                        <div className="rounded-2xl border border-border bg-surface-2 p-4 text-sm sm:col-span-2">
+                          <div className="mb-2 font-bold">خلاصه</div>
+                          <div className="grid gap-1.5 text-text-2 sm:grid-cols-2">
+                            <span>{form.name || "—"} · {BUSINESS_TYPES[form.business_type] ?? "—"}</span>
+                            <span>{form.province} / {form.city}</span>
+                            <span>سفارش ماهانه: {ORDER_VOLUMES[form.monthly_order_volume] ?? "—"}</span>
+                            <span>{form.requested_features.map(f => FEATURES[f]).join("، ")}</span>
+                          </div>
+                        </div>
+                        <p className="text-xs leading-6 text-muted sm:col-span-2" data-testid="req-terms">
+                          با ثبت درخواست، <Link to="/terms" target="_blank" className="font-medium text-brand hover:underline">قوانین و مقررات</Link> و <Link to="/privacy" target="_blank" className="font-medium text-brand hover:underline">سیاست حریم خصوصی</Link> {BRAND.nameFa} را می‌پذیرید.
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
-                {error && <p className="mt-6 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger" data-testid="request-error">{error}</p>}
-                <div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-6">
-                  {step > 0 ? <Button type="button" variant="ghost" icon={<ArrowRight className="size-4" />} onClick={() => { setError(null); setStep(step - 1); }}>مرحله قبل</Button> : <span />}
-                  <Button type="submit" size="lg" loading={submit.isPending} data-testid={step < 2 ? "request-next" : "request-submit"}>
-                    {step < 2 ? <>مرحله بعد<ArrowLeft className="size-4" /></> : <>ثبت درخواست<ClipboardCheck className="size-4" /></>}
-                  </Button>
-                </div>
+                  {error && <p className="mt-6 rounded-xl bg-danger-soft px-4 py-3 text-sm text-danger" data-testid="request-error">{error}</p>}
+                  <div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-6">
+                    {step > 0 ? <Button type="button" variant="ghost" icon={<ArrowRight className="size-4" />} onClick={() => { setError(null); setStep(step - 1); }}>مرحله قبل</Button> : <span />}
+                    <Button type="submit" size="lg" loading={submit.isPending} data-testid={step < 2 ? "request-next" : "request-submit"}>
+                      {step < 2 ? <>مرحله بعد<ArrowLeft className="size-4" /></> : <>ثبت درخواست<ClipboardCheck className="size-4" /></>}
+                    </Button>
+                  </div>
+                </fieldset>
               </form>
             )}
             <StatusLookup />
@@ -255,7 +268,7 @@ function Choice({ label, options, value, onPick, className, testId, clearable = 
   );
 }
 
-function Success({ result, onAgain }: { result: Schemas["OrganizationRequestSubmitted"]; onAgain: () => void }) {
+function Success({ result, onAgain }: { result: Schemas["OrganizationRequestSubmitted"]; onAgain?: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="card overflow-hidden" data-testid="request-success">
@@ -273,7 +286,7 @@ function Success({ result, onAgain }: { result: Schemas["OrganizationRequestSubm
         </div>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link to="/" className={buttonClass("secondary")}>بازگشت به صفحه اصلی</Link>
-          <Button variant="ghost" onClick={onAgain}>ثبت درخواست دیگر</Button>
+          <Button variant="ghost" disabled={!onAgain} onClick={onAgain}>ثبت درخواست دیگر</Button>
         </div>
       </div>
     </div>

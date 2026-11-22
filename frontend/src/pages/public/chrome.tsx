@@ -5,6 +5,7 @@ import { ArrowLeft, LogIn, Menu as MenuIcon, PackageSearch, X } from "lucide-rea
 import { BRAND } from "@/brand";
 import { BrandWordmark, Logo, ThemeToggle } from "@/ui/brand";
 import { buttonClass, cn } from "@/ui/primitives";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { ScrollTrigger, gsap, useReducedMotion } from "./motion";
 
 /** صفحه‌های اطلاع‌رسانی (جدا از بخش‌های صفحه اصلی) */
@@ -97,7 +98,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
           </Link>
           <div className="hidden items-center gap-1.5 sm:flex">
             <Link to="/app/login" className={buttonClass("ghost")}><LogIn className="size-4" />ورود</Link>
-            <Link to="/request?plan=trial" className={buttonClass("primary")} data-testid="cta-request">شروع رایگان<ArrowLeft className="size-4" /></Link>
+            <RequestAccessLink to="/request?plan=trial" className={buttonClass("primary")} data-testid="cta-request">شروع رایگان<ArrowLeft className="size-4" /></RequestAccessLink>
           </div>
           <div className="sm:hidden">
             <button className={buttonClass("ghost", "icon")} onClick={() => setOpen(o => !o)} aria-label="منو" data-testid="mobile-menu">
@@ -113,7 +114,7 @@ export function PublicHeader({ landing = false }: { landing?: boolean }) {
           {SITE_PAGES.map(p => <Link key={p.to} to={p.to} onClick={() => setOpen(false)} className="block rounded-lg px-3 py-2.5 text-text-2 hover:bg-surface-2">{p.label}</Link>)}
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link to="/app/login" className={buttonClass("secondary")}>ورود</Link>
-            <Link to="/request?plan=trial" className={buttonClass("primary")}>شروع رایگان</Link>
+            <RequestAccessLink to="/request?plan=trial" className={buttonClass("primary")}>شروع رایگان</RequestAccessLink>
           </div>
         </div>
       )}
@@ -195,7 +196,7 @@ export function PublicFooter() {
         <div>
           <div className="eyebrow mb-4">شروع</div>
           <ul className="space-y-2.5 text-sm text-text-2">
-            <li><Link to="/request" className="inline-block py-1 hover:text-brand">درخواست دسترسی سازمان</Link></li>
+            <li><RequestAccessLink to="/request" className="inline-block py-1 hover:text-brand">درخواست دسترسی سازمان</RequestAccessLink></li>
             <li><Link to="/track" className="inline-block py-1 hover:text-brand">پیگیری سفارش</Link></li>
             <li><Link to="/request#status" className="inline-block py-1 hover:text-brand">پیگیری درخواست سازمان</Link></li>
             <li><Link to="/app/login" className="inline-block py-1 hover:text-brand">ورود به پنل</Link></li>

@@ -24,15 +24,19 @@ export const useVehicles = (enabled = true) =>
 export const useUsers = (enabled = true) =>
   useQuery({ queryKey: ["users"], queryFn: () => unwrap(api.GET("/users/")), enabled });
 
+const organizationRequestOptions = {
+  queryKey: ["organization-request-options"],
+  queryFn: async (): Promise<{ provinces: string[]; accepting_requests: boolean }> => {
+    const res = await fetch("/organization-requests/form-options");
+    if (!res.ok) throw new Error("دریافت تنظیمات فرم درخواست ممکن نبود.");
+    return res.json();
+  },
+};
+
+export const useOrganizationRequestOptions = () => useQuery({ ...organizationRequestOptions, staleTime: 60_000 });
+
 export const useProvinces = () =>
-  useQuery({
-    queryKey: ["provinces"],
-    queryFn: async () => {
-      const res = await fetch("/organization-requests/form-options");
-      return ((await res.json()) as { provinces: string[] }).provinces;
-    },
-    staleTime: Infinity,
-  });
+  useQuery({ ...organizationRequestOptions, select: options => options.provinces, staleTime: Infinity });
 
 type ExportPath =
   | "/reports/export/orders/excel" | "/reports/export/orders/pdf"

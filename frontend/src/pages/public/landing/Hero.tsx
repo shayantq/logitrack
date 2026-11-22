@@ -8,6 +8,7 @@ import { ArrowLeft, Check, ChevronsDown, CircleCheck, Package, Truck, Warehouse,
 import { BRAND } from "@/brand";
 import { useTheme } from "@/theme/ThemeProvider";
 import { faNumber } from "@/lib/format";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { buttonClass, cn } from "@/ui/primitives";
 import type { CityScene } from "../city/CityScene";
 import { TRIAL_DAYS } from "../content/pricing";
@@ -126,7 +127,7 @@ export function Hero() {
                   ))}
                 </ul>
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <Link to="/request?plan=trial" className={buttonClass("primary", "lg")} data-testid="hero-cta">{`${faNumber(TRIAL_DAYS)} روز رایگان امتحان کنید`}<ArrowLeft className="size-4" /></Link>
+                  <RequestAccessLink to="/request?plan=trial" className={buttonClass("primary", "lg")} data-testid="hero-cta">{`${faNumber(TRIAL_DAYS)} روز رایگان امتحان کنید`}<ArrowLeft className="size-4" /></RequestAccessLink>
                   <Link to="/pricing" className={buttonClass("secondary", "lg")}>تعرفه‌ها</Link>
                 </div>
                 {!reduced && (

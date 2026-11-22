@@ -7,6 +7,7 @@ import { api, errorMessage, unwrap } from "@/api/client";
 import { BRAND } from "@/brand";
 import { Logo, ThemeToggle } from "@/ui/brand";
 import { Button, Field, Input } from "@/ui/primitives";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 
 /** تصویر کوچک مسیر: انبار ← مسیر خط‌چین متحرک ← مقصد */
 function RouteIllustration() {
@@ -135,7 +136,7 @@ export default function LoginPage() {
         <Button type="submit" size="lg" className="w-full" loading={submitting}>ورود <ArrowLeft className="size-4" /></Button>
       </form>
       <p className="mt-8 text-center text-sm text-muted">
-        هنوز سازمانتان در {BRAND.nameFa} نیست؟ <Link to="/request" className="font-semibold text-brand hover:underline">درخواست استفاده بدهید</Link>
+        هنوز سازمانتان در {BRAND.nameFa} نیست؟ <RequestAccessLink to="/request" className="font-semibold text-brand hover:underline">درخواست استفاده بدهید</RequestAccessLink>
       </p>
     </AuthLayout>
   );

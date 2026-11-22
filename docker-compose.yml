@@ -80,6 +80,7 @@ services:
       <<: *app-env
       # دیتابیس کاملاً جدا برای تست‌های یکپارچگی — هرگز با DATABASE_URL اصلی قاطی نمی‌شود
       TEST_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-your_secure_password}@db:5432/logitrack_test
+      PUBLIC_ORGANIZATION_REQUESTS_ENABLED: ${PUBLIC_ORGANIZATION_REQUESTS_ENABLED:-false}
       # فقط اگر کلاینتی روی دامنه جدا دارید (با کاما جدا کنید)
       CORS_ORIGINS: ${CORS_ORIGINS:-}
     volumes:

@@ -1,6 +1,6 @@
 /** ماشین‌حساب پلن سفارشی: اسلایدر منابع، انتخاب ماژول‌ها، جزئیات قیمت لحظه‌ای و پیشنهاد پلن ثابت (همان فرمول قیمت پلن‌ها) */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { ArrowLeft, ClipboardList, Lightbulb, Minus, Plus, Truck, UserRound, Warehouse, type LucideIcon } from "lucide-react";
 import { buttonClass, cn } from "@/ui/primitives";
 import {
@@ -139,15 +139,15 @@ export function PricingCalculator({ billing, initial }: { billing: Billing; init
                 : match.saving > 0 ? `همه این نیازها را پوشش می‌دهد و ${fa(match.saving)} تومان در ماه ارزان‌تر است.`
                 : "با همین هزینه، همه این نیازها و ظرفیت بیشتری دارد."}
             </p>
-            <Link to={`/request?plan=${match.plan.id}`} className="mt-2 inline-flex items-center gap-1 font-bold underline-offset-4 hover:underline">
+            <RequestAccessLink to={`/request?plan=${match.plan.id}`} className="mt-2 inline-flex items-center gap-1 font-bold underline-offset-4 hover:underline">
               {match.kind === "trial" ? "شروع دوره آزمایشی" : `انتخاب پلن ${match.plan.name}`}<ArrowLeft className="size-4" />
-            </Link>
+            </RequestAccessLink>
           </div>
         )}
 
-        <Link to={`/request?${customToQuery(config)}`} className={buttonClass("primary", "lg", "mt-5 w-full")} data-testid="calc-cta">
+        <RequestAccessLink to={`/request?${customToQuery(config)}`} className={buttonClass("primary", "lg", "mt-5 w-full")} data-testid="calc-cta">
           ثبت درخواست با همین پلن<ArrowLeft className="size-4" />
-        </Link>
+        </RequestAccessLink>
         <p className="mt-3 text-center text-xs text-muted">مبالغ بدون احتساب مالیات بر ارزش افزوده است.</p>
       </aside>
 

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import * as Accordion from "@radix-ui/react-accordion";
 import { ArrowLeft, CalendarCheck, Check, ChevronDown, ClipboardList, Gift, Minus, Phone, Receipt, SlidersHorizontal, Truck, UserRound, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { BRAND } from "@/brand";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { buttonClass, cn } from "@/ui/primitives";
 import { InfoLayout } from "./InfoLayout";
 import { PricingCalculator } from "./PricingCalculator";
@@ -77,10 +78,10 @@ function PlanCard({ plan, billing, onCustomize }: { plan: Plan; billing: Billing
         {plan.id === "enterprise" ? (
           <div className="grid gap-2">
             <a href={`tel:${BRAND.phone}`} className={buttonClass("primary", "lg", "w-full")} data-testid="plan-cta"><Phone className="size-4" />{PRICING_PUBLISHED ? plan.cta : "تماس برای مشاوره"}</a>
-            <Link to={to} className={buttonClass("ghost", "md", "w-full")}>یا ثبت درخواست</Link>
+            <RequestAccessLink to={to} className={buttonClass("ghost", "md", "w-full")}>یا ثبت درخواست</RequestAccessLink>
           </div>
         ) : (
-          <Link to={to} className={buttonClass(plan.highlight ? "primary" : "secondary", "lg", "w-full")} data-testid="plan-cta">{trialBeforePricing ? "شروع دورهٔ آزمایشی" : plan.cta}<ArrowLeft className="size-4" /></Link>
+          <RequestAccessLink to={to} className={buttonClass(plan.highlight ? "primary" : "secondary", "lg", "w-full")} data-testid="plan-cta">{trialBeforePricing ? "شروع دورهٔ آزمایشی" : plan.cta}<ArrowLeft className="size-4" /></RequestAccessLink>
         )}
         {PRICING_PUBLISHED && plan.monthly > 0 && (
           <button type="button" onClick={onCustomize} data-testid="plan-customize"

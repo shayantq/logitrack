@@ -5,6 +5,7 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { ArrowLeft, Building2, Check, ChevronDown, ClipboardList, History, KeyRound, Layers, MapPin, Phone, ShieldCheck, Truck, UserCog } from "lucide-react";
 import { faNumber } from "@/lib/format";
 import { buttonClass, cn } from "@/ui/primitives";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { range, Reveal, ScrubText, SectionTag, useProgressState, useReducedMotion } from "../motion";
 import { ALL_FAQ, LANDING_FAQ_IDS } from "../content/faq";
 
@@ -183,7 +184,7 @@ export function HowSection() {
         <div className="lg:sticky lg:top-32 lg:h-fit">
           <SectionTag label="شروع کار" />
           <ScrubText className="text-3xl font-black leading-tight tracking-tight sm:text-5xl" text="از ثبت‌نام تا اولین تحویل، در چهار قدم." />
-          <Link to="/request?plan=trial" className={buttonClass("primary", "lg", "mt-8")}>شروع رایگان<ArrowLeft className="size-4" /></Link>
+          <RequestAccessLink to="/request?plan=trial" className={buttonClass("primary", "lg", "mt-8")}>شروع رایگان<ArrowLeft className="size-4" /></RequestAccessLink>
         </div>
         <ol ref={list} className="flex flex-col gap-6">
           {HOW.map((step, i) => {
@@ -300,9 +301,9 @@ export function CtaSection() {
               <p className="mt-5 max-w-xl text-lg leading-8 opacity-85">فرم کوتاه درخواست را پر کنید؛ پس از تأیید، سازمان شما ساخته می‌شود و همان روز اولین سفارش را ثبت می‌کنید.</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-              <Link to="/request?plan=trial" className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-bg px-8 font-bold text-text shadow-lg transition hover:scale-[1.02]">
+              <RequestAccessLink to="/request?plan=trial" className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-bg px-8 font-bold text-text shadow-lg transition hover:scale-[1.02]">
                 <Building2 className="size-5" />شروع رایگان
-              </Link>
+              </RequestAccessLink>
               <Link to="/app/login" className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-current/30 px-8 font-bold transition hover:bg-white/10">
                 <KeyRound className="size-5" />ورود به پنل
               </Link>

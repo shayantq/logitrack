@@ -7,6 +7,7 @@ import {
 import { BRAND } from "@/brand";
 import { BUSINESS_TYPES } from "@/lib/labels";
 import { buttonClass } from "@/ui/primitives";
+import { RequestAccessLink } from "@/components/RequestAccessLink";
 import { InfoLayout } from "./InfoLayout";
 import { CountUp, Reveal, ScrubText, SectionTag } from "./motion";
 
@@ -50,7 +51,7 @@ export default function AboutPage() {
       lead={`${BRAND.nameFa} سامانه‌ای ابری برای کسب‌وکارهای ایرانی است که سفارش، موجودی انبار، رانندگان و ارسال را در یک‌جا و به‌صورت شفاف مدیریت می‌کند — از لحظه ثبت سفارش تا ثبت نظر مشتری.`}
       hero={
         <div className="flex flex-wrap gap-3">
-          <Link to="/request" className={buttonClass("primary", "lg")}>درخواست دسترسی</Link>
+          <RequestAccessLink to="/request" className={buttonClass("primary", "lg")}>درخواست دسترسی</RequestAccessLink>
           <Link to="/faq" className={buttonClass("secondary", "lg")}>سوالات متداول</Link>
         </div>
       }>

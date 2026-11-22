@@ -53,6 +53,7 @@ def _valid_request(**overrides) -> dict:
 @pytest.fixture(autouse=True)
 def _isolated_storage_and_limits(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "MEDIA_ROOT", tmp_path / "media")
+    monkeypatch.setenv("PUBLIC_ORGANIZATION_REQUESTS_ENABLED", "true")
     organization_request_limiter.reset()
     yield
     organization_request_limiter.reset()
@@ -94,6 +95,24 @@ def _submit(client, **overrides):
 # ---------------------------------------------------------------------------
 # فرم عمومی
 # ---------------------------------------------------------------------------
+
+def test_public_registration_closed_by_default_without_blocking_tracking(env, monkeypatch):
+    client, db, *_ = env
+    existing = _submit(client)
+    assert existing.status_code == 201
+    code = existing.json()["tracking_code"]
+
+    monkeypatch.delenv("PUBLIC_ORGANIZATION_REQUESTS_ENABLED", raising=False)
+    options = client.get("/organization-requests/form-options").json()
+    assert options["accepting_requests"] is False
+    assert "قزوین" in options["provinces"]
+
+    paused = _submit(client, national_id="10101234568")
+    assert paused.status_code == 503
+    assert paused.json()["detail"] == "این بخش بزودی فعال میشود"
+    assert db.query(OrganizationRequest).count() == 1
+    assert client.get(f"/organization-requests/status/{code}").json()["status"] == "pending"
+
 
 def test_submit_request_normalizes_and_returns_tracking_code(env):
     client, db, *_ = env
