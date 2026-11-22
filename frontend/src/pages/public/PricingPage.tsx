@@ -123,14 +123,19 @@ const PROMISES: [LucideIcon, string, string][] = [
 
 function CompareTable() {
   return (
-    <div className="overflow-x-auto rounded-3xl border border-border bg-surface" data-testid="pricing-compare">
-      <table className="w-full min-w-[720px] text-sm">
+    <div role="region" aria-labelledby="pricing-compare-heading" tabIndex={0}
+      className="snap-x snap-mandatory overflow-x-auto scroll-ps-[40%] rounded-3xl border border-border bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:snap-none sm:scroll-ps-0" data-testid="pricing-compare">
+      <table className="w-[160%] table-fixed text-sm sm:w-full">
+        <colgroup>
+          <col className="w-1/4 sm:w-48 lg:w-80" />
+          <col span={PLANS.length} />
+        </colgroup>
         <thead>
           <tr className="border-b border-border bg-surface-2">
-            <th className="sticky right-0 z-10 bg-surface-2 px-5 py-4 text-start font-semibold text-text-2">امکانات</th>
+            <th scope="col" className="sticky start-0 z-10 bg-surface-2 px-3 py-4 text-start font-semibold text-text-2 sm:px-5">امکانات</th>
             {PLANS.map(p => (
-              <th key={p.id} className={cn("px-4 py-4 text-center", p.highlight && "bg-brand-soft/60")}>
-                <div className={cn("text-base font-black", p.highlight ? "text-brand" : "text-text")}>{p.name}</div>
+              <th key={p.id} scope="col" className={cn("snap-start px-2 py-4 text-center sm:px-4", p.highlight && "bg-brand-soft/60")}>
+                <div className={cn("font-black sm:text-base", p.highlight ? "text-brand" : "text-text")}>{p.name}</div>
               </th>
             ))}
           </tr>
@@ -138,15 +143,17 @@ function CompareTable() {
         {FEATURE_GROUPS.map(group => (
           <tbody key={group.title}>
             <tr className="border-b border-border">
-              <th colSpan={PLANS.length + 1} className="bg-bg-2 px-5 py-2.5 text-start text-sm font-bold">{group.title}</th>
+              <th scope="rowgroup" colSpan={PLANS.length + 1} className="bg-bg-2 text-start font-bold">
+                <span className="sticky start-0 inline-block px-3 py-2.5 sm:px-5">{group.title}</span>
+              </th>
             </tr>
             {group.rows.map(f => (
               <tr key={f.label} className="border-b border-border">
-                <td className="sticky right-0 z-10 bg-surface px-5 py-3.5 text-text-2">{f.label}</td>
+                <th scope="row" className="sticky start-0 z-10 bg-surface px-3 py-2.5 text-start font-normal text-text-2 sm:px-5 sm:py-3.5">{f.label}</th>
                 {PLANS.map(p => {
                   const v = f.values[p.id];
                   return (
-                    <td key={p.id} className={cn("px-4 py-3.5 text-center", p.highlight && "bg-brand-soft/30")}>
+                    <td key={p.id} className={cn("px-2 py-2.5 text-center sm:px-4 sm:py-3.5", p.highlight && "bg-brand-soft/30")}>
                       {v === true ? <Check className="mx-auto size-5 text-success" aria-label="دارد" />
                         : v === false ? <Minus className="mx-auto size-4 text-border-strong" aria-label="ندارد" />
                         : <span className="font-medium">{v}</span>}
@@ -223,8 +230,8 @@ export default function PricingPage() {
         </section>
 
         <div className="mt-20">
-          <h2 className="text-2xl font-black tracking-tight sm:text-3xl">مقایسه کامل پلن‌ها</h2>
-          <p className="mt-2 text-text-2">همه امکانات، کنار هم.</p>
+          <h2 id="pricing-compare-heading" className="text-2xl font-black tracking-tight sm:text-3xl">مقایسه کامل پلن‌ها</h2>
+          <p className="mt-2 text-sm text-text-2 sm:hidden">برای دیدن پلن‌های دیگر، جدول را به چپ و راست بکشید.</p>
           <div className="mt-6"><CompareTable /></div>
         </div>
 

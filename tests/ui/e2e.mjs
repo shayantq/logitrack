@@ -1781,6 +1781,34 @@ await session("mobile-overflow", null, null, async page => {
     const { sw, w } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, w: innerWidth }));
     check("mobile", `${path} has no horizontal overflow`, sw <= w, `${sw} > ${w}`);
   }
+
+  await page.goto(`${BASE}/pricing`);
+  const comparison = page.getByTestId("pricing-compare");
+  const edges = await comparison.evaluate(async region => {
+    const headers = [...region.querySelectorAll("thead th")];
+    const groups = [...region.querySelectorAll("th[scope=rowgroup] span")];
+    const left = region.getBoundingClientRect().left + region.clientLeft;
+    const right = left + region.clientWidth;
+    const fits = (element, edge) => {
+      const rect = element.getBoundingClientRect();
+      return rect.left >= left - 1 && rect.right <= edge + 1;
+    };
+    const inspect = async (scrollLeft, plans) => {
+      region.scrollLeft = scrollLeft;
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const features = headers[0].getBoundingClientRect();
+      return {
+        scrollLeft: region.scrollLeft,
+        featuresPinned: Math.abs(features.right - right) <= 1,
+        plansFit: plans.every(plan => fits(plan, features.left)),
+        groupsFit: groups.length > 0 && groups.every(group => fits(group, right)),
+      };
+    };
+    return [await inspect(0, headers.slice(1, 3)), await inspect(-region.scrollWidth, headers.slice(-2))];
+  });
+  check("mobile", "pricing plans fit next to pinned features at both scroll ends",
+    edges[1].scrollLeft < 0 && edges.every(edge => edge.featuresPinned && edge.plansFit), JSON.stringify(edges));
+  check("mobile", "pricing group titles stay visible while scrolling", edges.every(edge => edge.groupsFit));
 }, { viewport: { width: 390, height: 844 } });
 
 // ---------------- نقطه سفارش هوشمند و برآورد سرمایه خرید ----------------
